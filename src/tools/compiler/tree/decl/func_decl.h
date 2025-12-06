@@ -10,7 +10,9 @@ struct FuncDeclNode : public DeclNode{
 	StmtSeqNode *stmts;
 	FuncType *sem_type;
 	Environ *sem_env;
-	FuncDeclNode( const std::string &i,const std::string &t,DeclSeqNode *p,StmtSeqNode *ss ):ident(i),tag(t),params(p),stmts(ss){}
+	int accessMod;  // Access modifier: DECL_PRIVATE, DECL_PUBLIC, or 0
+	std::string ownerClassName;  // Class that owns this method (empty for regular functions)
+	FuncDeclNode( const std::string &i,const std::string &t,DeclSeqNode *p,StmtSeqNode *ss,int access=0,const std::string &owner="" ):ident(i),tag(t),params(p),stmts(ss),accessMod(access),ownerClassName(owner){}
 	~FuncDeclNode(){ delete params;delete stmts; }
 	void proto( DeclSeq *d,Environ *e );
 	void semant( Environ *e );

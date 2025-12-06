@@ -33,6 +33,24 @@ ExprNode *MethodCallNode::semant( Environ *e ){
 		ex( "Method '" + method + "' not found in class '" + st->ident + "' or its parents" );
 	}
 
+	// Check access control for private methods
+	if( sem_decl->kind & DECL_PRIVATE ){
+		StructType *currentClass = e->getCurrentClass();
+		// Private methods can only be called from within the same class
+		if( !currentClass || currentClass != sem_decl->ownerClass ){
+			ex( "Cannot access private method '" + method + "'" );
+		}
+	}
+
+	// Check access control for protected methods
+	// Protected methods can be called from the same class or any subclass
+	if( sem_decl->kind & DECL_PROTECTED ){
+		StructType *currentClass = e->getCurrentClass();
+		if( !currentClass || !currentClass->isSubclassOf( sem_decl->ownerClass ) ){
+			ex( "Cannot access protected method '" + method + "'" );
+		}
+	}
+
 	FuncType *f = sem_decl->type->funcType();
 	if( t && f->returnType != t ) ex( "incorrect method return type" );
 

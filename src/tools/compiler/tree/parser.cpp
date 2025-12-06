@@ -735,31 +735,51 @@ DeclNode *Parser::parseClassDecl(){
 	while( toker->curr()=='\n' ) toker->next();
 	a_ptr<DeclSeqNode> fields( d_new DeclSeqNode() );
 	a_ptr<DeclSeqNode> methods( d_new DeclSeqNode() );
-	while( toker->curr()==FIELD || toker->curr()==METHOD || toker->curr()==STATIC ){
+	while( toker->curr()==FIELD || toker->curr()==METHOD || toker->curr()==STATIC ||
+	       toker->curr()==PRIVATE || toker->curr()==PUBLIC || toker->curr()==PROTECTED ){
+		// Check for access modifier
+		int accessMod = 0;  // Default is public (no flag)
+		if( toker->curr()==PRIVATE ){
+			accessMod = DECL_PRIVATE;
+			toker->next();
+		}else if( toker->curr()==PUBLIC ){
+			accessMod = DECL_PUBLIC;
+			toker->next();
+		}else if( toker->curr()==PROTECTED ){
+			accessMod = DECL_PROTECTED;
+			toker->next();
+		}
+
 		if( toker->curr()==FIELD ){
 			do{
 				toker->next();
-				fields->push_back( parseVarDecl( DECL_FIELD,false ) );
+				DeclNode *fieldDecl = parseVarDecl( DECL_FIELD | accessMod, false );
+				fields->push_back( fieldDecl );
 			}while( toker->curr()==',' );
 		}else if( toker->curr()==STATIC ){
 			toker->next();
 			if( toker->curr()!=METHOD ) exp( "'Method'" );
 			toker->next();
-			methods->push_back( parseMethodDecl( ident, true ) );  // isStatic=true
+			DeclNode *methodDecl = parseMethodDecl( ident, true, accessMod );  // isStatic=true
+			methods->push_back( methodDecl );
 		}else if( toker->curr()==METHOD ){
 			toker->next();
-			methods->push_back( parseMethodDecl( ident, false ) );  // isStatic=false
+			DeclNode *methodDecl = parseMethodDecl( ident, false, accessMod );  // isStatic=false
+			methods->push_back( methodDecl );
+		}else if( accessMod ){
+			// Access modifier without Field or Method
+			exp( "'Field' or 'Method'" );
 		}
 		while( toker->curr()=='\n' ) toker->next();
 	}
-	if( toker->curr()!=ENDCLASS ) exp( "'Field', 'Method', 'Static' or 'End Class'" );
+	if( toker->curr()!=ENDCLASS ) exp( "'Field', 'Method', 'Static', 'Private', 'Public', 'Protected' or 'End Class'" );
 	toker->next();
 	DeclNode *d=d_new ClassDeclNode( ident,superName,fields.release(),methods.release() );
 	d->pos=pos;d->file=incfile;
 	return d;
 }
 
-DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic ){
+DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic, int accessMod ){
 	int pos=toker->pos();
 	std::string methodName=parseIdent();
 	std::string tag=parseTypeTag();
@@ -799,8 +819,8 @@ DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic )
 	StmtNode *ret=d_new ReturnNode(0);ret->pos=toker->pos();
 	stmts->push_back( ret );toker->next();
 
-	// Create as a regular function declaration
-	DeclNode *d=d_new FuncDeclNode( funcName,tag,params.release(),stmts.release() );
+	// Create as a regular function declaration with access modifier and owner class
+	DeclNode *d=d_new FuncDeclNode( funcName,tag,params.release(),stmts.release(),accessMod,className );
 	d->pos=pos;d->file=incfile;
 	return d;
 }

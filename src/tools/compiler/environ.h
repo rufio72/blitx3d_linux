@@ -41,6 +41,9 @@ public:
 	Label *insertLabel( const std::string &s,int def,int src,int sz );
 
 	std::string setBreak( const std::string &s );
+
+	// Returns the class type if we're inside a method of that class, null otherwise
+	StructType *getCurrentClass();
 };
 
 #endif

@@ -58,7 +58,7 @@ private:
 	DeclNode *parseFuncDecl();
 	DeclNode *parseStructDecl();
 	DeclNode *parseClassDecl();
-	DeclNode *parseMethodDecl( const std::string &className, bool isStatic=false );
+	DeclNode *parseMethodDecl( const std::string &className, bool isStatic=false, int accessMod=0 );
 
 	ExprSeqNode *parseExprSeq();
 

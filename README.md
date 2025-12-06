@@ -88,6 +88,22 @@ to generate the documentation.
 $ make help
 ```
 
+## New Features
+
+### Object-Oriented Programming (OOP)
+
+Blitz3D-NG introduces full OOP support with the following features:
+
+- **Classes**: Define custom types with `Class...End Class`
+- **Methods**: Member functions with `Method...End Method`
+- **Constructors**: Automatic initialization with `Method New()`
+- **Inheritance**: Extend classes with the `Extends` keyword
+- **Self/Super**: Access current instance and parent class methods
+- **Static Methods**: Class-level functions with `Static Method`
+- **Access Modifiers**: `Private`, `Protected`, and `Public` visibility control
+
+See the full [OOP Documentation](docs/OOP.md) for details and examples.
+
 ## Roadmap
 
 - Add misc. quick fixes & improvements (i.e., add "missing" features like [BlitzClose](http://www.blitzbasic.com/codearcs/codearcs.php?code=832).)

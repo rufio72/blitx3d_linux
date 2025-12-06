@@ -65,3 +65,13 @@ std::string Environ::setBreak( const std::string &s ){
 	std::string t=breakLabel;
 	breakLabel=s;return t;
 }
+
+StructType *Environ::getCurrentClass(){
+	// Look for 'self' parameter which indicates we're in a method
+	Decl *self = decls->findDecl( "self" );
+	if( self && (self->kind & DECL_PARAM) ){
+		// 'self' is a parameter, get its struct type
+		return self->type->structType();
+	}
+	return 0;
+}

@@ -8,8 +8,17 @@ void FuncDeclNode::proto( DeclSeq *d,Environ *e ){
 	a_ptr<DeclSeq> decls( d_new DeclSeq() );
 	params->proto( decls,e );
 	sem_type=d_new FuncType( t,decls.release(),false,false );
-	if( !d->insertDecl( ident,sem_type,DECL_FUNC ) ){
+	// Include access modifier in the declaration kind
+	Decl *decl = d->insertDecl( ident,sem_type,DECL_FUNC | accessMod );
+	if( !decl ){
 		delete sem_type;ex( "duplicate identifier" );
+	}
+	// Set owner class if this is a method
+	if( !ownerClassName.empty() ){
+		Type *ownerType = e->findType( ownerClassName );
+		if( ownerType && ownerType->structType() ){
+			decl->ownerClass = ownerType->structType();
+		}
 	}
 	e->types.push_back( sem_type );
 }

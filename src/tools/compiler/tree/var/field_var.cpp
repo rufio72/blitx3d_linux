@@ -9,6 +9,24 @@ void FieldVarNode::semant( Environ *e ){
 	if( !s ) ex( "Variable must be a Type" );
 	sem_field=s->fields->findDecl( ident );
 	if( !sem_field ) ex( "Type field not found" );
+
+	// Check access control for private fields
+	if( sem_field->kind & DECL_PRIVATE ){
+		StructType *currentClass = e->getCurrentClass();
+		if( !currentClass || currentClass != s ){
+			ex( "Cannot access private field '" + ident + "'" );
+		}
+	}
+
+	// Check access control for protected fields
+	// Protected fields can be accessed from the same class or any subclass
+	if( sem_field->kind & DECL_PROTECTED ){
+		StructType *currentClass = e->getCurrentClass();
+		if( !currentClass || !currentClass->isSubclassOf( s ) ){
+			ex( "Cannot access protected field '" + ident + "'" );
+		}
+	}
+
 	sem_type=sem_field->type;
 }
 

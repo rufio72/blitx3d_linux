@@ -43,6 +43,9 @@ static void makeKeywords(){
 	alphaTokes["Super"]=SUPER;
 	alphaTokes["Extends"]=EXTENDS;
 	alphaTokes["Static"]=STATIC;
+	alphaTokes["Private"]=PRIVATE;
+	alphaTokes["Public"]=PUBLIC;
+	alphaTokes["Protected"]=PROTECTED;
 	alphaTokes["Local"]=LOCAL;
 	alphaTokes["Global"]=GLOBAL;
 	alphaTokes["Field"]=FIELD;

@@ -11,18 +11,22 @@ using namespace nlohmann;
 
 enum{
 	DECL_FUNC=1,DECL_ARRAY=2,DECL_STRUCT=4,						//NOT vars
-	DECL_GLOBAL=8,DECL_LOCAL=16,DECL_PARAM=32,DECL_FIELD=64		//ARE vars
+	DECL_GLOBAL=8,DECL_LOCAL=16,DECL_PARAM=32,DECL_FIELD=64,	//ARE vars
+	DECL_PRIVATE=128,DECL_PUBLIC=256,DECL_PROTECTED=512			//Access modifiers
 };
 
 struct Type;
 struct ConstType;
+
+struct StructType;
 
 struct Decl{
 	std::string name;
 	Type *type;			//type
 	int kind,offset;
 	ConstType *defType;	//default value
-	Decl( const std::string &s,Type *t,int k,ConstType *d=0 ):name(s),type(t),kind(k),defType(d)
+	StructType *ownerClass;	//class that owns this member (for access control)
+	Decl( const std::string &s,Type *t,int k,ConstType *d=0 ):name(s),type(t),kind(k),defType(d),ownerClass(0)
 #ifdef USE_LLVM
 	,arg_index(0)
 	,ptr(0)

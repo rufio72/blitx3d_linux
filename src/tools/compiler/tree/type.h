@@ -99,6 +99,16 @@ struct StructType : public Type{
 	StructType *structType(){ return this; }
 	virtual bool canCastTo( Type *t );
 
+	// Check if this class inherits from (or is) the given class
+	bool isSubclassOf( StructType *base ){
+		StructType *derived = this;
+		while( derived ){
+			if( derived == base ) return true;
+			derived = derived->superType;
+		}
+		return false;
+	}
+
 #ifdef USE_LLVM
 	llvm::StructType *structtype=0;
 	llvm::StructType *deftype=0;

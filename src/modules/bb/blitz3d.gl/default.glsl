@@ -15,6 +15,7 @@ uniform samplerCube bbTextureCube[8];
 struct BBLightData {
   mat4 TForm;
   vec4 Color;
+  vec4 Direction; // Optimization #8: Pre-computed light direction from CPU
 } ;
 
 layout(std140) uniform BBLightState {
@@ -140,7 +141,9 @@ void main() {
     for( int i=0;i<LS.LightsUsed;i++ ){
       float nDotVP,nDotHV,pf;
 
-      vec3 LightPos=normalize( mat3( bbViewMatrix*LS.Light[i].TForm*rotationMatrix( vec3(1.0,0.0,0.0), 1.5708 ) )*vec3(0.0,1.0,0.0) );
+      // Optimization #8: Use pre-computed light direction from CPU
+      // This eliminates the expensive rotationMatrix() calculation per vertex
+      vec3 LightPos = LS.Light[i].Direction.xyz;
       vec3 halfVector = normalize( LightPos+vec3( 0.0,0.0,-1.0 ));
 
       nDotVP = max( 0.0,dot( bbVertex_Normal,LightPos ) );

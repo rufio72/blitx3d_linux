@@ -1,5 +1,5 @@
-; OpenGL Performance Benchmark
-; Tests rendering performance with multiple objects
+; OpenGL Performance Benchmark v2
+; Tests rendering performance with multiple objects and various scenarios
 
 Graphics3D 800,600,0,2
 SetBuffer BackBuffer()

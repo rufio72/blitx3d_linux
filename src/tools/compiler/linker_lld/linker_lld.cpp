@@ -46,7 +46,7 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 	std::string libdir=toolchain+"/lib";
 
 	bool android=(target.type=="android"||target.type=="ovr");
-	std::string androidsdk,ndkroot,sysroot,ndktriple,ndkarch;
+	std::string androidsdk,ndkroot,sysroot,ndktriple,ndkarch,ndkapi;
 	if( android ){
 		char *androidhome=getenv("ANDROID_HOME");
 		// TODO: verify environment at the start...
@@ -65,7 +65,7 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 		ndkroot=std::string( ndkhome )+"/toolchains/llvm/prebuilt/" UNAME "-x86_64";
 		sysroot=ndkroot+"/sysroot";
 
-		if( target.arch=="arm64-v8a" ){
+		if( target.arch=="arm64-v8a" || target.arch=="arm64" ){
 			ndktriple="aarch64-linux-android";
 			ndkarch="aarch64";
 		}else if( target.arch=="armeabi-v7a" ){
@@ -77,6 +77,13 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 		}else if( target.arch=="x86" ){
 			ndktriple="i686-linux-android";
 			ndkarch="x86";
+		}
+
+		// Extract API level from version string (e.g., "android-24" -> "24")
+		ndkapi=target.version;
+		size_t dashpos=ndkapi.rfind('-');
+		if( dashpos!=std::string::npos ){
+			ndkapi=ndkapi.substr(dashpos+1);
 		}
 	}
 
@@ -221,12 +228,12 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 		args.push_back("--enable-new-dtags");
 		args.push_back("--eh-frame-hdr");
 
-		args.push_back( sysroot+"/usr/lib/"+ndktriple+"/"+target.version+"/crtbegin_so.o");
+		args.push_back( sysroot+"/usr/lib/"+ndktriple+"/"+ndkapi+"/crtbegin_so.o");
 		args.push_back("-L");args.push_back( ndkroot+"/lib64/clang/11.0.5/lib/linux/"+ndkarch);
 		args.push_back("-L");args.push_back( ndkroot+"/lib/gcc/"+ndktriple+"/4.9.x");
 		args.push_back("-L");args.push_back( ndkroot+"/"+ndktriple+"/lib64");
 		args.push_back("-L");args.push_back( ndkroot+"/"+ndktriple+"/lib");
-		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"/"+target.version);
+		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"/"+ndkapi);
 		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"");
 		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib");
 	}else if( nx ){
@@ -427,10 +434,10 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 	}else if( android ){
 		args.push_back("-l");args.push_back("c++_static");
 		args.push_back("-l");args.push_back("c++abi");
-		//args.push_back("-l");args.push_back("gcc");
 		args.push_back("-l");args.push_back("c");
-		//args.push_back("-l");args.push_back("gcc");
-		args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"/"+target.version+"/crtend_so.o" );
+		// Link compiler-rt builtins for atomic operations support
+		args.push_back( ndkroot+"/lib/clang/17/lib/linux/libclang_rt.builtins-"+ndkarch+"-android.a" );
+		args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"/"+ndkapi+"/crtend_so.o" );
 	}else if( nx ){
 		std::string gcc=devkitpro+"/devkitA64/lib/gcc/aarch64-none-elf/"+target.version+"/pic";
 		args.push_back( "-L"+devkitpro+"/devkitA64/aarch64-none-elf/lib/pic" );

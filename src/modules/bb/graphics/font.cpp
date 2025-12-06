@@ -100,9 +100,44 @@ bool lookupFontData( const std::string &fontName,BBFontData &font ){
 	return false;
 }
 #else
+#ifdef BB_NDK
+// Android: use system fonts from /system/fonts/
+bool lookupFontData( const std::string &fontName,BBFontData &font ){
+	// Map common font names to Android system fonts
+	std::string fontPath;
+	std::string lowerName=tolower(fontName);
+
+	if( lowerName.find("courier")!=std::string::npos || lowerName.find("mono")!=std::string::npos ){
+		fontPath="/system/fonts/DroidSansMono.ttf";
+	}else if( lowerName.find("serif")!=std::string::npos ){
+		fontPath="/system/fonts/NotoSerif-Regular.ttf";
+	}else{
+		// Default to DroidSans (similar to sans-serif)
+		fontPath="/system/fonts/DroidSans.ttf";
+	}
+
+	std::ifstream file( fontPath,std::ios::binary|std::ios::ate );
+	if( !file.is_open() ){
+		// Fallback to Roboto if DroidSans not found
+		fontPath="/system/fonts/Roboto-Regular.ttf";
+		file.open( fontPath,std::ios::binary|std::ios::ate );
+		if( !file.is_open() ) return false;
+	}
+
+	font.size=file.tellg();
+	file.seekg( 0,std::ios::beg );
+
+	font.data=new unsigned char[font.size];
+	if( file.read( (char*)font.data,font.size ) ){
+		return true;
+	}
+	return false;
+}
+#else
 bool lookupFontData( const std::string &fontName,BBFontData &font ){
 	return false;
 }
+#endif
 #endif
 #endif
 #endif

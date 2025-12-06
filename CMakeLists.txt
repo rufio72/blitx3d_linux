@@ -20,6 +20,11 @@ if(ANDROID)
   include(UseJava)
   set(CMAKE_JAVA_COMPILE_FLAGS -source 1.8 -target 1.8)
   set(ANDROID_JAR $ENV{ANDROID_HOME}/platforms/android-${ANDROID_PLATFORM}/android.jar)
+  # Disable outline atomics globally for all targets to fix __aarch64_* symbol errors on older Android devices
+  if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mno-outline-atomics")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-outline-atomics")
+  endif()
 endif()
 
 # TODO: make this toggleable
@@ -123,6 +128,10 @@ ELSEIF(BB_PLATFORM MATCHES ios)
 ELSEIF(BB_PLATFORM MATCHES android)
   set (BB_ANDROID true)
   add_definitions(-DBB_ANDROID)
+  # Disable outline atomics to fix __aarch64_swp4_acq_rel symbol errors on older Android devices
+  if(BB_ARCH MATCHES arm64)
+    add_compile_options(-mno-outline-atomics)
+  endif()
 ELSEIF(BB_PLATFORM MATCHES ovr)
   set (BB_OVR true)
   set (OVR_HOME ${PROJECT_SOURCE_DIR}/ovr-sdk)

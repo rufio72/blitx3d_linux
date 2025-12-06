@@ -109,11 +109,16 @@ void Codegen_LLVM::SetTarget( const ::Target &t ){
 		exit( 1 );
 	}
 
-	auto cpu="generic",features="";
+	auto cpu="generic";
+	std::string features="";
+	// Disable outline atomics for Android ARM64 to avoid __aarch64_* symbol errors on older devices
+	if( (t.type=="android" || t.type=="ovr") && (t.arch=="arm64" || t.arch=="arm64-v8a") ){
+		features="-outline-atomics";
+	}
 	llvm::TargetOptions opt;
 	auto rm=std::optional<llvm::Reloc::Model>( llvm::Reloc::PIC_ );
 	auto cm=std::optional<llvm::CodeModel::Model>( llvm::CodeModel::Model::Small );
-	targetMachine=targ->createTargetMachine( t.triple,cpu,features,opt,rm,cm );
+	targetMachine=targ->createTargetMachine( t.triple,cpu,features.c_str(),opt,rm,cm );
 
 	module->setTargetTriple( t.triple );
 	module->setDataLayout( targetMachine->createDataLayout() );

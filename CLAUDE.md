@@ -117,3 +117,54 @@ OOP test samples in `_release/samples/oop/`:
 - `deps/`: Third-party dependencies (submodules)
 - `_release/`: Output directory with built binaries and help files
 - `CHANGES.md`: Document of changes from original Blitz3D
+
+## Android Build
+
+### Prerequisites
+```bash
+# Install Android SDK Command Line Tools, then:
+sdkmanager "ndk;26.1.10909125" "build-tools;34.0.0" "cmake;3.22.1" "platforms;android-34" "platforms;android-24"
+```
+
+### Environment Variables (REQUIRED)
+```bash
+export ANDROID_HOME=/home/rufio72/Android/Sdk
+export ANDROID_NDK_HOME=/home/rufio72/Android/Sdk/ndk/26.1.10909125
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+```
+
+### Build Android Runtime
+```bash
+cd /home/rufio72/b3d
+cmake -G Ninja -B build-android \
+  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+  -DANDROID_PLATFORM=24 \
+  -DANDROID_ABI=arm64-v8a \
+  -DARCH=arm64 \
+  -DBB_PLATFORM=android
+ninja -C build-android
+```
+
+### Compile BB to APK
+```bash
+export blitzpath=/home/rufio72/b3d/_release
+blitzcc -target arm64-android-24 -o game.apk game.bb
+```
+
+### Important Android Notes
+- **Toolchain location**: `_release/bin/arm64-android-24/`
+- **JAR files**: SDL.jar and Runtime.jar in `_release/bin/arm64-android-24/lib/`
+- **minSdk**: 24 (Android 7.0), **targetSdk**: 34 (Android 14)
+- **-mno-outline-atomics**: Added in CMakeLists.txt to fix `__aarch64_swp4_acq_rel` symbol errors on older Android devices
+
+### Android Linker (linker_lld.cpp)
+- Extracts API level from version string (e.g., "android-24" -> "24")
+- Supports arch "arm64" and "arm64-v8a"
+- Uses NDK clang 17 paths (not old 11.0.5 paths)
+
+### Android Packager (package_apk.cpp)
+- Uses build-tools 34.0.0
+- Uses `d8` instead of deprecated `dx` for DEX
+- Uses android-34/android.jar for Java compilation
+- Default package: `com.blitz3dng.game`
+- Default app name: `Blitz3D Game`

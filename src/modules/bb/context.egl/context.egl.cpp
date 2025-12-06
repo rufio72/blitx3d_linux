@@ -255,7 +255,9 @@ void EGLContextDriver::flip( bool vwait ){
 }
 
 static BBContextDriver *createEGLContext( const std::string &name ){
-	if( name.find("gl")!=std::string::npos ){
+	// EGL context driver is for platforms that don't use SDL (NX, etc.)
+	// If the name contains "sdl", don't create an EGL driver since SDL handles EGL internally
+	if( name.find("gl")!=std::string::npos || name.find("sdl")!=std::string::npos ){
 		return 0;
 	}
 

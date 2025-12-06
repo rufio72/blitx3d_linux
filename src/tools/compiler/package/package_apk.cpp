@@ -26,14 +26,14 @@
 void createApk( const std::string &out,const std::string &tmpdir,const std::string &home,const std::string &toolchain,const BundleInfo &bundle,const Target &target,const std::string &rt,const std::string &androidsdk ){
 	std::string libdir=toolchain+"/lib";
 
-	std::string btversion="30.0.2";
+	std::string btversion="34.0.0";
 	std::string buildtools=androidsdk+"/build-tools/"+btversion;
 	std::string aapt=buildtools+"/aapt";
 	std::string aapt2=buildtools+"/aapt2";
-	std::string dex=buildtools+"/dx";
+	std::string d8=buildtools+"/d8";
 	std::string apksigner=buildtools+"/apksigner";
 	std::string zipalign=buildtools+"/zipalign";
-	std::string androidjar=androidsdk+"/platforms/android-"+target.version+"/android.jar";
+	std::string androidjar=androidsdk+"/platforms/android-34/android.jar";
 
 	// TODO: support release keys...
 	std::string keystore=home+"/cfg/debug.keystore";
@@ -89,17 +89,27 @@ void createApk( const std::string &out,const std::string &tmpdir,const std::stri
 	styles.close();
 
 	// manifest...
+	std::string packageId=bundle.identifier;
+	if( packageId.empty() ) packageId="com.blitz3dng.game";
+
+	// Extract API level from version string (e.g., "android-24" -> "24")
+	std::string apiLevel=target.version;
+	size_t dashpos=apiLevel.rfind('-');
+	if( dashpos!=std::string::npos ){
+		apiLevel=apiLevel.substr(dashpos+1);
+	}
+
 	std::ofstream m;
 	m.open( manifest );
 	m<<"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
 	m<<"<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"\n";
-	m<<"  package=\""+bundle.identifier+"\"\n";
+	m<<"  package=\""+packageId+"\"\n";
 	m<<"  android:versionCode=\"1\"\n";
 	m<<"  android:versionName=\"1.0\"\n";
 	m<<"  android:installLocation=\"auto\">\n";
 	m<<"\n";
-	m<<"  <uses-sdk android:minSdkVersion=\""+target.version+"\"\n";
-	m<<"            android:targetSdkVersion=\""+target.version+"\" />\n";
+	m<<"  <uses-sdk android:minSdkVersion=\""+apiLevel+"\"\n";
+	m<<"            android:targetSdkVersion=\"33\" />\n";
 	m<<"\n";
 	std::ifstream content( toolchain+"/manifest.template.xml" );
 	if( content.is_open() ){
@@ -130,7 +140,7 @@ void createApk( const std::string &out,const std::string &tmpdir,const std::stri
 	}
 
 	if( jars!="" ){
-		RUN( dex+" --dex --output="+tmpdir+"/classes.dex "+jars );
+		RUN( d8+" --output "+tmpdir+" "+jars );
 	}
 
 	for( std::string mod:rti.modules ){

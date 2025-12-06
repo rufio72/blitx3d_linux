@@ -6,6 +6,7 @@
 #include "default.glsl.h"
 
 #include <iostream>
+#include <cmath>
 
 //degrees to radians and back
 static const float dtor=0.0174532925199432957692369076848861f;
@@ -104,20 +105,28 @@ public:
 	}
 
 	void unlock(){
-#ifndef GLES
+		// Optimization #3: Upload both vertex and index buffers once in unlock()
 		GL( glBindBuffer( GL_ARRAY_BUFFER,vertex_buffer ) );
 		GL( glBufferData( GL_ARRAY_BUFFER,max_verts*sizeof(GLVertex),verts,GL_STATIC_DRAW ) );
-#endif
+		GL( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,index_buffer ) );
+		GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,max_tris*3*sizeof(unsigned int),tris,GL_STATIC_DRAW ) );
 	}
 
 	void offsetIndices( int offset ){
+		// Optimization #3: No longer re-uploads - data is already on GPU from unlock()
+		// This function is now a no-op for non-GLES, offset is handled in glDrawElementsBaseVertex
+#ifdef GLES
 		GL( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,index_buffer ) );
 		GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,(max_tris-offset)*3*sizeof(unsigned int),tris+offset*3,GL_STATIC_DRAW ) );
+#endif
 	}
 
 	void offsetArrays( int offset ){
+		// Optimization #3: Only needed for GLES which doesn't support glDrawElementsBaseVertex
+#ifdef GLES
 		GL( glBindBuffer( GL_ARRAY_BUFFER,vertex_buffer ) );
 		GL( glBufferData( GL_ARRAY_BUFFER,(max_verts-offset)*sizeof(GLVertex),verts+offset,GL_STATIC_DRAW ) );
+#endif
 	}
 
 	void setVertex( int n,const void *_v ){
@@ -188,6 +197,28 @@ private:
 
 	float view_matrix[16];
 
+	// Cached uniform locations (optimization #1)
+	struct {
+		GLint proj_matrix = -1;
+		GLint view_matrix = -1;
+		GLint world_matrix = -1;
+		GLint normal_matrix = -1; // Optimization #4
+	} uniform_locs;
+
+	// Cached view matrix for normal matrix calculation (optimization #4)
+	float cached_view_matrix[16];
+
+	// Cached UBO handles (optimization #2)
+	GLuint light_ubo = 0;
+	GLuint render_ubo = 0;
+	bool ubos_initialized = false;
+
+	// Texture state cache (optimization #5)
+	struct {
+		GLuint bound_2d[MAX_TEXTURES] = {0};
+		GLuint bound_cube[MAX_TEXTURES] = {0};
+	} tex_cache;
+
 	void setLights(){
 		LightState ls={ 0 };
 
@@ -228,16 +259,17 @@ private:
 			}
 		}
 
-		static unsigned int ubo=0;
-		if( ubo==0 ){
-			GL( glGenBuffers( 1,&ubo ) );
-			GL( glBindBuffer( GL_UNIFORM_BUFFER,ubo ) );
-			GL( glBindBufferRange( GL_UNIFORM_BUFFER,1,ubo,0,sizeof(ls) ) );
+		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData
+		if( light_ubo==0 ){
+			GL( glGenBuffers( 1,&light_ubo ) );
+			GL( glBindBuffer( GL_UNIFORM_BUFFER,light_ubo ) );
+			GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(ls),nullptr,GL_DYNAMIC_DRAW ) );
+			GL( glBindBufferRange( GL_UNIFORM_BUFFER,1,light_ubo,0,sizeof(ls) ) );
 		}else{
-			GL( glBindBuffer( GL_UNIFORM_BUFFER,ubo ) );
+			GL( glBindBuffer( GL_UNIFORM_BUFFER,light_ubo ) );
 		}
 
-		GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(ls),&ls,GL_DYNAMIC_DRAW ) );
+		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(ls),&ls ) );
 		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
 	}
 
@@ -314,8 +346,8 @@ public:
 	}
 
 	void setProj( const float matrix[16] ){
-		GLint projLocation=GL( glGetUniformLocation( defaultProgram,"bbProjMatrix" ) );
-		GL( glUniformMatrix4fv( projLocation,1,GL_FALSE,matrix ) );
+		// Optimization #1: Use cached uniform location
+		GL( glUniformMatrix4fv( uniform_locs.proj_matrix,1,GL_FALSE,matrix ) );
 	}
 
 	void setOrthoProj( float nr,float fr,float nr_l,float nr_r,float nr_t,float nr_b ){
@@ -378,8 +410,11 @@ public:
 			mat[12]=m->elements[3][0]; mat[13]=m->elements[3][1]; mat[14]=-m->elements[3][2];
 		}
 
-		GLint viewLocation=GL( glGetUniformLocation( defaultProgram,"bbViewMatrix" ) );
-		GL( glUniformMatrix4fv( viewLocation,1,GL_FALSE,mat ) );
+		// Optimization #4: Cache view matrix for normal matrix calculation
+		memcpy( cached_view_matrix, mat, sizeof(cached_view_matrix) );
+
+		// Optimization #1: Use cached uniform location
+		GL( glUniformMatrix4fv( uniform_locs.view_matrix,1,GL_FALSE,mat ) );
 	}
 
 	void setWorldMatrix( const Matrix *matrix ){
@@ -398,8 +433,56 @@ public:
 			mat[12]=m->elements[3][0];  mat[13]=m->elements[3][1]; mat[14]=m->elements[3][2];
 		}
 
-		GLint worldLocation=GL( glGetUniformLocation( defaultProgram,"bbWorldMatrix" ) );
-		GL( glUniformMatrix4fv( worldLocation,1,GL_FALSE,mat ) );
+		// Optimization #1: Use cached uniform location
+		GL( glUniformMatrix4fv( uniform_locs.world_matrix,1,GL_FALSE,mat ) );
+
+		// Optimization #4: Calculate normal matrix on CPU (transpose of inverse of upper-left 3x3 of modelview)
+		// ModelView = View * World
+		float mv[16];
+		// Multiply cached_view_matrix * mat (column-major)
+		for( int i=0; i<4; i++ ){
+			for( int j=0; j<4; j++ ){
+				mv[i*4+j] = 0;
+				for( int k=0; k<4; k++ ){
+					mv[i*4+j] += cached_view_matrix[k*4+j] * mat[i*4+k];
+				}
+			}
+		}
+
+		// Extract upper-left 3x3 and compute inverse-transpose
+		// For orthonormal matrices (rotation only), inverse-transpose = original
+		// For general case, we compute the proper inverse-transpose
+		float m3[9] = {
+			mv[0], mv[1], mv[2],
+			mv[4], mv[5], mv[6],
+			mv[8], mv[9], mv[10]
+		};
+
+		// Compute determinant of 3x3
+		float det = m3[0]*(m3[4]*m3[8] - m3[5]*m3[7])
+		          - m3[1]*(m3[3]*m3[8] - m3[5]*m3[6])
+		          + m3[2]*(m3[3]*m3[7] - m3[4]*m3[6]);
+
+		if( fabs(det) > 0.0001f ){
+			float invDet = 1.0f / det;
+			// Compute inverse (already transposed for column-major layout)
+			float normal_mat[9] = {
+				(m3[4]*m3[8] - m3[5]*m3[7]) * invDet,
+				(m3[5]*m3[6] - m3[3]*m3[8]) * invDet,
+				(m3[3]*m3[7] - m3[4]*m3[6]) * invDet,
+				(m3[2]*m3[7] - m3[1]*m3[8]) * invDet,
+				(m3[0]*m3[8] - m3[2]*m3[6]) * invDet,
+				(m3[1]*m3[6] - m3[0]*m3[7]) * invDet,
+				(m3[1]*m3[5] - m3[2]*m3[4]) * invDet,
+				(m3[2]*m3[3] - m3[0]*m3[5]) * invDet,
+				(m3[0]*m3[4] - m3[1]*m3[3]) * invDet
+			};
+			GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,normal_mat ) );
+		} else {
+			// Fallback to identity if matrix is degenerate
+			float identity[9] = { 1,0,0, 0,1,0, 0,0,1 };
+			GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,identity ) );
+		}
 	}
 
 	void setRenderState( const RenderState &rs ){
@@ -445,24 +528,25 @@ public:
 		us.fullbright=rs.fx&FX_FULLBRIGHT;
 		us.use_vertex_color=rs.fx&FX_VERTEXCOLOR;
 
-		for( int i=0;i<MAX_TEXTURES;i++ ){
-			GL( glActiveTexture( GL_TEXTURE0+i ) );
-			GL( glBindTexture( GL_TEXTURE_2D,0 ) );
-
-			GL( glActiveTexture( GL_TEXTURE0+i+8 ) );
-			GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
-		}
+		// Optimization #5: Track which textures need to be unbound instead of unbinding all
+		// We'll unbind unused slots at the end based on what was actually used
 
 		us.texs_used=0;
 		for( int i=0;i<MAX_TEXTURES;i++ ){
 			const RenderState::TexState &ts=rs.tex_states[i];
 
 			if( !ts.canvas ){
-				GL( glActiveTexture( GL_TEXTURE0+i ) );
-				GL( glBindTexture( GL_TEXTURE_2D,0 ) );
-
-				GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
-				GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
+				// Optimization #5: Only unbind if something was previously bound
+				if( tex_cache.bound_2d[i] != 0 ){
+					GL( glActiveTexture( GL_TEXTURE0+i ) );
+					GL( glBindTexture( GL_TEXTURE_2D,0 ) );
+					tex_cache.bound_2d[i] = 0;
+				}
+				if( tex_cache.bound_cube[i] != 0 ){
+					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
+					GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
+					tex_cache.bound_cube[i] = 0;
+				}
 				continue;
 			}
 
@@ -474,15 +558,23 @@ public:
 				int flags=ts.canvas->getFlags();
 
 				if( flags&BBCanvas::CANVAS_TEX_CUBE ){
-					GL( glActiveTexture( GL_TEXTURE0+i ) );
-					GL( glBindTexture( GL_TEXTURE_2D,0 ) );
-
+					// Unbind 2D only if needed
+					if( tex_cache.bound_2d[i] != 0 ){
+						GL( glActiveTexture( GL_TEXTURE0+i ) );
+						GL( glBindTexture( GL_TEXTURE_2D,0 ) );
+						tex_cache.bound_2d[i] = 0;
+					}
 					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
+					tex_cache.bound_cube[i] = canvas->texture;
 				}else{
-					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
-					GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
-
+					// Unbind cube only if needed
+					if( tex_cache.bound_cube[i] != 0 ){
+						GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
+						GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
+						tex_cache.bound_cube[i] = 0;
+					}
 					GL( glActiveTexture( GL_TEXTURE0+i ) );
+					tex_cache.bound_2d[i] = canvas->texture;
 				}
 
 				canvas->bind();
@@ -543,16 +635,17 @@ public:
 			break;
 		}
 
-		static unsigned int ubo=0;
-		if( ubo==0 ){
-			GL( glGenBuffers( 1,&ubo ) );
-			GL( glBindBuffer( GL_UNIFORM_BUFFER,ubo ) );
-			GL( glBindBufferRange( GL_UNIFORM_BUFFER,2,ubo,0,sizeof(us) ) );
+		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData
+		if( render_ubo==0 ){
+			GL( glGenBuffers( 1,&render_ubo ) );
+			GL( glBindBuffer( GL_UNIFORM_BUFFER,render_ubo ) );
+			GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(us),nullptr,GL_DYNAMIC_DRAW ) );
+			GL( glBindBufferRange( GL_UNIFORM_BUFFER,2,render_ubo,0,sizeof(us) ) );
 		}else{
-			GL( glBindBuffer( GL_UNIFORM_BUFFER,ubo ) );
+			GL( glBindBuffer( GL_UNIFORM_BUFFER,render_ubo ) );
 		}
 
-		GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(us),&us,GL_DYNAMIC_DRAW ) );
+		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(us),&us ) );
 		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
 
 		// restore
@@ -593,6 +686,12 @@ public:
 
 			GLint renderIdx=GL( glGetUniformBlockIndex( defaultProgram,"BBRenderState" ) );
 			GL( glUniformBlockBinding( defaultProgram,renderIdx,2 ) );
+
+			// Optimization #1: Cache uniform locations once
+			uniform_locs.proj_matrix = GL( glGetUniformLocation( defaultProgram,"bbProjMatrix" ) );
+			uniform_locs.view_matrix = GL( glGetUniformLocation( defaultProgram,"bbViewMatrix" ) );
+			uniform_locs.world_matrix = GL( glGetUniformLocation( defaultProgram,"bbWorldMatrix" ) );
+			uniform_locs.normal_matrix = GL( glGetUniformLocation( defaultProgram,"bbNormalMatrix" ) );
 		}
 
 		GL( glUseProgram( defaultProgram ) );
@@ -623,15 +722,16 @@ public:
 	void render( BBMesh *m,int first_vert,int vert_cnt,int first_tri,int tri_cnt ){
 		GLMesh *mesh=(GLMesh*)m;
 
-		// TODO: there's probably more performance to be found here...
-		mesh->offsetIndices( first_tri );
-
 		GL( glBindVertexArray( mesh->vertex_array ) );
 #ifdef GLES
+		// GLES doesn't support glDrawElementsBaseVertex, so we need to re-upload with offset
+		mesh->offsetIndices( first_tri );
 		mesh->offsetArrays( first_vert );
 		GL( glDrawElements( GL_TRIANGLES,tri_cnt*3,GL_UNSIGNED_INT,0 ) );
 #else
-		GL( glDrawElementsBaseVertex( GL_TRIANGLES,tri_cnt*3,GL_UNSIGNED_INT,0,first_vert ) );
+		// Optimization #3: Use offset in draw call instead of re-uploading buffers
+		GL( glDrawElementsBaseVertex( GL_TRIANGLES,tri_cnt*3,GL_UNSIGNED_INT,
+			(void*)(first_tri*3*sizeof(unsigned int)),first_vert ) );
 #endif
 		GL( glBindVertexArray( 0 ) );
 	}

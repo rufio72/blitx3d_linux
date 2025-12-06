@@ -4,6 +4,7 @@ precision highp int;
 uniform mat4 bbProjMatrix;
 uniform mat4 bbViewMatrix;
 uniform mat4 bbWorldMatrix;
+uniform mat3 bbNormalMatrix; // Optimization #4: Precomputed on CPU
 
 uniform sampler2D bbTexture[8];
 uniform samplerCube bbTextureCube[8];
@@ -103,7 +104,7 @@ layout(location = 4) in vec2 bbTexCoord1;
 void main() {
   mat4 bbModelViewMatrix = bbViewMatrix * bbWorldMatrix;
   mat4 bbModelViewProjectionMatrix=bbProjMatrix * bbModelViewMatrix;
-  mat3 bbNormalMatrix=transpose(inverse(mat3(bbModelViewMatrix)));
+  // Optimization #4: bbNormalMatrix is now passed as uniform from CPU
 
   bbVertex_Position = bbPosition;
 

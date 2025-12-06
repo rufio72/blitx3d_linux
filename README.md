@@ -11,6 +11,8 @@ So far, we've made huge strides in making this happen. Some of the basic samples
 
 This is achieved by adding [LLVM](#LLVM)-powered code generation to the original compiler. A basic test suite [test/all.bb](test/all.bb) has been implemented to help ensure the compiler functions as expected and the runtime can execute without error.
 
+**Supported Platforms:** Windows, macOS, Linux, and Android (ARM64).
+
 (Note: The 32-bit Windows build still uses the original Blitz code generation.)
 
 ## Download
@@ -78,6 +80,82 @@ Alternatively, you can build everything with [docker](https://docker.io). See
 [env.sh](env.sh) and the [docker-images](https://github.com/blitz3d-ng/docker-images) repo for some
 example Dockerfiles.
 
+### Android
+
+Blitz3D-NG supports cross-compilation to Android ARM64. You can compile your Blitz3D programs directly to APK files that run on Android 7.0+ devices.
+
+#### Prerequisites
+
+1. **Java 11** (required for Android build tools):
+   ```bash
+   $ sudo apt install openjdk-11-jdk
+   $ export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+   ```
+
+2. **Android SDK Command Line Tools**: Download from [developer.android.com](https://developer.android.com/studio#command-tools)
+
+3. **Install required SDK components**:
+   ```bash
+   $ sdkmanager "ndk;26.1.10909125" "build-tools;34.0.0" "platforms;android-34" "platforms;android-24" "platform-tools"
+   ```
+
+4. **Set environment variables** (add to `~/.bashrc`):
+   ```bash
+   export ANDROID_HOME=~/Android/Sdk
+   export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125
+   export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+   ```
+
+#### Building the Android Runtime
+
+First, build the host compiler (Linux/macOS):
+```bash
+$ make ENV=release
+```
+
+Then build the Android runtime libraries:
+```bash
+$ cmake -G Ninja -B build-android \
+    -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+    -DANDROID_PLATFORM=24 \
+    -DANDROID_ABI=arm64-v8a \
+    -DARCH=arm64 \
+    -DBB_PLATFORM=android
+$ ninja -C build-android
+```
+
+#### Compiling Blitz3D Programs to APK
+
+Once the runtime is built, compile any `.bb` file directly to an APK:
+
+```bash
+$ export blitzpath=/path/to/b3d/_release
+$ blitzcc -target arm64-android-24 -o mygame.apk mygame.bb
+```
+
+#### Installing and Testing
+
+Install on a connected Android device via ADB:
+```bash
+$ adb install -r mygame.apk
+```
+
+Or enable wireless debugging on your phone and connect:
+```bash
+$ adb pair <ip>:<port>    # Pair with device
+$ adb connect <ip>:<port> # Connect to device
+$ adb install -r mygame.apk
+```
+
+#### Technical Notes
+
+- **Minimum SDK**: Android 7.0 (API 24)
+- **Target SDK**: Android 13 (API 33) for compatibility with Android 14+
+- **Architecture**: ARM64 (arm64-v8a)
+- **Graphics**: OpenGL ES 3.0+
+- **APK signing**: Uses debug keystore by default (auto-generated)
+- **Package name**: Default is `com.blitz3dng.game` (configurable via bundle options)
+
 ## Documentation
 
 The original Blitz3D help is available in the [\_release/help](_release/help) directory in HTML form. We've
@@ -110,7 +188,7 @@ See the full [OOP Documentation](docs/OOP.md) for details and examples.
 - Improve help files & styling.
 - Swap out FMOD for something with a more permissive license.
 - OpenGL, Vulkan, Metal, and newer Direct3D renderers.
-- macOS, Linux, Android, iOS support.
+- ~~macOS, Linux, Android~~, iOS support. (macOS, Linux, and Android are now supported!)
 
 ## License
 

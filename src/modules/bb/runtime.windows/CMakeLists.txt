@@ -1,6 +1,0 @@
-IF(BB_WINDOWS)
-  bb_start_module(runtime.windows)
-  set(DEPENDS_ON bb.blitz3d.d3d7 bb.frame)
-  set(SOURCES gxruntime.cpp gxruntime.h module.cpp)
-  bb_end_module()
-ENDIF()

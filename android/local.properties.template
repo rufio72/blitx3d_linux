@@ -1,0 +1,46 @@
+# Blitz3D-NG Android Local Properties Template
+# Copy this file to local.properties and fill in your values
+# DO NOT commit local.properties to version control!
+
+# =====================================================
+# SDK/NDK PATHS (auto-detected by Android Studio)
+# =====================================================
+# sdk.dir=/path/to/Android/Sdk
+# ndk.dir=/path/to/Android/Sdk/ndk/26.1.10909125
+
+# =====================================================
+# RELEASE SIGNING CONFIGURATION
+# =====================================================
+# Required for Play Store uploads
+
+# Path to your release keystore file
+RELEASE_STORE_FILE=/path/to/your/release.keystore
+
+# Keystore password
+RELEASE_STORE_PASSWORD=your_keystore_password
+
+# Key alias (the name you gave the key)
+RELEASE_KEY_ALIAS=your_key_alias
+
+# Key password (often same as keystore password)
+RELEASE_KEY_PASSWORD=your_key_password
+
+# =====================================================
+# HOW TO CREATE A RELEASE KEYSTORE
+# =====================================================
+# Run this command to generate a new keystore:
+#
+# keytool -genkey -v \
+#   -keystore release.keystore \
+#   -alias your_key_alias \
+#   -keyalg RSA \
+#   -keysize 2048 \
+#   -validity 10000
+#
+# You will be prompted for:
+# - Keystore password (remember this!)
+# - Your name, organization, city, state, country
+# - Key password (can be same as keystore password)
+#
+# IMPORTANT: Keep your keystore file and passwords safe!
+# If you lose them, you cannot update your app on Play Store.

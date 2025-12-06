@@ -1,0 +1,32 @@
+# Blitz3D-NG Android .gitignore
+
+# Local configuration
+local.properties
+
+# Signing files (NEVER commit these)
+*.keystore
+*.jks
+signing/
+
+# Build outputs
+build/
+app/build/
+.gradle/
+.cxx/
+
+# IDE files
+.idea/
+*.iml
+.externalNativeBuild/
+
+# Generated files
+app/src/main/assets/
+captures/
+
+# NDK
+obj/
+
+# Misc
+*.log
+*.tmp
+.DS_Store

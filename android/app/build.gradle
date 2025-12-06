@@ -1,0 +1,283 @@
+// Blitz3D-NG Android App Module
+// Play Store Ready Configuration
+
+plugins {
+    id 'com.android.application'
+}
+
+// Load local.properties for signing config (if exists)
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localProperties.load(new FileInputStream(localPropertiesFile))
+}
+
+// Helper function to get signing property from various sources
+def getSigningProperty(String propName, String envName) {
+    // Priority: local.properties > gradle.properties > environment
+    return localProperties.getProperty(propName) ?:
+           project.findProperty(propName) ?:
+           System.getenv(envName)
+}
+
+android {
+    namespace 'blitz3d.runtime'
+
+    // =====================================================
+    // SDK VERSIONS - Play Store Requirements (2024+)
+    // =====================================================
+    compileSdk 34  // Latest stable SDK
+
+    defaultConfig {
+        applicationId project.findProperty('APP_ID') ?: 'com.example.blitz3dng'
+
+        // minSdk 24 = Android 7.0 (covers ~95% of devices)
+        minSdk 24
+
+        // targetSdk 34 = Required for Play Store (2024+)
+        targetSdk 34
+
+        // Version management from gradle.properties
+        versionCode (project.findProperty('VERSION_CODE') ?: '1').toInteger()
+        versionName project.findProperty('VERSION_NAME') ?: '1.0.0'
+
+        // Native build configuration
+        externalNativeBuild {
+            cmake {
+                // C++ standard library
+                arguments "-DANDROID_STL=c++_shared"
+
+                // Target architectures (remove x86 for smaller APK)
+                abiFilters 'armeabi-v7a', 'arm64-v8a'
+
+                // For Play Store, you might want only arm64-v8a:
+                // abiFilters 'arm64-v8a'
+            }
+        }
+
+        // Vector drawables support
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    // =====================================================
+    // SIGNING CONFIGURATION
+    // =====================================================
+    signingConfigs {
+        debug {
+            // Default debug keystore
+        }
+
+        release {
+            def storeFilePath = getSigningProperty('RELEASE_STORE_FILE', 'BLITZ3D_KEYSTORE_FILE')
+            def storePassword = getSigningProperty('RELEASE_STORE_PASSWORD', 'BLITZ3D_KEYSTORE_PASSWORD')
+            def keyAlias = getSigningProperty('RELEASE_KEY_ALIAS', 'BLITZ3D_KEY_ALIAS')
+            def keyPassword = getSigningProperty('RELEASE_KEY_PASSWORD', 'BLITZ3D_KEY_PASSWORD')
+
+            if (storeFilePath && storePassword && keyAlias && keyPassword) {
+                storeFile file(storeFilePath)
+                this.storePassword = storePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            } else {
+                // Fall back to debug signing if release not configured
+                // Build will work but won't be uploadable to Play Store
+                println "WARNING: Release signing not configured. Using debug keystore."
+                println "Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD"
+            }
+        }
+    }
+
+    // =====================================================
+    // BUILD TYPES
+    // =====================================================
+    buildTypes {
+        debug {
+            debuggable true
+            jniDebuggable true
+            minifyEnabled false
+            signingConfig signingConfigs.debug
+        }
+
+        release {
+            debuggable false
+            jniDebuggable false
+
+            // Enable code shrinking and obfuscation
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            // Use release signing if available, otherwise debug
+            def storeFilePath = getSigningProperty('RELEASE_STORE_FILE', 'BLITZ3D_KEYSTORE_FILE')
+            if (storeFilePath && file(storeFilePath).exists()) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+                println "WARNING: Building release with debug signing (not suitable for Play Store)"
+            }
+        }
+    }
+
+    // =====================================================
+    // BUILD FEATURES
+    // =====================================================
+    buildFeatures {
+        // Enable BuildConfig generation
+        buildConfig true
+    }
+
+    // =====================================================
+    // NATIVE BUILD (CMake)
+    // =====================================================
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'  // NDK r25+ recommended
+        }
+    }
+
+    // =====================================================
+    // NDK VERSION
+    // =====================================================
+    // Specify NDK version for reproducible builds
+    // Check https://developer.android.com/ndk/downloads for latest
+    ndkVersion '26.1.10909125'  // NDK r26b (2024)
+
+    // =====================================================
+    // COMPILE OPTIONS
+    // =====================================================
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    // =====================================================
+    // PACKAGING OPTIONS
+    // =====================================================
+    packagingOptions {
+        // Don't strip debug symbols in debug builds
+        doNotStrip "*/armeabi-v7a/*.so"
+        doNotStrip "*/arm64-v8a/*.so"
+
+        // Exclude unnecessary files
+        resources {
+            excludes += ['META-INF/LICENSE', 'META-INF/NOTICE']
+        }
+    }
+
+    // =====================================================
+    // LINT OPTIONS
+    // =====================================================
+    lint {
+        abortOnError false
+        checkReleaseBuilds true
+    }
+
+    // =====================================================
+    // APP BUNDLE (AAB) CONFIGURATION
+    // =====================================================
+    bundle {
+        // Language splits - download only needed languages
+        language {
+            enableSplit = true
+        }
+
+        // Density splits - download only needed screen densities
+        density {
+            enableSplit = true
+        }
+
+        // ABI splits - download only needed native libraries
+        abi {
+            enableSplit = true
+        }
+    }
+}
+
+dependencies {
+    // SDL2 library (built separately)
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+
+    // AndroidX core
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.core:core:1.12.0'
+}
+
+// =====================================================
+// CUSTOM TASKS
+// =====================================================
+
+// Task to generate release keystore (for development)
+task generateDebugKeystore(type: Exec) {
+    description = 'Generates a debug keystore for development'
+    group = 'signing'
+
+    def keystorePath = "${rootProject.projectDir}/debug.keystore"
+
+    commandLine 'keytool', '-genkey', '-v',
+        '-keystore', keystorePath,
+        '-alias', 'debugkey',
+        '-keyalg', 'RSA',
+        '-keysize', '2048',
+        '-validity', '10000',
+        '-storepass', 'android',
+        '-keypass', 'android',
+        '-dname', 'CN=Debug,O=Android,C=US'
+
+    doFirst {
+        if (file(keystorePath).exists()) {
+            throw new GradleException("Keystore already exists at ${keystorePath}")
+        }
+    }
+}
+
+// Task to check signing configuration
+task checkSigningConfig {
+    description = 'Checks if release signing is properly configured'
+    group = 'verification'
+
+    doLast {
+        def storeFile = getSigningProperty('RELEASE_STORE_FILE', 'BLITZ3D_KEYSTORE_FILE')
+        def storePassword = getSigningProperty('RELEASE_STORE_PASSWORD', 'BLITZ3D_KEYSTORE_PASSWORD')
+        def keyAlias = getSigningProperty('RELEASE_KEY_ALIAS', 'BLITZ3D_KEY_ALIAS')
+        def keyPassword = getSigningProperty('RELEASE_KEY_PASSWORD', 'BLITZ3D_KEY_PASSWORD')
+
+        println "=== Release Signing Configuration ==="
+        println "RELEASE_STORE_FILE: ${storeFile ? 'SET' : 'NOT SET'}"
+        println "RELEASE_STORE_PASSWORD: ${storePassword ? 'SET' : 'NOT SET'}"
+        println "RELEASE_KEY_ALIAS: ${keyAlias ? 'SET' : 'NOT SET'}"
+        println "RELEASE_KEY_PASSWORD: ${keyPassword ? 'SET' : 'NOT SET'}"
+
+        if (storeFile && storePassword && keyAlias && keyPassword) {
+            if (file(storeFile).exists()) {
+                println "\n✓ Release signing is fully configured!"
+            } else {
+                println "\n✗ Keystore file not found at: ${storeFile}"
+            }
+        } else {
+            println "\n✗ Release signing is NOT configured"
+            println "Set the missing properties in local.properties or environment variables"
+        }
+    }
+}
+
+// Print build info
+task printBuildInfo {
+    description = 'Prints build configuration information'
+    group = 'help'
+
+    doLast {
+        println "=== Blitz3D-NG Android Build Info ==="
+        println "App ID: ${project.findProperty('APP_ID') ?: 'com.example.blitz3dng'}"
+        println "Version: ${project.findProperty('VERSION_NAME') ?: '1.0.0'} (${project.findProperty('VERSION_CODE') ?: '1'})"
+        println "Min SDK: 24 (Android 7.0)"
+        println "Target SDK: 34 (Android 14)"
+        println "NDK Version: 26.1.10909125"
+        println ""
+        println "Build commands:"
+        println "  Debug APK:      ./gradlew assembleDebug"
+        println "  Release APK:    ./gradlew assembleRelease"
+        println "  Release AAB:    ./gradlew bundleRelease"
+        println "  Check signing:  ./gradlew checkSigningConfig"
+    }
+}

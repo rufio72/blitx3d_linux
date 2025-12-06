@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- USB Game Controllers -->
+    <!-- Class 3 = HID (Human Interface Device) -->
+    <usb-device class="3" subclass="0" />
+</resources>

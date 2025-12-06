@@ -1,0 +1,24 @@
+// Blitz3D-NG Android Project - Top-level build file
+// Supports: Release signing, App Bundle (.aab), modern SDK
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Android Gradle Plugin 8.x requires Gradle 8.x
+        classpath 'com.android.tools.build:gradle:8.2.2'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

@@ -35,9 +35,8 @@ struct Vertex{
 
 static
 bool makeProgram( ContextResources *res,float sx,float sy,float tx,float ty,bool tex_enabled,float resx,float resy,float x,float y,float width,float height,float color[3] ){
-	if( !glIsProgram( res->default_program ) ){
-		// LOGD( "rebuilding 2d shader...\n" );
-
+	// Phase 1 Optimization: Use cached flag instead of glIsProgram() every frame
+	if( !res->program_initialized ){
 		std::string src( DEFAULT_GLSL,DEFAULT_GLSL+DEFAULT_GLSL_SIZE );
 		res->default_program=GL( _bbGLCompileProgram( "default.glsl",src ) );
 		if( !res->default_program ){
@@ -46,11 +45,21 @@ bool makeProgram( ContextResources *res,float sx,float sy,float tx,float ty,bool
 
 		GL( glUseProgram( res->default_program ) );
 
-		GLint texLocation=GL( glGetUniformLocation( res->default_program,"u_tex" ) );
-		GL( glUniform1i( texLocation,0 ) );
+		// Cache uniform locations once
+		res->uniform_tex_location=GL( glGetUniformLocation( res->default_program,"u_tex" ) );
+		GL( glUniform1i( res->uniform_tex_location,0 ) );
 
-		GLint idx=GL( glGetUniformBlockIndex( res->default_program,"BBRenderState" ) );
-		GL( glUniformBlockBinding( res->default_program,idx,0 ) );
+		res->uniform_block_index=GL( glGetUniformBlockIndex( res->default_program,"BBRenderState" ) );
+		GL( glUniformBlockBinding( res->default_program,res->uniform_block_index,0 ) );
+
+		// Initialize texture state cache
+		res->bound_texture_2d=0;
+		res->tex_min_filter=-1;
+		res->tex_mag_filter=-1;
+		res->tex_wrap_s=-1;
+		res->tex_wrap_t=-1;
+
+		res->program_initialized=true;
 	}
 
 	GL( glUseProgram( res->default_program ) );
@@ -65,16 +74,48 @@ bool makeProgram( ContextResources *res,float sx,float sy,float tx,float ty,bool
 
 	if( res->ubo ){
 		GL( glBindBuffer( GL_UNIFORM_BUFFER,res->ubo ) );
+		// Phase 1 Optimization: Use glBufferSubData instead of glBufferData to avoid GPU stall
+		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(us),&us ) );
 	}else{
 		GL( glGenBuffers( 1,&res->ubo ) );
 		GL( glBindBuffer( GL_UNIFORM_BUFFER,res->ubo ) );
 		GL( glBindBufferRange( GL_UNIFORM_BUFFER,0,res->ubo,0,sizeof(us) ) );
+		// First time: must use glBufferData to allocate
+		GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(us),&us,GL_DYNAMIC_DRAW ) );
 	}
-
-	GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(us),&us,GL_DYNAMIC_DRAW ) );
 	GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
 
 	return true;
+}
+
+// Phase 1 Optimization: Helper to set texture parameters only when changed
+static
+void setTextureParams( ContextResources *res, GLuint texture, GLint min_filter, GLint mag_filter, GLint wrap_s, GLint wrap_t ){
+	if( res->bound_texture_2d != texture ){
+		// Texture changed, reset cache
+		res->tex_min_filter = -1;
+		res->tex_mag_filter = -1;
+		res->tex_wrap_s = -1;
+		res->tex_wrap_t = -1;
+		res->bound_texture_2d = texture;
+	}
+
+	if( res->tex_min_filter != min_filter ){
+		GL( glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter ) );
+		res->tex_min_filter = min_filter;
+	}
+	if( res->tex_mag_filter != mag_filter ){
+		GL( glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter ) );
+		res->tex_mag_filter = mag_filter;
+	}
+	if( res->tex_wrap_s != wrap_s ){
+		GL( glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s ) );
+		res->tex_wrap_s = wrap_s;
+	}
+	if( res->tex_wrap_t != wrap_t ){
+		GL( glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t ) );
+		res->tex_wrap_t = wrap_t;
+	}
 }
 
 static
@@ -333,10 +374,8 @@ void GLCanvas::text( int x,int y,const std::string &t ){
 
 			GL( glPixelStorei( GL_UNPACK_ALIGNMENT,1 ) );
 			GL( glTexImage2D( GL_TEXTURE_2D,0,GL_RGBA,font->atlas->width,font->atlas->height,0,GL_RGBA,GL_UNSIGNED_BYTE,bmp.data() ) );
-			GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE ) );
-			GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE ) );
-			GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR ) );
-			GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR ) );
+			// Phase 1 Optimization: Use cached texture parameters
+			setTextureParams( res, texture, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE );
 		}
 	}
 	if( !font->atlas ) return;
@@ -424,7 +463,10 @@ void GLCanvas::blit( int x,int y,BBCanvas *s,int src_x,int src_y,int src_w,int s
 	GL( glBindFramebuffer( GL_DRAW_FRAMEBUFFER,dfb ) );
 
 	GL( glBlitFramebuffer( srcX0,srcY0,srcX1,srcY1,dstX0,dstY0,dstX1,dstY1,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,GL_NEAREST ) );
-	GL( glGenerateMipmap( target ) );
+	// Phase 1 Optimization: Only generate mipmap if texture has mipmapping enabled
+	if( flags & CANVAS_TEX_MIPMAP ){
+		GL( glGenerateMipmap( target ) );
+	}
 
 	if( !(flags&CANVAS_TEX_VIDMEM) ){
 		downloadData();
@@ -445,10 +487,8 @@ void GLCanvas::image( BBCanvas *c,int x,int y,bool solid ){
 	GL( glEnable( GL_BLEND ) );
 	GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA ) );
 
-	GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR ) );
-	GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR ) );
-	GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE ) );
-	GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE ) );
+	// Phase 1 Optimization: Use cached texture parameters
+	setTextureParams( res, src->texture, GL_LINEAR, GL_LINEAR, GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE );
 
 	float white[3]={ 1.0,1.0,1.0 };
 	quad( x-src->handle_x,y-src->handle_y,src->getWidth(),src->getHeight(),true,true,1.0,1.0,white );
@@ -602,7 +642,8 @@ void GLCanvas::unset(){
 	// GL( glBindFramebuffer( GL_FRAMEBUFFER,cfb ) );
 	// dirty=true;
 
-	if( texture ){
+	// Phase 1 Optimization: Only generate mipmap if texture has mipmapping enabled
+	if( texture && (flags & CANVAS_TEX_MIPMAP) ){
 		GL( glBindTexture( target,texture ) );
 		GL( glGenerateMipmap( target ) );
 		GL( glBindTexture( target,0 ) );

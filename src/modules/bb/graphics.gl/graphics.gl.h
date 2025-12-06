@@ -51,6 +51,18 @@ struct ContextResources{
 	GLuint oval_buffer,oval_array;
 	GLuint text_buffer,text_array;
 	std::map<BBImageFont*,unsigned int> font_textures;
+
+	// Phase 1 Optimization: Cached uniform locations (avoid glGetUniformLocation per frame)
+	bool program_initialized;
+	GLint uniform_tex_location;
+	GLint uniform_block_index;
+
+	// Phase 1 Optimization: Texture state cache (avoid redundant glTexParameteri calls)
+	GLuint bound_texture_2d;
+	GLint tex_min_filter;
+	GLint tex_mag_filter;
+	GLint tex_wrap_s;
+	GLint tex_wrap_t;
 };
 
 #include "canvas.h"

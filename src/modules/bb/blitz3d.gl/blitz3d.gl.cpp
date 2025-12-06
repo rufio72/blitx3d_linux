@@ -241,6 +241,26 @@ private:
 	// Last bound VAO (optimization #11)
 	GLuint last_bound_vao = 0;
 
+	// Z-Mode state cache (Phase 3)
+	int cached_zmode = -1;
+
+	// Polygon mode cache (Phase 3, non-GLES only)
+	int cached_polygon_mode = -1; // 0=fill, 1=line
+
+	// Front face cache (Phase 3)
+	int cached_front_face = -1; // 0=CCW, 1=CW
+
+	// Active texture unit cache (Phase 3)
+	int cached_active_texture = -1;
+
+	// Phase 3: Helper to set active texture with caching
+	void setActiveTexture( int unit ){
+		if( cached_active_texture != unit ){
+			GL( glActiveTexture( GL_TEXTURE0 + unit ) );
+			cached_active_texture = unit;
+		}
+	}
+
 	void setLights(){
 		LightState ls={ 0 };
 
@@ -323,7 +343,7 @@ private:
 		}
 
 		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(ls),&ls ) );
-		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
+		// Phase 3: Removed unnecessary glBindBuffer(0) - UBO remains bound until next bind
 	}
 
 public:
@@ -347,7 +367,12 @@ public:
 		wireframe=enable;
 	}
 	void setFlippedTris( bool enable ){
-		GL( glFrontFace( enable ? GL_CW : GL_CCW ) );
+		// Phase 3: Cache front face state
+		int want_face = enable ? 1 : 0;
+		if( cached_front_face != want_face ){
+			GL( glFrontFace( enable ? GL_CW : GL_CCW ) );
+			cached_front_face = want_face;
+		}
 	}
 	void setAmbient( const float rgb[3] ){
 		us.ambient[0]=rgb[0];us.ambient[1]=rgb[1];us.ambient[2]=rgb[2];us.ambient[3]=1.0f;
@@ -370,6 +395,10 @@ public:
 	}
 
 	void setZMode( int mode ){
+		// Phase 3: Cache Z-mode state
+		if( cached_zmode == mode ) return;
+		cached_zmode = mode;
+
 		switch( mode ){
 		case ZMODE_NORMAL:
 			GL( glEnable( GL_DEPTH_TEST ) );
@@ -573,10 +602,11 @@ public:
 
 		// TODO: sort this out for ES
 #ifndef GLES
-		if( rs.fx&FX_WIREFRAME||wireframe ){
-			GL( glPolygonMode(GL_FRONT_AND_BACK,GL_LINE) );
-		}else{
-			GL( glPolygonMode(GL_FRONT_AND_BACK,GL_FILL) );
+		// Phase 3: Cache polygon mode
+		int want_poly = (rs.fx&FX_WIREFRAME||wireframe) ? 1 : 0;
+		if( cached_polygon_mode != want_poly ){
+			GL( glPolygonMode(GL_FRONT_AND_BACK, want_poly ? GL_LINE : GL_FILL) );
+			cached_polygon_mode = want_poly;
 		}
 #endif
 
@@ -596,12 +626,12 @@ public:
 			if( !ts.canvas ){
 				// Optimization #5: Only unbind if something was previously bound
 				if( tex_cache.bound_2d[i] != 0 ){
-					GL( glActiveTexture( GL_TEXTURE0+i ) );
+					setActiveTexture( i );
 					GL( glBindTexture( GL_TEXTURE_2D,0 ) );
 					tex_cache.bound_2d[i] = 0;
 				}
 				if( tex_cache.bound_cube[i] != 0 ){
-					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
+					setActiveTexture( MAX_TEXTURES+i );
 					GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
 					tex_cache.bound_cube[i] = 0;
 				}
@@ -618,20 +648,20 @@ public:
 				if( flags&BBCanvas::CANVAS_TEX_CUBE ){
 					// Unbind 2D only if needed
 					if( tex_cache.bound_2d[i] != 0 ){
-						GL( glActiveTexture( GL_TEXTURE0+i ) );
+						setActiveTexture( i );
 						GL( glBindTexture( GL_TEXTURE_2D,0 ) );
 						tex_cache.bound_2d[i] = 0;
 					}
-					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
+					setActiveTexture( MAX_TEXTURES+i );
 					tex_cache.bound_cube[i] = canvas->texture;
 				}else{
 					// Unbind cube only if needed
 					if( tex_cache.bound_cube[i] != 0 ){
-						GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
+						setActiveTexture( MAX_TEXTURES+i );
 						GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
 						tex_cache.bound_cube[i] = 0;
 					}
-					GL( glActiveTexture( GL_TEXTURE0+i ) );
+					setActiveTexture( i );
 					tex_cache.bound_2d[i] = canvas->texture;
 				}
 
@@ -727,7 +757,7 @@ public:
 		}
 
 		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(us),&us ) );
-		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
+		// Phase 3: Removed unnecessary glBindBuffer(0) - UBO remains bound until next bind
 
 		// restore
 		us.fog_mode=fog_mode;
@@ -823,7 +853,7 @@ public:
 
 	void end(){
 		GL( glUseProgram( 0 ) );
-		GL( glActiveTexture( GL_TEXTURE0 ) );
+		setActiveTexture( 0 ); // Phase 3: Use cached setter
 		GL( glDisable( GL_DEPTH_TEST ) );
 
 		GL( glDisable( GL_BLEND ) );
@@ -837,6 +867,11 @@ public:
 		// Reset state caches for next frame
 		blend_cache.current_blend = -1;
 		cached_cull_enabled = -1;
+		// Phase 3: Reset additional caches
+		cached_zmode = -1;
+		cached_polygon_mode = -1;
+		cached_front_face = -1;
+		cached_active_texture = -1;
 
 		GL( glViewport( viewport[0],viewport[1],viewport[2],viewport[3] ) );
 		GL( glScissor( viewport[0],viewport[1],viewport[2],viewport[3] ) );

@@ -1,0 +1,3 @@
+Info: Rex is a German Shepherd trained in police work
+Speak: Woof!
+Test completed!

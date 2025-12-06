@@ -30,6 +30,7 @@ private:
 	std::set<std::string> included;
 	Toker *toker,*main_toker;
 	std::map<std::string,DimNode*> arrayDecls;
+	std::string currentClassName;  // Track current class for Super keyword
 
 	DeclSeqNode *consts;
 	DeclSeqNode *structs;

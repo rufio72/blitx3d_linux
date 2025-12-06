@@ -7,11 +7,7 @@
 #include <bb/graphics/graphics.h>
 #include <bb/pixmap/pixmap.h>
 #include "blitz3d.h"
-#ifdef USE_D3DXOF
-#include "loader_x.h"
-#else
 #include "loader_x2.h"
-#endif
 #include "loader_3ds.h"
 #include "loader_b3d.h"
 #include "std.h"
@@ -44,11 +40,7 @@ static ObjCollision picked;
 
 extern float stats3d[10];
 
-#ifdef USE_D3DXOF
-static Loader_X loader_x;
-#else
 static Loader_X2 loader_x;
-#endif
 static Loader_3DS loader_3ds;
 static Loader_B3D loader_b3d;
 

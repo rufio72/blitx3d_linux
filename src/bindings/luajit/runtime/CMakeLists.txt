@@ -10,10 +10,6 @@ if(TARGET runtime.test.static)
   blitzlua(test)
 endif()
 
-if(TARGET runtime.d3d7.static)
-  blitzlua(d3d7)
-endif()
-
 if(TARGET runtime.opengl.static)
   blitzlua(opengl)
 endif()

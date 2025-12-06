@@ -40,6 +40,7 @@ static void makeKeywords(){
 	alphaTokes["Method"]=METHOD;
 	alphaTokes["End Method"]=ENDMETHOD;
 	alphaTokes["Self"]=SELF;
+	alphaTokes["Super"]=SUPER;
 	alphaTokes["Extends"]=EXTENDS;
 	alphaTokes["Static"]=STATIC;
 	alphaTokes["Local"]=LOCAL;

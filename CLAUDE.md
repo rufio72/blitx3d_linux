@@ -58,21 +58,38 @@ The `blitzcc` compiler parses Blitz3D source (.bb files) and generates executabl
   - `linker_lld/`: LLD-based linker for LLVM builds
 - **JIT**: `jit_orc/` provides LLVM ORC JIT support
 
+### OOP Implementation (`src/tools/compiler/tree/`)
+The compiler supports Object-Oriented Programming with these key files:
+- **Class declarations** (`decl/class_decl.cpp/h`): Handles `Class`/`End Class` syntax
+- **Method calls** (`expr/method_call.cpp/h`): Implements `obj\Method()` and `Super\Method()`
+- **Object creation** (`expr/new.cpp/h`): Handles `New ClassName()` with constructor support
+- **Parser** (`parser.cpp`): Parses OOP keywords (Class, Method, Self, Super, Extends, Static)
+- **Toker** (`toker.cpp`): Tokenizes OOP keywords
+
+#### OOP Features:
+- `Class`/`End Class` - Define classes with fields and methods
+- `Method`/`End Method` - Define instance methods (receive implicit `self` parameter)
+- `Static Method` - Define class methods (no `self` parameter)
+- `Self` - Reference to current object instance
+- `Super\Method()` - Call parent class method
+- `Extends` - Single inheritance
+- Methods compiled as global functions: `ClassName_MethodName(self, args...)`
+
 ### Runtime Modules (`src/modules/bb/`)
 Platform-agnostic APIs with platform-specific implementations:
 - **Core**: `blitz` (runtime core), `math`, `string`, `bank` (memory buffers)
 - **I/O**: `filesystem`, `stream`, `stdio`, `sockets`
-- **Graphics**: `graphics` (2D), `blitz3d` (3D engine), `pixmap`
+- **Graphics**: `graphics` (2D), `graphics.gl` (OpenGL), `blitz3d` (3D engine), `blitz3d.gl` (OpenGL 3D), `pixmap`
 - **Audio**: `audio` with backends (`audio.fmod`, `audio.openal`)
-- **Input**: `input` with backends (`input.directinput8`, `input.nx`)
-- **Platform runtimes**: `runtime.windows`, `runtime.sdl`, `runtime.html`, etc.
+- **Input**: `input` with platform backends
+- **Platform runtimes**: `runtime.sdl`, `runtime.html`, etc.
 
 Platform-specific variants use dot notation (e.g., `filesystem.posix`, `filesystem.windows`).
 
 ### Runtime Libraries (`src/runtime/`)
 - `base/`: Core runtime linked into executables
-- `opengl/`: OpenGL renderer
-- `d3d7/`: Direct3D 7 renderer (Windows)
+- `opengl/`: OpenGL renderer (primary graphics backend)
+- `test/`: Test runtime
 
 ### Platform Configuration
 The root `CMakeLists.txt` detects and sets:
@@ -88,9 +105,15 @@ Test files are in `test/` directory as `.bb` Blitz3D source files:
 - `test/language/`: Language feature tests
 - `test/modules/`: Module-specific tests
 
+OOP test samples in `_release/samples/oop/`:
+- `test_super.bb`: Tests Super keyword
+- `test_inheritance.bb`: Tests method inheritance
+- `test_multi_inheritance.bb`: Tests multi-level inheritance
+
 ## Key Files
 
 - `Makefile`: Primary build entry point
 - `CMakeLists.txt`: CMake configuration
 - `deps/`: Third-party dependencies (submodules)
 - `_release/`: Output directory with built binaries and help files
+- `CHANGES.md`: Document of changes from original Blitz3D

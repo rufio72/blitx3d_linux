@@ -25,4 +25,26 @@ struct MethodCallNode : public ExprNode{
 #endif
 };
 
+// Super method call node: Super\Method(args)
+// Calls the parent class's method with self as the object
+struct SuperMethodCallNode : public ExprNode{
+	std::string currentClass; // Current class name (set by parser)
+	std::string method;       // Method name
+	std::string tag;          // Return type tag
+	ExprSeqNode *exprs;       // Arguments
+	Decl *sem_decl;           // Resolved function declaration
+	Decl *self_decl;          // The 'self' parameter from current method
+	std::string resolved_ident; // Resolved function name (ParentClass_Method)
+
+	SuperMethodCallNode( const std::string &cls,const std::string &m,const std::string &t,ExprSeqNode *e )
+		:currentClass(cls),method(m),tag(t),exprs(e),sem_decl(0),self_decl(0){}
+	~SuperMethodCallNode(){ delete exprs; }
+	ExprNode *semant( Environ *e );
+	TNode *translate( Codegen *g );
+	json toJSON( Environ *e );
+#ifdef USE_LLVM
+	llvm::Value *translate2( Codegen_LLVM *g );
+#endif
+};
+
 #endif

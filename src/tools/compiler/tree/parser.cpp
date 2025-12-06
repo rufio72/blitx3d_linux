@@ -226,6 +226,28 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				result=d_new AssNode( var.release(),expr );
 			}
 			break;
+		case SUPER:
+			// Super\Method() as a statement
+			{
+				toker->next();
+				if( currentClassName.empty() ){
+					ex( "Super can only be used inside a method" );
+				}
+				if( toker->curr()!='\\' ){
+					exp( "'\\'" );
+				}
+				toker->next();
+				std::string method_ident=parseIdent();
+				std::string method_tag=parseTypeTag();
+				if( toker->curr()!='(' ) exp( "'('" );
+				toker->next();
+				a_ptr<ExprSeqNode> exprs( parseExprSeq() );
+				if( toker->curr()!=')' ) exp( "')'" );
+				toker->next();
+				ExprNode *method_call=d_new SuperMethodCallNode( currentClassName, method_ident, method_tag, exprs.release() );
+				result=d_new ExprStmtNode( method_call );
+			}
+			break;
 		case IDENT:
 			{
 				std::string ident=toker->text();
@@ -768,8 +790,11 @@ DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic )
 	}
 	toker->next();
 
-	// Parse method body
+	// Parse method body - set current class for Super keyword
+	std::string prevClass = currentClassName;
+	currentClassName = className;
 	a_ptr<StmtSeqNode> stmts( parseStmtSeq( STMTS_BLOCK ) );
+	currentClassName = prevClass;  // Restore previous (empty if not nested)
 	if( toker->curr()!=ENDMETHOD ) exp( "'End Method'" );
 	StmtNode *ret=d_new ReturnNode(0);ret->pos=toker->pos();
 	stmts->push_back( ret );toker->next();
@@ -1036,6 +1061,27 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		toker->next();tag=parseTypeTag();
 		// Use parseVarOrMethodCall to support self\Method() syntax
 		result=parseVarOrMethodCall( "self",tag );
+		break;
+	case SUPER:
+		// Super\Method() calls the parent class's method
+		{
+			toker->next();
+			if( currentClassName.empty() ){
+				ex( "Super can only be used inside a method" );
+			}
+			if( toker->curr()!='\\' ){
+				exp( "'\\'" );
+			}
+			toker->next();
+			std::string method_ident=parseIdent();
+			std::string method_tag=parseTypeTag();
+			if( toker->curr()!='(' ) exp( "'('" );
+			toker->next();
+			a_ptr<ExprSeqNode> exprs( parseExprSeq() );
+			if( toker->curr()!=')' ) exp( "')'" );
+			toker->next();
+			result=d_new SuperMethodCallNode( currentClassName, method_ident, method_tag, exprs.release() );
+		}
 		break;
 	case IDENT:
 		ident=toker->text();

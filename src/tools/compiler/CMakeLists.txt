@@ -13,7 +13,12 @@ if(BB64 AND NOT BB_MINGW)
     c:/llvm
   )
 
-  find_package(LLVM ${REQUIRED_LLVM_VERSION} PATHS ${LLVM_KNOWN_PATHS} NO_DEFAULT_PATH)
+  # Find LLVM 19.x (accepts any 19.x.y version)
+  find_package(LLVM CONFIG PATHS ${LLVM_KNOWN_PATHS} NO_DEFAULT_PATH)
+  if(LLVM_FOUND AND NOT LLVM_VERSION_MAJOR EQUAL 19)
+    message(WARNING "Found LLVM ${LLVM_VERSION} but version 19.x is required")
+    set(LLVM_FOUND FALSE)
+  endif()
   find_package(LLD PATHS ${LLVM_KNOWN_PATHS} NO_DEFAULT_PATH)
 
   # TODO: this will go away once CI is sorted...

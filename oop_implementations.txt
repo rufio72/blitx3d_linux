@@ -1,0 +1,467 @@
+================================================================================
+                    OOP IMPLEMENTATIONS FOR BLITZ3D-NG
+================================================================================
+
+Author: Claude AI
+Date: December 2025
+
+This document describes the Object-Oriented Programming features added to the
+Blitz3D-NG compiler.
+
+================================================================================
+PHASE 1: CLASS KEYWORD
+================================================================================
+
+Added support for Class/End Class syntax as an alias for Type/End Type.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/toker.h
+  Added tokens: CLASS, ENDCLASS
+
+- src/tools/compiler/tree/toker.cpp
+  Added keyword mappings: "Class" -> CLASS, "End Class" -> ENDCLASS
+
+- src/tools/compiler/tree/parser.h
+  Added: DeclNode *parseClassDecl();
+
+- src/tools/compiler/tree/parser.cpp
+  Added parseClassDecl() function
+
+SYNTAX:
+  Class ClassName
+    Field x%, y%
+    Field name$
+  End Class
+
+================================================================================
+PHASE 2: METHODS
+================================================================================
+
+Added support for methods inside classes with Self keyword.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/toker.h
+  Added tokens: METHOD, ENDMETHOD, SELF
+
+- src/tools/compiler/tree/toker.cpp
+  Added keyword mappings: "Method" -> METHOD, "End Method" -> ENDMETHOD,
+                          "Self" -> SELF
+
+- src/tools/compiler/tree/parser.h
+  Added: DeclNode *parseMethodDecl( const std::string &className );
+
+- src/tools/compiler/tree/parser.cpp
+  Added parseMethodDecl() function
+  Added SELF handling in parseStmtSeq() and parsePrimary()
+
+NEW FILES:
+- src/tools/compiler/tree/decl/class_decl.h
+- src/tools/compiler/tree/decl/class_decl.cpp
+  ClassDeclNode with fields and methods support
+
+- src/tools/compiler/CMakeLists.txt
+  Added class_decl.cpp/h to build
+
+IMPLEMENTATION DETAILS:
+- Methods are compiled as global functions named: ClassName_MethodName
+- Each method has an implicit 'self' parameter as first argument
+- 'Self' keyword accesses the current object's fields: self\fieldname
+
+SYNTAX:
+  Class Player
+    Field x#, y#
+    Field name$
+
+    Method Init(px#, py#, pname$)
+      self\x = px
+      self\y = py
+      self\name = pname
+    End Method
+
+    Method Move(dx#, dy#)
+      self\x = self\x + dx
+      self\y = self\y + dy
+    End Method
+
+    Method GetX#()
+      Return self\x
+    End Method
+  End Class
+
+  ; Old syntax (still works):
+  p.Player = New Player
+  Player_Init(p, 10.0, 20.0, "Mario")
+
+================================================================================
+PHASE 3: METHOD CALL SYNTAX
+================================================================================
+
+Added support for calling methods using obj\Method() syntax.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/parser.h
+  Added: ExprNode *parseVarOrMethodCall( const std::string &ident,
+                                          const std::string &tag );
+
+- src/tools/compiler/tree/parser.cpp
+  Added parseVarOrMethodCall() function
+  Modified parsePrimary() to use parseVarOrMethodCall
+  Modified parseStmtSeq() to handle method calls as statements
+
+NEW FILES:
+- src/tools/compiler/tree/expr/method_call.h
+- src/tools/compiler/tree/expr/method_call.cpp
+  MethodCallNode for obj\Method() syntax
+
+- src/tools/compiler/CMakeLists.txt
+  Added method_call.cpp/h to build
+
+IMPLEMENTATION DETAILS:
+- MethodCallNode stores the object expression and method name
+- During semantic analysis, resolves to ClassName_MethodName function
+- First argument is automatically the object (self)
+- Supports chained method calls: obj\Method1()\Method2()
+
+SYNTAX:
+  p.Player = New Player
+  p\Init(10.0, 20.0, "Mario")  ; Calls Player_Init(p, ...)
+  p\Move(5.0, -3.0)
+  x# = p\GetX()
+
+================================================================================
+PHASE 4: CONSTRUCTOR
+================================================================================
+
+Added support for constructors called automatically by New.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/expr/new.h
+  Added: ExprSeqNode *ctor_args (constructor arguments)
+  Added: Decl *ctor_decl (constructor function declaration)
+  Added destructor to delete ctor_args
+
+- src/tools/compiler/tree/expr/new.cpp
+  Modified semant() to look for ClassName_constructor function
+  Modified translate() to call constructor after object creation
+  Modified translate2() (LLVM) to call constructor after object creation
+
+- src/tools/compiler/tree/parser.cpp
+  Modified BBNEW case to parse optional constructor arguments: New Class(args)
+
+IMPLEMENTATION DETAILS:
+- Constructor is a method named "Constructor" (case-insensitive)
+- When New ClassName(args) is used, compiler looks for classname_constructor
+- Constructor is called automatically after object allocation
+- Arguments are validated against constructor parameters (excluding self)
+
+SYNTAX:
+  Class Counter
+    Field value%
+    Field name$
+
+    Method Constructor(n$, v%)
+      self\name = n
+      self\value = v
+    End Method
+  End Class
+
+  ; Create and initialize in one line:
+  c.Counter = New Counter("MyCounter", 100)
+
+  ; Equivalent to:
+  c.Counter = New Counter
+  c\Constructor("MyCounter", 100)
+
+================================================================================
+COMPLETE EXAMPLE
+================================================================================
+
+Class Vector2D
+  Field x#, y#
+
+  Method Constructor(px#, py#)
+    self\x = px
+    self\y = py
+  End Method
+
+  Method Add(other.Vector2D)
+    self\x = self\x + other\x
+    self\y = self\y + other\y
+  End Method
+
+  Method Length#()
+    Return Sqr(self\x * self\x + self\y * self\y)
+  End Method
+
+  Method Print()
+    Print "(" + self\x + ", " + self\y + ")"
+  End Method
+End Class
+
+; Usage:
+v1.Vector2D = New Vector2D(3.0, 4.0)
+v2.Vector2D = New Vector2D(1.0, 2.0)
+
+v1\Add(v2)
+v1\Print()  ; Prints: (4.0, 6.0)
+Print "Length: " + v1\Length()  ; Prints: Length: 7.211...
+
+Delete v1
+Delete v2
+
+================================================================================
+PHASE 5: TYPE INFERENCE
+================================================================================
+
+Added support for inferring variable type from New expression.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/parser.cpp
+  Modified assignment handling in parseStmtSeq() to detect when:
+  1. Variable has no type tag (no .ClassName)
+  2. Right-hand side is a NewNode with constructor arguments
+
+  When both conditions are met, the type is inferred from the NewNode's
+  class name and applied to the variable.
+
+IMPLEMENTATION DETAILS:
+- Only works when constructor arguments are provided: New Class(args)
+- Does NOT work with plain New Class (no parentheses)
+- This is intentional: the constructor syntax signals "modern OOP style"
+- Zero runtime overhead - inference happens at parse time
+- Backward compatible: old syntax c.Class = New Class still works
+
+SYNTAX:
+  ; NEW - Type inferred from constructor call:
+  c = New Counter("MyCounter", 100)
+
+  ; OLD - Explicit type declaration (still works):
+  c.Counter = New Counter("MyCounter", 100)
+
+  ; Note: This does NOT work (no constructor args = no inference):
+  ; c = New Counter  ; ERROR - type not specified
+
+================================================================================
+PHASE 6: DESTRUCTOR
+================================================================================
+
+Added support for destructors called automatically by Delete.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/stmt/delete.h
+  Added: Decl *dtor_decl (destructor function declaration)
+
+- src/tools/compiler/tree/stmt/delete.cpp
+  Modified semant() to look for ClassName_destructor function
+  Modified translate2() (LLVM) to call destructor before __bbObjDelete
+
+IMPLEMENTATION DETAILS:
+- Destructor is a method named "Destructor" (case-insensitive)
+- When Delete obj is called, compiler looks for classname_destructor
+- Destructor is called automatically BEFORE object deallocation
+- Destructor takes 'self' as only parameter (like any method)
+
+SYNTAX:
+  Class Resource
+    Field id%
+
+    Method Constructor(i%)
+      self\id = i
+    End Method
+
+    Method Destructor()
+      ; Cleanup code here
+      Print "Resource " + self\id + " destroyed"
+    End Method
+  End Class
+
+  r.Resource = New Resource(42)
+  Delete r  ; Automatically calls Resource_Destructor(r) first
+
+================================================================================
+PHASE 7: INHERITANCE (EXTENDS)
+================================================================================
+
+Added support for class inheritance with the Extends keyword.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/toker.h
+  Added token: EXTENDS
+
+- src/tools/compiler/tree/toker.cpp
+  Added keyword mapping: "Extends" -> EXTENDS
+
+- src/tools/compiler/tree/type.h
+  Added: StructType *superType (pointer to parent class type)
+  Modified constructors to initialize superType to null
+  Modified canCastTo() to check inheritance chain
+
+- src/tools/compiler/tree/type.cpp
+  Modified canCastTo() to allow subclass to be assigned to parent type
+
+- src/tools/compiler/tree/decl/class_decl.h
+  Added: std::string superName (parent class name)
+  Modified constructor to accept superName parameter
+
+- src/tools/compiler/tree/decl/class_decl.cpp
+  Modified proto() to find and store parent type reference
+  Modified semant() to copy parent fields before adding own fields
+  Offsets adjusted so inherited fields come first
+
+- src/tools/compiler/tree/parser.cpp
+  Modified parseClassDecl() to parse "Extends ParentClass" syntax
+  Modified ClassDeclNode constructor call to pass superName
+
+IMPLEMENTATION DETAILS:
+- Child class inherits all fields from parent class
+- Fields are laid out with inherited fields first, then own fields
+- Child can be assigned to parent type variable (polymorphism)
+- Methods are NOT automatically inherited (must be redeclared)
+- Parent class must be declared before child class
+
+SYNTAX:
+  Class Animal
+    Field name$
+    Field age%
+
+    Method Constructor(n$, a%)
+      self\name = n
+      self\age = a
+    End Method
+  End Class
+
+  Class Dog Extends Animal
+    Field breed$
+
+    Method Constructor(n$, a%, b$)
+      self\name = n
+      self\age = a
+      self\breed = b
+    End Method
+
+    Method Bark()
+      Print self\name + " says Woof!"
+    End Method
+  End Class
+
+  ; Usage:
+  d = New Dog("Rex", 5, "German Shepherd")
+  Print d\name   ; Inherited from Animal
+  Print d\breed  ; Dog's own field
+  Dog_Bark(d)
+
+================================================================================
+PHASE 8: STATIC METHODS
+================================================================================
+
+Added support for static methods that don't require an object instance.
+
+FILES MODIFIED:
+- src/tools/compiler/tree/toker.h
+  Added token: STATIC
+
+- src/tools/compiler/tree/toker.cpp
+  Added keyword mapping: "Static" -> STATIC
+
+- src/tools/compiler/tree/parser.h
+  Modified: parseMethodDecl() now accepts isStatic parameter
+
+- src/tools/compiler/tree/parser.cpp
+  Modified parseClassDecl() to parse "Static Method" syntax
+  Modified parseMethodDecl() to skip implicit 'self' parameter when isStatic=true
+
+IMPLEMENTATION DETAILS:
+- Static methods are declared with "Static Method" keyword
+- Static methods have NO implicit 'self' parameter
+- Static methods can be called without an instance: ClassName_MethodName()
+- Static methods cannot access instance fields (no self)
+- Useful for factory methods, utility functions, class-level operations
+
+SYNTAX:
+  Class Counter
+    Field value%
+
+    Method Constructor(v%)
+      self\value = v
+    End Method
+
+    Method Increment()
+      self\value = self\value + 1
+    End Method
+
+    ; Static method - no self parameter
+    Static Method Create%(startValue%)
+      c.Counter = New Counter(startValue)
+      Return Handle(c)
+    End Method
+
+    Static Method GetDefaultValue%()
+      Return 100
+    End Method
+  End Class
+
+  ; Usage - call without instance:
+  defaultVal = Counter_GetDefaultValue()  ; Returns 100
+
+  ; Factory pattern:
+  handle = Counter_Create(50)
+
+================================================================================
+PHASE 9: DEFAULT CONSTRUCTOR (EMPTY PARENTHESES)
+================================================================================
+
+Added support for creating objects with empty parentheses: New Class()
+
+FILES MODIFIED:
+- src/tools/compiler/tree/expr/new.cpp
+  Modified semant() to handle three cases:
+  1. ctor_args with elements → constructor required
+  2. ctor_args empty (0 elements) → constructor optional (call if exists)
+  3. ctor_args null → just create object (old behavior)
+
+IMPLEMENTATION DETAILS:
+- New Class() with empty parentheses now works for all classes
+- If class has no constructor, object is created with default field values
+- If class has a default constructor (only self param), it is called
+- If class has a parameterized constructor, New Class() calls it with no args
+  (which may fail if required parameters are missing)
+
+SYNTAX:
+  ; Class without constructor
+  Class Point
+    Field x%, y%
+  End Class
+
+  ; Class with default constructor
+  Class Logger
+    Field id%
+
+    Method Constructor()
+      self\id = 999
+    End Method
+  End Class
+
+  ; Class with parameterized constructor
+  Class Counter
+    Field value%
+
+    Method Constructor(v%)
+      self\value = v
+    End Method
+  End Class
+
+  ; Usage:
+  p = New Point()       ; Works - no constructor needed
+  log = New Logger()    ; Works - calls default constructor
+  c = New Counter(42)   ; Works - must provide argument
+
+================================================================================
+FUTURE ENHANCEMENTS
+================================================================================
+
+Possible future additions:
+1. Access modifiers: Private/Public fields
+2. Operator overloading
+3. Super keyword to call parent methods
+
+================================================================================

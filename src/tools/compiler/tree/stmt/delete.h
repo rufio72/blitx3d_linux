@@ -6,7 +6,8 @@
 
 struct DeleteNode : public StmtNode{
 	ExprNode *expr;
-	DeleteNode( ExprNode *e ):expr(e){}
+	Decl *dtor_decl;  // Destructor declaration (may be null)
+	DeleteNode( ExprNode *e ):expr(e),dtor_decl(0){}
 	~DeleteNode(){ delete expr; }
 	void semant( Environ *e );
 	void translate( Codegen *g );

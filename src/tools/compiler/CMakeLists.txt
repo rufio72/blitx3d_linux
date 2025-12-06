@@ -30,6 +30,7 @@ set(TREE_SOURCES
   tree/decl/decl_seq.cpp tree/decl/decl_seq.h
   tree/decl/func_decl.cpp tree/decl/func_decl.h
   tree/decl/struct_decl.cpp tree/decl/struct_decl.h
+  tree/decl/class_decl.cpp tree/decl/class_decl.h
   tree/decl/var_decl.cpp tree/decl/var_decl.h
   tree/decl/vector_decl.cpp tree/decl/vector_decl.h
 
@@ -63,6 +64,7 @@ set(TREE_SOURCES
   tree/expr/before.cpp tree/expr/before.h
   tree/expr/bin_expr.cpp tree/expr/bin_expr.h
   tree/expr/call.cpp tree/expr/call.h
+  tree/expr/method_call.cpp tree/expr/method_call.h
   tree/expr/cast.cpp tree/expr/cast.h
   tree/expr/expr_seq.cpp tree/expr/expr_seq.h
   tree/expr/first.cpp tree/expr/first.h

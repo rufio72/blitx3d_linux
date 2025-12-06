@@ -35,6 +35,13 @@ static void makeKeywords(){
 	alphaTokes["Type"]=TYPE;
 	alphaTokes["End Type"]=ENDTYPE;
 	alphaTokes["Each"]=EACH;
+	alphaTokes["Class"]=CLASS;
+	alphaTokes["End Class"]=ENDCLASS;
+	alphaTokes["Method"]=METHOD;
+	alphaTokes["End Method"]=ENDMETHOD;
+	alphaTokes["Self"]=SELF;
+	alphaTokes["Extends"]=EXTENDS;
+	alphaTokes["Static"]=STATIC;
 	alphaTokes["Local"]=LOCAL;
 	alphaTokes["Global"]=GLOBAL;
 	alphaTokes["Field"]=FIELD;

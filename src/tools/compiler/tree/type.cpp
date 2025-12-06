@@ -153,7 +153,15 @@ llvm::Constant *ArrayType::llvmZero( llvm::LLVMContext *c ){
 #endif
 
 bool StructType::canCastTo( Type *t ){
-	return t==this || t==Type::null_type || (this==Type::null_type && t->structType());
+	if( t==this || t==Type::null_type || (this==Type::null_type && t->structType()) ) return true;
+	// Check if t is a parent class (inheritance chain)
+	StructType *target=t->structType();
+	if( target ){
+		for( StructType *p=superType; p; p=p->superType ){
+			if( p==target ) return true;
+		}
+	}
+	return false;
 }
 
 #ifdef USE_LLVM

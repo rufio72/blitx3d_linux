@@ -6,6 +6,7 @@
 #include "decl/data_decl.h"
 #include "decl/func_decl.h"
 #include "decl/struct_decl.h"
+#include "decl/class_decl.h"
 #include "decl/var_decl.h"
 #include "decl/vector_decl.h"
 
@@ -14,6 +15,7 @@
 #include "expr/before.h"
 #include "expr/bin_expr.h"
 #include "expr/call.h"
+#include "expr/method_call.h"
 #include "expr/cast.h"
 #include "expr/first.h"
 #include "expr/float_const.h"
@@ -101,6 +103,9 @@ void Parser::exp( const std::string &s ){
 	case ELSE:case ELSEIF:ex( "'Else' without 'If'" );
 	case ENDIF:ex( "'Endif' without 'If'" );
 	case ENDFUNCTION:ex( "'End Function' without 'Function'" );
+	case ENDTYPE:ex( "'End Type' without 'Type'" );
+	case ENDCLASS:ex( "'End Class' without 'Class'" );
+	case ENDMETHOD:ex( "'End Method' without 'Method'" );
 	case UNTIL:ex( "'Until' without 'Repeat'" );
 	case FOREVER:ex( "'Forever' without 'Repeat'" );
 	case CASE:ex( "'Case' without 'Select'" );
@@ -210,6 +215,17 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				bundle.files.push_back( BundleFile( path,abspath ) );
 			}
 			break;
+		case SELF:
+			// Self is treated as a variable named "self"
+			{
+				toker->next();
+				std::string tag=parseTypeTag();
+				a_ptr<VarNode> var( parseVar( "self",tag ) );
+				if( toker->curr()!='=' ) exp( "variable assignment" );
+				toker->next();ExprNode *expr=parseExpr( false );
+				result=d_new AssNode( var.release(),expr );
+			}
+			break;
 		case IDENT:
 			{
 				std::string ident=toker->text();
@@ -237,11 +253,43 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 					CallNode *call=d_new CallNode( ident,tag,exprs );
 					result=d_new ExprStmtNode( call );
 				}else{
-					//must be a var
-					a_ptr<VarNode> var( parseVar( ident,tag ) );
-					if( toker->curr()!='=' ) exp( "variable assignment" );
-					toker->next();ExprNode *expr=parseExpr( false );
-					result=d_new AssNode( var.release(),expr );
+					//must be a var or method call
+					ExprNode *expr_or_var = parseVarOrMethodCall( ident,tag );
+					// Check if it's a method call (statement) or var (needs assignment)
+					if( dynamic_cast<MethodCallNode*>(expr_or_var) ){
+						// Method call as statement
+						result=d_new ExprStmtNode( expr_or_var );
+					}else{
+						// Must be a var assignment
+						VarExprNode *var_expr = dynamic_cast<VarExprNode*>(expr_or_var);
+						if( !var_expr ) ex( "Unexpected expression" );
+						if( toker->curr()!='=' ) exp( "variable assignment" );
+						toker->next();ExprNode *rhs=parseExpr( false );
+
+						// OOP Type Inference: if tag is empty and rhs is New ClassName(...),
+						// infer the type from the class name
+						std::string inferred_tag = tag;
+						if( tag.empty() ){
+							NewNode *newNode = dynamic_cast<NewNode*>(rhs);
+							if( newNode && newNode->ctor_args ){
+								// Infer type from New expression
+								inferred_tag = newNode->ident;
+							}
+						}
+
+						// Extract VarNode from VarExprNode for AssNode
+						VarNode *var = var_expr->var;
+						// Update the tag if we inferred it
+						if( !inferred_tag.empty() && tag.empty() ){
+							IdentVarNode *identVar = dynamic_cast<IdentVarNode*>(var);
+							if( identVar ){
+								identVar->tag = inferred_tag;
+							}
+						}
+						var_expr->var = 0; // prevent double delete
+						delete var_expr;
+						result=d_new AssNode( var,rhs );
+					}
 				}
 			}
 			break;
@@ -398,6 +446,10 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			if( scope!=STMTS_PROG ) ex( "'Type' can only appear in main program" );
 			toker->next();structs->push_back( parseStructDecl() );
 			break;
+		case CLASS:
+			if( scope!=STMTS_PROG ) ex( "'Class' can only appear in main program" );
+			toker->next();structs->push_back( parseClassDecl() );
+			break;
 		case BBCONST:
 			if( scope!=STMTS_PROG ) ex( "'Const' can only appear in main program" );
 			do{
@@ -499,6 +551,75 @@ VarNode *Parser::parseVar( const std::string &ident,const std::string &tag ){
 	return var.release();
 }
 
+// Parse a variable access or method call (obj\Method())
+// Returns either VarExprNode or MethodCallNode
+ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::string &tag ){
+	a_ptr<VarNode> var;
+	if( toker->curr()=='(' ){
+		toker->next();
+		a_ptr<ExprSeqNode> exprs( parseExprSeq() );
+		if( toker->curr()!=')' ) exp( "')'" );
+		toker->next();
+		var=d_new ArrayVarNode( ident,tag,exprs.release() );
+	}else var=d_new IdentVarNode( ident,tag );
+
+	for(;;){
+		if( toker->curr()=='\\' ){
+			toker->next();
+			std::string field_ident=parseIdent();
+			std::string field_tag=parseTypeTag();
+
+			// Check if this is a method call: obj\Method(...)
+			if( toker->curr()=='(' ){
+				// This is a method call!
+				toker->next();
+				a_ptr<ExprSeqNode> exprs( parseExprSeq() );
+				if( toker->curr()!=')' ) exp( "')'" );
+				toker->next();
+
+				// Create VarExprNode from current var
+				ExprNode *obj_expr=d_new VarExprNode( var.release() );
+
+				// Create method call node
+				ExprNode *method_call=d_new MethodCallNode( obj_expr,field_ident,field_tag,exprs.release() );
+
+				// Check for chained method calls or field access
+				while( toker->curr()=='\\' ){
+					toker->next();
+					std::string next_ident=parseIdent();
+					std::string next_tag=parseTypeTag();
+					if( toker->curr()=='(' ){
+						// Chained method call
+						toker->next();
+						a_ptr<ExprSeqNode> next_exprs( parseExprSeq() );
+						if( toker->curr()!=')' ) exp( "')'" );
+						toker->next();
+						method_call=d_new MethodCallNode( method_call,next_ident,next_tag,next_exprs.release() );
+					}else{
+						// Field access after method call - not supported yet
+						ex( "Field access after method call not yet supported" );
+					}
+				}
+				return method_call;
+			}
+
+			// Regular field access
+			ExprNode *expr=d_new VarExprNode( var.release() );
+			var=d_new FieldVarNode( expr,field_ident,field_tag );
+		}else if( toker->curr()=='[' ){
+			toker->next();
+			a_ptr<ExprSeqNode> exprs( parseExprSeq() );
+			if( exprs->exprs.size()!=1 || toker->curr()!=']' ) exp( "']'" );
+			toker->next();
+			ExprNode *expr=d_new VarExprNode( var.release() );
+			var=d_new VectorVarNode( expr,exprs.release() );
+		}else{
+			break;
+		}
+	}
+	return d_new VarExprNode( var.release() );
+}
+
 DeclNode *Parser::parseVarDecl( int kind,bool constant ){
 	int pos=toker->pos();
 	std::string ident=parseIdent();
@@ -576,6 +697,85 @@ DeclNode *Parser::parseStructDecl(){
 	if( toker->curr()!=ENDTYPE ) exp( "'Field' or 'End Type'" );
 	toker->next();
 	DeclNode *d=d_new StructDeclNode( ident,fields.release() );
+	d->pos=pos;d->file=incfile;
+	return d;
+}
+
+DeclNode *Parser::parseClassDecl(){
+	int pos=toker->pos();
+	std::string ident=parseIdent();
+	std::string superName;
+	// Check for Extends keyword
+	if( toker->curr()==EXTENDS ){
+		toker->next();
+		superName=parseIdent();
+	}
+	while( toker->curr()=='\n' ) toker->next();
+	a_ptr<DeclSeqNode> fields( d_new DeclSeqNode() );
+	a_ptr<DeclSeqNode> methods( d_new DeclSeqNode() );
+	while( toker->curr()==FIELD || toker->curr()==METHOD || toker->curr()==STATIC ){
+		if( toker->curr()==FIELD ){
+			do{
+				toker->next();
+				fields->push_back( parseVarDecl( DECL_FIELD,false ) );
+			}while( toker->curr()==',' );
+		}else if( toker->curr()==STATIC ){
+			toker->next();
+			if( toker->curr()!=METHOD ) exp( "'Method'" );
+			toker->next();
+			methods->push_back( parseMethodDecl( ident, true ) );  // isStatic=true
+		}else if( toker->curr()==METHOD ){
+			toker->next();
+			methods->push_back( parseMethodDecl( ident, false ) );  // isStatic=false
+		}
+		while( toker->curr()=='\n' ) toker->next();
+	}
+	if( toker->curr()!=ENDCLASS ) exp( "'Field', 'Method', 'Static' or 'End Class'" );
+	toker->next();
+	DeclNode *d=d_new ClassDeclNode( ident,superName,fields.release(),methods.release() );
+	d->pos=pos;d->file=incfile;
+	return d;
+}
+
+DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic ){
+	int pos=toker->pos();
+	std::string methodName=parseIdent();
+	std::string tag=parseTypeTag();
+
+	// Method becomes a global function named ClassName_MethodName
+	std::string funcName=className+"_"+methodName;
+
+	if( toker->curr()!='(' ) exp( "'('" );
+
+	// Create params
+	a_ptr<DeclSeqNode> params( d_new DeclSeqNode() );
+
+	// Add implicit Self parameter only for non-static methods
+	if( !isStatic ){
+		DeclNode *selfParam=d_new VarDeclNode( "self",className,DECL_PARAM,false,0 );
+		selfParam->pos=pos;selfParam->file=incfile;
+		params->push_back( selfParam );
+	}
+
+	// Parse remaining parameters
+	if( toker->next()!=')' ){
+		for(;;){
+			params->push_back( parseVarDecl( DECL_PARAM,false ) );
+			if( toker->curr()!=',' ) break;
+			toker->next();
+		}
+		if( toker->curr()!=')' ) exp( "')'" );
+	}
+	toker->next();
+
+	// Parse method body
+	a_ptr<StmtSeqNode> stmts( parseStmtSeq( STMTS_BLOCK ) );
+	if( toker->curr()!=ENDMETHOD ) exp( "'End Method'" );
+	StmtNode *ret=d_new ReturnNode(0);ret->pos=toker->pos();
+	stmts->push_back( ret );toker->next();
+
+	// Create as a regular function declaration
+	DeclNode *d=d_new FuncDeclNode( funcName,tag,params.release(),stmts.release() );
 	d->pos=pos;d->file=incfile;
 	return d;
 }
@@ -774,7 +974,16 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		break;
 	case BBNEW:
 		toker->next();t=parseIdent();
-		result=d_new NewNode( t );
+		// Check for constructor arguments: New ClassName(args)
+		if( toker->curr()=='(' ){
+			toker->next();
+			ExprSeqNode *args = parseExprSeq();
+			if( toker->curr()!=')' ) exp( "')'" );
+			toker->next();
+			result=d_new NewNode( t, args );
+		}else{
+			result=d_new NewNode( t );
+		}
 		break;
 	case FIRST:
 		toker->next();t=parseIdent();
@@ -822,6 +1031,12 @@ ExprNode *Parser::parsePrimary( bool opt ){
 	case BBFALSE:
 		result=d_new IntConstNode( 0 );
 		toker->next();break;
+	case SELF:
+		// Self is treated as a variable named "self"
+		toker->next();tag=parseTypeTag();
+		// Use parseVarOrMethodCall to support self\Method() syntax
+		result=parseVarOrMethodCall( "self",tag );
+		break;
 	case IDENT:
 		ident=toker->text();
 		toker->next();tag=parseTypeTag();
@@ -833,9 +1048,8 @@ ExprNode *Parser::parsePrimary( bool opt ){
 			toker->next();
 			result=d_new CallNode( ident,tag,exprs.release() );
 		}else{
-			//must be a var
-			VarNode *var=parseVar( ident,tag );
-			result=d_new VarExprNode( var );
+			//must be a var - or method call if obj\Method()
+			result=parseVarOrMethodCall( ident,tag );
 		}
 		break;
 	default:

@@ -48,6 +48,7 @@ private:
 
 	VarNode *parseVar();
 	VarNode *parseVar( const std::string &ident,const std::string &tag );
+	ExprNode *parseVarOrMethodCall( const std::string &ident,const std::string &tag );
 	CallNode *parseCall( const std::string &ident,const std::string &tag );
 	IfNode *parseIf();
 
@@ -55,6 +56,8 @@ private:
 	DimNode  *parseArrayDecl();
 	DeclNode *parseFuncDecl();
 	DeclNode *parseStructDecl();
+	DeclNode *parseClassDecl();
+	DeclNode *parseMethodDecl( const std::string &className, bool isStatic=false );
 
 	ExprSeqNode *parseExprSeq();
 

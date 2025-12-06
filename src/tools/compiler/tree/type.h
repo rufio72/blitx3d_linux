@@ -92,8 +92,9 @@ struct ArrayType : public Type{
 struct StructType : public Type{
 	std::string ident;
 	DeclSeq *fields;
-	StructType( const std::string &i ):ident(i),fields(0){}
-	StructType( const std::string &i,DeclSeq *f ):ident(i),fields( f ){}
+	StructType *superType;  // Parent class (null if no inheritance)
+	StructType( const std::string &i ):ident(i),fields(0),superType(0){}
+	StructType( const std::string &i,DeclSeq *f ):ident(i),fields( f ),superType(0){}
 	~StructType(){ delete fields; }
 	StructType *structType(){ return this; }
 	virtual bool canCastTo( Type *t );

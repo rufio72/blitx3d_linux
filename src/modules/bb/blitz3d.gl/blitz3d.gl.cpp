@@ -7,7 +7,6 @@
 
 #include <iostream>
 #include <cmath>
-#include <map>
 
 //degrees to radians and back
 static const float dtor=0.0174532925199432957692369076848861f;
@@ -161,7 +160,6 @@ struct LightState{
 	struct LightData{
 		float mat[16];
 		float color[4];
-		float direction[4]; // Optimization #8: Pre-computed light direction (w=0 for padding)
 	} data[8];
 
 	int lights_used;
@@ -221,46 +219,6 @@ private:
 		GLuint bound_cube[MAX_TEXTURES] = {0};
 	} tex_cache;
 
-	// Blend state cache (optimization #9)
-	struct {
-		int current_blend = -1;
-	} blend_cache;
-
-	// Cull face state cache (optimization #9)
-	int cached_cull_enabled = -1; // -1 = unknown
-
-	// Texture parameter cache (optimization #10)
-	struct TexParamCache {
-		GLenum mag_filter = 0;
-		GLenum min_filter = 0;
-		GLenum wrap_s = 0;
-		GLenum wrap_t = 0;
-	};
-	std::map<GLuint, TexParamCache> tex_param_cache;
-
-	// Last bound VAO (optimization #11)
-	GLuint last_bound_vao = 0;
-
-	// Z-Mode state cache (Phase 3)
-	int cached_zmode = -1;
-
-	// Polygon mode cache (Phase 3, non-GLES only)
-	int cached_polygon_mode = -1; // 0=fill, 1=line
-
-	// Front face cache (Phase 3)
-	int cached_front_face = -1; // 0=CCW, 1=CW
-
-	// Active texture unit cache (Phase 3)
-	int cached_active_texture = -1;
-
-	// Phase 3: Helper to set active texture with caching
-	void setActiveTexture( int unit ){
-		if( cached_active_texture != unit ){
-			GL( glActiveTexture( GL_TEXTURE0 + unit ) );
-			cached_active_texture = unit;
-		}
-	}
-
 	void setLights(){
 		LightState ls={ 0 };
 
@@ -274,37 +232,6 @@ private:
 
 			memcpy( ls.data[i].mat,lights[i]->matrix,sizeof(ls.data[i].mat) );
 			ls.data[i].color[0]=lights[i]->r;ls.data[i].color[1]=lights[i]->g;ls.data[i].color[2]=lights[i]->b;ls.data[i].color[3]=1.0;
-
-			// Optimization #8: Pre-compute light direction on CPU
-			// This replaces the expensive rotationMatrix() calculation in the vertex shader
-			// The light direction is transformed by: viewMatrix * lightTform * rotation(x, 90deg) * (0,1,0)
-			// Which simplifies to extracting and transforming the rotated Y axis of the light
-
-			// Light transform matrix (column-major)
-			const float* ltm = lights[i]->matrix;
-
-			// Rotation by 90 degrees around X axis transforms Y to Z
-			// So we need the Z column of the light transform (elements [8,9,10])
-			float lz[3] = { ltm[8], ltm[9], ltm[10] };
-
-			// Transform by view matrix (column-major): result = viewMatrix * lz
-			float dir[3];
-			dir[0] = cached_view_matrix[0]*lz[0] + cached_view_matrix[4]*lz[1] + cached_view_matrix[8]*lz[2];
-			dir[1] = cached_view_matrix[1]*lz[0] + cached_view_matrix[5]*lz[1] + cached_view_matrix[9]*lz[2];
-			dir[2] = cached_view_matrix[2]*lz[0] + cached_view_matrix[6]*lz[1] + cached_view_matrix[10]*lz[2];
-
-			// Normalize
-			float len = sqrtf(dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2]);
-			if( len > 0.0001f ){
-				ls.data[i].direction[0] = dir[0] / len;
-				ls.data[i].direction[1] = dir[1] / len;
-				ls.data[i].direction[2] = dir[2] / len;
-			} else {
-				ls.data[i].direction[0] = 0.0f;
-				ls.data[i].direction[1] = 0.0f;
-				ls.data[i].direction[2] = 1.0f;
-			}
-			ls.data[i].direction[3] = 0.0f; // padding for alignment
 
 			float z=1.0f,w=0.0f;
 			if( lights[i]->type!=Light::LIGHT_DISTANT ){
@@ -343,7 +270,7 @@ private:
 		}
 
 		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(ls),&ls ) );
-		// Phase 3: Removed unnecessary glBindBuffer(0) - UBO remains bound until next bind
+		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
 	}
 
 public:
@@ -367,12 +294,7 @@ public:
 		wireframe=enable;
 	}
 	void setFlippedTris( bool enable ){
-		// Phase 3: Cache front face state
-		int want_face = enable ? 1 : 0;
-		if( cached_front_face != want_face ){
-			GL( glFrontFace( enable ? GL_CW : GL_CCW ) );
-			cached_front_face = want_face;
-		}
+		GL( glFrontFace( enable ? GL_CW : GL_CCW ) );
 	}
 	void setAmbient( const float rgb[3] ){
 		us.ambient[0]=rgb[0];us.ambient[1]=rgb[1];us.ambient[2]=rgb[2];us.ambient[3]=1.0f;
@@ -395,10 +317,6 @@ public:
 	}
 
 	void setZMode( int mode ){
-		// Phase 3: Cache Z-mode state
-		if( cached_zmode == mode ) return;
-		cached_zmode = mode;
-
 		switch( mode ){
 		case ZMODE_NORMAL:
 			GL( glEnable( GL_DEPTH_TEST ) );
@@ -585,15 +503,10 @@ public:
 			us.fog_mode = 0;
 		}
 
-		// Optimization #9: Cache cull face state
-		int want_cull = (rs.fx&FX_DOUBLESIDED) ? 0 : 1;
-		if( cached_cull_enabled != want_cull ){
-			if( want_cull ){
-				GL( glEnable( GL_CULL_FACE ) );
-			}else{
-				GL( glDisable( GL_CULL_FACE ) );
-			}
-			cached_cull_enabled = want_cull;
+		if( rs.fx&FX_DOUBLESIDED ){
+			GL( glDisable( GL_CULL_FACE ) );
+		}else{
+			GL( glEnable( GL_CULL_FACE ) );
 		}
 
 		int blend=rs.blend;
@@ -602,11 +515,10 @@ public:
 
 		// TODO: sort this out for ES
 #ifndef GLES
-		// Phase 3: Cache polygon mode
-		int want_poly = (rs.fx&FX_WIREFRAME||wireframe) ? 1 : 0;
-		if( cached_polygon_mode != want_poly ){
-			GL( glPolygonMode(GL_FRONT_AND_BACK, want_poly ? GL_LINE : GL_FILL) );
-			cached_polygon_mode = want_poly;
+		if( rs.fx&FX_WIREFRAME||wireframe ){
+			GL( glPolygonMode(GL_FRONT_AND_BACK,GL_LINE) );
+		}else{
+			GL( glPolygonMode(GL_FRONT_AND_BACK,GL_FILL) );
 		}
 #endif
 
@@ -626,12 +538,12 @@ public:
 			if( !ts.canvas ){
 				// Optimization #5: Only unbind if something was previously bound
 				if( tex_cache.bound_2d[i] != 0 ){
-					setActiveTexture( i );
+					GL( glActiveTexture( GL_TEXTURE0+i ) );
 					GL( glBindTexture( GL_TEXTURE_2D,0 ) );
 					tex_cache.bound_2d[i] = 0;
 				}
 				if( tex_cache.bound_cube[i] != 0 ){
-					setActiveTexture( MAX_TEXTURES+i );
+					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
 					GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
 					tex_cache.bound_cube[i] = 0;
 				}
@@ -648,20 +560,20 @@ public:
 				if( flags&BBCanvas::CANVAS_TEX_CUBE ){
 					// Unbind 2D only if needed
 					if( tex_cache.bound_2d[i] != 0 ){
-						setActiveTexture( i );
+						GL( glActiveTexture( GL_TEXTURE0+i ) );
 						GL( glBindTexture( GL_TEXTURE_2D,0 ) );
 						tex_cache.bound_2d[i] = 0;
 					}
-					setActiveTexture( MAX_TEXTURES+i );
+					GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
 					tex_cache.bound_cube[i] = canvas->texture;
 				}else{
 					// Unbind cube only if needed
 					if( tex_cache.bound_cube[i] != 0 ){
-						setActiveTexture( MAX_TEXTURES+i );
+						GL( glActiveTexture( GL_TEXTURE0+MAX_TEXTURES+i ) );
 						GL( glBindTexture( GL_TEXTURE_CUBE_MAP,0 ) );
 						tex_cache.bound_cube[i] = 0;
 					}
-					setActiveTexture( i );
+					GL( glActiveTexture( GL_TEXTURE0+i ) );
 					tex_cache.bound_2d[i] = canvas->texture;
 				}
 
@@ -687,29 +599,10 @@ public:
 				bool no_filter=flags&BBCanvas::CANVAS_TEX_NOFILTERING;
 				bool mipmap=flags&BBCanvas::CANVAS_TEX_MIPMAP;
 
-				// Optimization #10: Cache texture parameters - only set when changed
-				GLenum want_mag = no_filter ? GL_NEAREST : GL_LINEAR;
-				GLenum want_min = mipmap ? GL_LINEAR_MIPMAP_LINEAR : (no_filter ? GL_NEAREST : GL_LINEAR);
-				GLenum want_wrap_s = (flags&BBCanvas::CANVAS_TEX_CLAMPU) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-				GLenum want_wrap_t = (flags&BBCanvas::CANVAS_TEX_CLAMPV) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
-
-				TexParamCache& tpc = tex_param_cache[canvas->texture];
-				if( tpc.mag_filter != want_mag ){
-					GL( glTexParameteri( canvas->target,GL_TEXTURE_MAG_FILTER,want_mag ) );
-					tpc.mag_filter = want_mag;
-				}
-				if( tpc.min_filter != want_min ){
-					GL( glTexParameteri( canvas->target,GL_TEXTURE_MIN_FILTER,want_min ) );
-					tpc.min_filter = want_min;
-				}
-				if( tpc.wrap_s != want_wrap_s ){
-					GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,want_wrap_s ) );
-					tpc.wrap_s = want_wrap_s;
-				}
-				if( tpc.wrap_t != want_wrap_t ){
-					GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,want_wrap_t ) );
-					tpc.wrap_t = want_wrap_t;
-				}
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_MAG_FILTER,no_filter?GL_NEAREST:GL_LINEAR ) );
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_MIN_FILTER,mipmap?GL_LINEAR_MIPMAP_LINEAR:(no_filter?GL_NEAREST:GL_LINEAR) ) );
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,flags&BBCanvas::CANVAS_TEX_CLAMPU?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,flags&BBCanvas::CANVAS_TEX_CLAMPV?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
 
 				if( flags&BBCanvas::CANVAS_TEX_ALPHA ){
 					us.alpha_test=1;
@@ -724,26 +617,22 @@ public:
 			}
 		}
 
-		// Optimization #9: Cache blend state - only change when needed
-		if( blend != blend_cache.current_blend ){
-			blend_cache.current_blend = blend;
-			switch( blend ){
-			default:case BLEND_REPLACE:
-				GL( glDisable( GL_BLEND ) );
-				break;
-			case BLEND_ALPHA:
-				GL( glEnable( GL_BLEND ) );
-				GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA ) );
-				break;
-			case BLEND_MULTIPLY:
-				GL( glEnable( GL_BLEND ) );
-				GL( glBlendFunc( GL_DST_COLOR,GL_ZERO ) );
-				break;
-			case BLEND_ADD:
-				GL( glEnable( GL_BLEND ) );
-				GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE ) );
-				break;
-			}
+		switch( blend ){
+		default:case BLEND_REPLACE:
+			GL( glDisable( GL_BLEND ) );
+			break;
+		case BLEND_ALPHA:
+			GL( glEnable( GL_BLEND ) );
+			GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA ) );
+			break;
+		case BLEND_MULTIPLY:
+			GL( glEnable( GL_BLEND ) );
+			GL( glBlendFunc( GL_DST_COLOR,GL_ZERO ) );
+			break;
+		case BLEND_ADD:
+			GL( glEnable( GL_BLEND ) );
+			GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE ) );
+			break;
 		}
 
 		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData
@@ -757,7 +646,7 @@ public:
 		}
 
 		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(us),&us ) );
-		// Phase 3: Removed unnecessary glBindBuffer(0) - UBO remains bound until next bind
+		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
 
 		// restore
 		us.fog_mode=fog_mode;
@@ -833,11 +722,7 @@ public:
 	void render( BBMesh *m,int first_vert,int vert_cnt,int first_tri,int tri_cnt ){
 		GLMesh *mesh=(GLMesh*)m;
 
-		// Optimization #11: Only bind VAO if different from last one
-		if( last_bound_vao != mesh->vertex_array ){
-			GL( glBindVertexArray( mesh->vertex_array ) );
-			last_bound_vao = mesh->vertex_array;
-		}
+		GL( glBindVertexArray( mesh->vertex_array ) );
 #ifdef GLES
 		// GLES doesn't support glDrawElementsBaseVertex, so we need to re-upload with offset
 		mesh->offsetIndices( first_tri );
@@ -848,30 +733,15 @@ public:
 		GL( glDrawElementsBaseVertex( GL_TRIANGLES,tri_cnt*3,GL_UNSIGNED_INT,
 			(void*)(first_tri*3*sizeof(unsigned int)),first_vert ) );
 #endif
-		// Optimization #11: Don't unbind VAO - next render() will bind a new one anyway
+		GL( glBindVertexArray( 0 ) );
 	}
 
 	void end(){
 		GL( glUseProgram( 0 ) );
-		setActiveTexture( 0 ); // Phase 3: Use cached setter
+		GL( glActiveTexture( GL_TEXTURE0 ) );
 		GL( glDisable( GL_DEPTH_TEST ) );
 
 		GL( glDisable( GL_BLEND ) );
-
-		// Optimization #11: Unbind VAO and reset cache at end of frame
-		if( last_bound_vao != 0 ){
-			GL( glBindVertexArray( 0 ) );
-			last_bound_vao = 0;
-		}
-
-		// Reset state caches for next frame
-		blend_cache.current_blend = -1;
-		cached_cull_enabled = -1;
-		// Phase 3: Reset additional caches
-		cached_zmode = -1;
-		cached_polygon_mode = -1;
-		cached_front_face = -1;
-		cached_active_texture = -1;
 
 		GL( glViewport( viewport[0],viewport[1],viewport[2],viewport[3] ) );
 		GL( glScissor( viewport[0],viewport[1],viewport[2],viewport[3] ) );

@@ -2,10 +2,15 @@
 #define NEW_NODE_H
 
 #include "node.h"
+#include "expr_seq.h"
 
 struct NewNode : public ExprNode{
 	std::string ident;
-	NewNode( const std::string &i ):ident(i){}
+	ExprSeqNode *ctor_args;  // Constructor arguments (may be null)
+	Decl *ctor_decl;         // Constructor function declaration (may be null)
+
+	NewNode( const std::string &i, ExprSeqNode *args=0 ):ident(i),ctor_args(args),ctor_decl(0){}
+	~NewNode(){ delete ctor_args; }
 	ExprNode *semant( Environ *e );
 	TNode *translate( Codegen *g );
 #ifdef USE_LLVM
@@ -16,6 +21,7 @@ struct NewNode : public ExprNode{
 		json tree;tree["@class"]="NewNode";
 		tree["sem_type"]=sem_type->toJSON();
 		tree["ident"]=ident;
+		if( ctor_args ) tree["ctor_args"]=ctor_args->toJSON( e );
 		return tree;
 	}
 };

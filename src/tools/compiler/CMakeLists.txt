@@ -1,6 +1,9 @@
 set (CMAKE_EXECUTABLE_SUFFIX_ )
 
-if(BB64 AND NOT BB_MINGW)
+# Option to use GCC backend instead of LLVM
+option(USE_GCC_BACKEND "Use GCC/Clang C backend instead of LLVM" OFF)
+
+if(BB64 AND NOT BB_MINGW AND NOT USE_GCC_BACKEND)
   set(REQUIRED_LLVM_VERSION 19)
 
   set(LLVM_KNOWN_PATHS
@@ -21,10 +24,16 @@ if(BB64 AND NOT BB_MINGW)
   endif()
   find_package(LLD PATHS ${LLVM_KNOWN_PATHS} NO_DEFAULT_PATH)
 
-  # TODO: this will go away once CI is sorted...
+  # If LLVM not found, fall back to GCC backend
   if(NOT LLVM_FOUND OR NOT LLD_FOUND)
-    return()
+    message(STATUS "LLVM/LLD not found, using GCC backend")
+    set(USE_GCC_BACKEND ON)
   endif()
+endif()
+
+# Force GCC backend for non-64-bit or MinGW builds
+if(NOT BB64 OR BB_MINGW)
+  set(USE_GCC_BACKEND ON)
 endif()
 
 include_directories (SYSTEM ../../modules)
@@ -149,6 +158,9 @@ endif()
 
 target_include_directories(blitzcc PRIVATE ../src/runtime)
 target_link_libraries(blitzcc stdutil toml11 nlohmann_json)
+if(BB_LINUX)
+  target_link_libraries(blitzcc dl)
+endif()
 target_output_to_bin(blitzcc)
 
 if(LLVM_FOUND)
@@ -209,4 +221,18 @@ endif()
 
 if(NOT BB_MSVC)
   target_compile_options(blitzcc PRIVATE -Wno-error=delete-incomplete)
+endif()
+
+# GCC/Clang C backend (alternative to LLVM)
+if(USE_GCC_BACKEND)
+  message(STATUS "Using GCC/Clang C backend")
+  target_compile_definitions(blitzcc PRIVATE USE_GCC_BACKEND)
+
+  target_sources(blitzcc PUBLIC
+    codegen_c/codegen_c.h
+    codegen_c/codegen_c.cpp
+
+    linker_gcc/linker_gcc.h
+    linker_gcc/linker_gcc.cpp
+  )
 endif()

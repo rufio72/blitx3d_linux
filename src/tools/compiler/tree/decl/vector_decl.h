@@ -17,6 +17,9 @@ struct VectorDeclNode : public DeclNode{
 #ifdef USE_LLVM
 	void translate2( Codegen_LLVM *g );
 #endif
+#ifdef USE_GCC_BACKEND
+	void translate3( Codegen_C *g );
+#endif
 };
 
 #endif

@@ -84,3 +84,44 @@ void ForEachNode::translate2( Codegen_LLVM *g ){
 	g->builder->SetInsertPoint( cont );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void ForEachNode::translate3( Codegen_C *g ){
+	std::string objFirst, objNext;
+
+	if( var->isObjParam() ){
+		objFirst = "_bbObjEachFirst2";
+		objNext = "_bbObjEachNext2";
+	}else{
+		objFirst = "_bbObjEachFirst";
+		objNext = "_bbObjEachNext";
+	}
+
+	std::string loopLabel = g->getLabel( "foreach_loop" );
+	std::string brkLabel = g->getLabel( sem_brk );
+
+	// Get pointer to the variable and type
+	std::string varPtr = var->translate3( g );
+	std::string typePtr = "_t" + g->toCSafeName( typeIdent );
+
+	// Call objFirst - if false, skip the loop
+	g->emitLine( "if (!" + objFirst + "((bb_obj_t*)&" + varPtr + ", (BBObjType*)&" + typePtr + ")) goto " + brkLabel + ";" );
+
+	// Push break label for Exit statements
+	g->breakLabelStack.push_back( brkLabel );
+
+	// Loop body
+	g->emitLabel( loopLabel );
+	stmts->translate3( g );
+
+	// Pop break label
+	g->breakLabelStack.pop_back();
+
+	// Call objNext - if true, continue loop
+	g->emitLine( "if (" + objNext + "((bb_obj_t*)&" + varPtr + ")) goto " + loopLabel + ";" );
+
+	g->emitLabel( brkLabel );
+}
+#endif

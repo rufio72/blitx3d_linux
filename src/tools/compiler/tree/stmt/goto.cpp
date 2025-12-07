@@ -23,3 +23,11 @@ void GotoNode::translate2( Codegen_LLVM *g ){
 	g->builder->SetInsertPoint( block );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void GotoNode::translate3( Codegen_C *g ){
+	g->emitLine( "goto _l" + g->toCSafeName( ident ) + ";" );
+}
+#endif

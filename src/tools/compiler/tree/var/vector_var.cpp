@@ -77,3 +77,91 @@ json VectorVarNode::toJSON( Environ *e ){
 	tree["vec_type"]=vec_type->toJSON();
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string VectorVarNode::translate3( Codegen_C *g ){
+	// Calculate the linear offset into the vector
+	// For a multi-dimensional array arr[i][j][k] with sizes [S0][S1][S2]:
+	// offset = i*S1*S2 + j*S2 + k
+	// Each element is 4 bytes (like the original code)
+
+	std::string offset = "";
+	int stride = 1;
+	for( int k = exprs->size() - 1; k >= 0; --k ){
+		std::string idx = exprs->exprs[k]->translate3( g );
+		if( stride == 1 ){
+			offset = idx;
+		} else {
+			if( offset.empty() ){
+				offset = "(" + idx + ") * " + std::to_string( stride );
+			} else {
+				offset = "(" + idx + ") * " + std::to_string( stride ) + " + " + offset;
+			}
+		}
+		stride *= vec_type->sizes[k];
+	}
+
+	// The expr is the pointer to the vector data
+	std::string basePtr = expr->translate3( g );
+
+	// Access element at offset - vectors store elements directly
+	// Vector is stored as: type metadata followed by actual data
+	// The pointer we get is to the data array
+	return "((" + g->toCType( sem_type ) + "*)(" + basePtr + "))[" + offset + "]";
+}
+
+std::string VectorVarNode::load3( Codegen_C *g ){
+	std::string offset = "";
+	int stride = 1;
+	for( int k = exprs->size() - 1; k >= 0; --k ){
+		std::string idx = exprs->exprs[k]->translate3( g );
+		if( stride == 1 ){
+			offset = idx;
+		} else {
+			if( offset.empty() ){
+				offset = "(" + idx + ") * " + std::to_string( stride );
+			} else {
+				offset = "(" + idx + ") * " + std::to_string( stride ) + " + " + offset;
+			}
+		}
+		stride *= vec_type->sizes[k];
+	}
+
+	std::string basePtr = expr->translate3( g );
+
+	if( sem_type == Type::string_type ){
+		return "_bbStrLoad((bb_string_t*)&((" + g->toCType( sem_type ) + "*)(" + basePtr + "))[" + offset + "])";
+	}
+	return "((" + g->toCType( sem_type ) + "*)(" + basePtr + "))[" + offset + "]";
+}
+
+void VectorVarNode::store3( Codegen_C *g, const std::string &value ){
+	std::string offset = "";
+	int stride = 1;
+	for( int k = exprs->size() - 1; k >= 0; --k ){
+		std::string idx = exprs->exprs[k]->translate3( g );
+		if( stride == 1 ){
+			offset = idx;
+		} else {
+			if( offset.empty() ){
+				offset = "(" + idx + ") * " + std::to_string( stride );
+			} else {
+				offset = "(" + idx + ") * " + std::to_string( stride ) + " + " + offset;
+			}
+		}
+		stride *= vec_type->sizes[k];
+	}
+
+	std::string basePtr = expr->translate3( g );
+
+	if( sem_type == Type::string_type ){
+		g->emitLine( "_bbStrStore((bb_string_t*)&((" + g->toCType( sem_type ) + "*)(" + basePtr + "))[" + offset + "], " + value + ");" );
+	} else if( sem_type->structType() ){
+		g->emitLine( "_bbObjStore((void**)&((" + g->toCType( sem_type ) + "*)(" + basePtr + "))[" + offset + "], " + value + ");" );
+	} else {
+		g->emitLine( "((" + g->toCType( sem_type ) + "*)(" + basePtr + "))[" + offset + "] = " + value + ";" );
+	}
+}
+#endif

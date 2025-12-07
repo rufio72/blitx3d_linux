@@ -91,3 +91,30 @@ json RelExprNode::toJSON( Environ *e ){
 	tree["opType"]=opType->toJSON();
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string RelExprNode::translate3( Codegen_C *g ){
+	std::string l = lhs->translate3( g );
+	std::string r = rhs->translate3( g );
+
+	std::string cmpOp;
+	switch( op ){
+	case '<': cmpOp = "<"; break;
+	case '=': cmpOp = "=="; break;
+	case '>': cmpOp = ">"; break;
+	case LE: cmpOp = "<="; break;
+	case NE: cmpOp = "!="; break;
+	case GE: cmpOp = ">="; break;
+	default: cmpOp = "=="; break;
+	}
+
+	if( opType == Type::string_type ){
+		// String comparison using strcmp
+		return "(bb_int_t)(_bbStrCompare(" + l + ", " + r + ") " + cmpOp + " 0)";
+	}
+
+	return "(bb_int_t)((" + l + ") " + cmpOp + " (" + r + "))";
+}
+#endif

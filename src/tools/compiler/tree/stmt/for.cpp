@@ -116,3 +116,59 @@ json ForNode::toJSON( Environ *e ){
 	tree["sem_brk"]=sem_brk;
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void ForNode::translate3( Codegen_C *g ){
+	Type *ty = var->sem_type;
+
+	// Initial assignment
+	std::string fromVal = fromExpr->translate3( g );
+	var->store3( g, fromVal );
+
+	// Generate labels
+	std::string condLabel = g->getLabel( "for_cond" );
+	std::string loopLabel = g->getLabel( "for_loop" );
+	std::string brkLabel = g->getLabel( sem_brk );
+
+	// Jump to condition check
+	g->emitLine( "goto " + condLabel + ";" );
+
+	// Push break label for Exit statements
+	g->breakLabelStack.push_back( brkLabel );
+
+	// Loop body
+	g->emitLabel( loopLabel );
+	stmts->translate3( g );
+
+	// Pop break label
+	g->breakLabelStack.pop_back();
+
+	// Step increment
+	std::string varLoad = var->load3( g );
+	std::string stepVal = stepExpr->translate3( g );
+	if( ty == Type::int_type ){
+		var->store3( g, "(" + varLoad + " + " + stepVal + ")" );
+	} else {
+		var->store3( g, "(" + varLoad + " + " + stepVal + ")" );
+	}
+
+	// Condition check
+	g->emitLabel( condLabel );
+	std::string toVal = toExpr->translate3( g );
+	varLoad = var->load3( g );
+
+	char op = stepExpr->constNode()->floatValue() > 0 ? '>' : '<';
+	std::string cmp;
+	if( op == '>' ){
+		cmp = varLoad + " <= " + toVal;
+	} else {
+		cmp = varLoad + " >= " + toVal;
+	}
+	g->emitLine( "if (" + cmp + ") goto " + loopLabel + ";" );
+
+	// Break label
+	g->emitLabel( brkLabel );
+}
+#endif

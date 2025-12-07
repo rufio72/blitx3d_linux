@@ -78,3 +78,18 @@ json DeclSeqNode::toJSON( Environ *e ){
 	}
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void DeclSeqNode::translate3( Codegen_C *g ){
+	for( int k=0;k<decls.size();++k ){
+		try{ decls[k]->translate3( g ); }
+		catch( Ex &x ){
+			if( x.pos<0 ) x.pos=decls[k]->pos;
+			if(!x.file.size() ) x.file=decls[k]->file;
+			throw;
+		}
+	}
+}
+#endif

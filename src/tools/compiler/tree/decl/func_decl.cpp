@@ -114,3 +114,42 @@ json FuncDeclNode::toJSON( Environ *e ){
 	tree["sem_type"]=sem_type->toJSON( );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void FuncDeclNode::translate3( Codegen_C *g ){
+	// Get return type
+	std::string retType;
+	if( sem_type->returnType == Type::int_type ) retType = "bb_int_t";
+	else if( sem_type->returnType == Type::float_type ) retType = "bb_float_t";
+	else if( sem_type->returnType == Type::string_type ) retType = "bb_string_t";
+	else if( sem_type->returnType->structType() ) retType = "bb_obj_t";
+	else retType = "bb_int_t";
+
+	// Build parameter list
+	std::vector<std::pair<std::string, std::string>> cParams;
+	for( int k=0; k<sem_type->params->size(); ++k ){
+		Decl *d = sem_type->params->decls[k];
+		std::string ptype;
+		if( d->type == Type::int_type ) ptype = "bb_int_t";
+		else if( d->type == Type::float_type ) ptype = "bb_float_t";
+		else if( d->type == Type::string_type ) ptype = "bb_string_t";
+		else if( d->type->structType() ) ptype = "bb_obj_t";
+		else ptype = "bb_int_t";
+		std::string pname = g->toCSafeName( "_p" + d->name );
+		cParams.push_back( std::make_pair( ptype, pname ) );
+	}
+
+	// Begin function
+	g->beginFunction( "f" + ident, retType, cParams );
+
+	// Create local variables
+	createVars3( sem_env, g );
+
+	// Translate statements
+	stmts->translate3( g );
+
+	g->endFunction();
+}
+#endif

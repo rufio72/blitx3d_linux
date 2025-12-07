@@ -18,6 +18,14 @@ void DeclStmtNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void DeclStmtNode::translate3( Codegen_C *g ){
+	decl->translate3( g );
+}
+#endif
+
 json DeclStmtNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="DeclStmtNode";
 	tree["pos"]=pos;

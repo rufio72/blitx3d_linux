@@ -81,3 +81,25 @@ json IfNode::toJSON( Environ *e ){
 	if( elseOpt ) tree["elseOpt"]=elseOpt->toJSON( e );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void IfNode::translate3( Codegen_C *g ){
+	std::string condExpr = expr->translate3( g );
+	std::string endLabel = g->getLabel( "endif" );
+
+	if( elseOpt ){
+		std::string elseLabel = g->getLabel( "else" );
+		g->emitLine( "if (!(" + condExpr + ")) goto " + elseLabel + ";" );
+		stmts->translate3( g );
+		g->emitLine( "goto " + endLabel + ";" );
+		g->emitLabel( elseLabel );
+		elseOpt->translate3( g );
+	} else {
+		g->emitLine( "if (!(" + condExpr + ")) goto " + endLabel + ";" );
+		stmts->translate3( g );
+	}
+	g->emitLabel( endLabel );
+}
+#endif

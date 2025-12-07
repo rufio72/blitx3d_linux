@@ -59,6 +59,25 @@ llvm::Value *BinExprNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string BinExprNode::translate3( Codegen_C *g ){
+	std::string l = lhs->translate3( g );
+	std::string r = rhs->translate3( g );
+	std::string opStr;
+	switch( op ){
+	case AND: opStr = "&"; break;
+	case OR:  opStr = "|"; break;
+	case XOR: opStr = "^"; break;
+	case SHL: opStr = "<<"; break;
+	case SHR: return "((bb_int_t)((uint64_t)(" + l + ") >> (" + r + ")))";
+	case SAR: opStr = ">>"; break;
+	}
+	return "((" + l + ") " + opStr + " (" + r + "))";
+}
+#endif
+
 json BinExprNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="BinExprNode";
 	tree["sem_type"]=sem_type->toJSON();

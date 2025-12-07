@@ -98,3 +98,32 @@ llvm::Value *NewNode::translate2( Codegen_LLVM *g ){
 	return obj;
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string NewNode::translate3( Codegen_C *g ){
+	// Create a new object of this type
+	std::string typePtr = "_t" + g->toCSafeName( ident );
+	std::string obj = "_bbObjNew((BBObjType*)&" + typePtr + ")";
+
+	// If we have constructor args, call the constructor
+	if( ctor_args && ctor_decl ){
+		// Need to store the object in a temp, call constructor, return temp
+		std::string temp = g->newTemp();
+		g->emitLine( "bb_obj_t " + temp + " = " + obj + ";" );
+
+		// Build constructor call
+		std::string ctorName = g->toCSafeName( "f" + ident + "_constructor" );
+		std::string args = temp;
+		for( int i = 0; i < ctor_args->size(); i++ ){
+			args += ", " + ctor_args->exprs[i]->translate3( g );
+		}
+		g->emitLine( ctorName + "(" + args + ");" );
+
+		return temp;
+	}
+
+	return obj;
+}
+#endif

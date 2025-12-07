@@ -88,6 +88,23 @@ void StmtSeqNode::translate2( Codegen_LLVM *g ) {
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+void StmtSeqNode::translate3( Codegen_C *g ) {
+	for( int k=0;k<stmts.size();++k ){
+		StmtNode *stmt=stmts[k];
+		try{
+			stmt->translate3( g );
+		}
+		catch( Ex &x ){
+			if( x.pos<0 ) x.pos=stmts[k]->pos;
+			if( !x.file.size() ) x.file=file;
+			throw;
+		}
+	}
+}
+#endif
+
 json StmtSeqNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="StmtSeqNode";
 	tree["file"]=file;

@@ -61,3 +61,16 @@ json VarDeclNode::toJSON( Environ *e ){
 	if( sem_var ) tree["sem_var"]=sem_var->toJSON( e );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void VarDeclNode::translate3( Codegen_C *g ){
+	// Generate assignment for global variables with initial values
+	if( expr && (kind & DECL_GLOBAL) ){
+		std::string varName = sem_var->translate3( g );
+		std::string value = expr->translate3( g );
+		g->emitLine( varName + " = " + value + ";" );
+	}
+}
+#endif

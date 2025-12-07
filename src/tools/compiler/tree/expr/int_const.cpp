@@ -35,3 +35,11 @@ json IntConstNode::toJSON( Environ *e ){
 	tree["value"]=value;
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string IntConstNode::translate3( Codegen_C *g ){
+	return g->constantInt( value );
+}
+#endif

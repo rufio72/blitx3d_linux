@@ -10,6 +10,10 @@
 #include "../codegen_llvm/codegen_llvm.h"
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../codegen_c/codegen_c.h"
+#endif
+
 #include <vector>
 
 extern std::vector<std::string> modules;
@@ -51,6 +55,10 @@ struct ProgNode : public Node{
 
 #ifdef USE_LLVM
 	void translate2( Codegen_LLVM *g,const std::vector<UserFunc> &userfuncs );
+#endif
+
+#ifdef USE_GCC_BACKEND
+	void translate3( Codegen_C *g,const std::vector<UserFunc> &userfuncs );
 #endif
 };
 

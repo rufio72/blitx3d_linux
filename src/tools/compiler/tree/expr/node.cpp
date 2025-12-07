@@ -18,3 +18,12 @@ llvm::Value *ExprNode::translate2( Codegen_LLVM *g ){
 	abort();
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+std::string ExprNode::translate3( Codegen_C *g ){
+	std::cerr<<"translate3 missing implementation for "<<typeid(*this).name()<<std::endl;
+	abort();
+	return "";
+}
+#endif

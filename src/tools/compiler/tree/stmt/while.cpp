@@ -69,6 +69,41 @@ void WhileNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+#include "../expr/const.h"
+
+void WhileNode::translate3( Codegen_C *g ){
+	ConstNode *c = expr->constNode();
+	if( c && !c->intValue() ) return;
+
+	std::string loopLabel = g->getLabel( "while" );
+	std::string condLabel = g->getLabel( "while_cond" );
+	std::string brkLabel = g->getLabel( sem_brk );
+
+	// Push break label for Exit statements
+	g->breakLabelStack.push_back( brkLabel );
+
+	if( c ){
+		// Infinite loop (constant true condition)
+		g->emitLabel( loopLabel );
+		stmts->translate3( g );
+		g->emitLine( "goto " + loopLabel + ";" );
+	}else{
+		// Normal while loop
+		g->emitLine( "goto " + condLabel + ";" );
+		g->emitLabel( loopLabel );
+		stmts->translate3( g );
+		g->emitLabel( condLabel );
+		g->emitLine( "if (" + expr->translate3( g ) + ") goto " + loopLabel + ";" );
+	}
+
+	// Pop break label
+	g->breakLabelStack.pop_back();
+	g->emitLabel( brkLabel );
+}
+#endif
+
 json WhileNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="WhileNode";
 	tree["pos"]=pos;

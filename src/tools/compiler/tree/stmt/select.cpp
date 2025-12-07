@@ -131,6 +131,58 @@ void SelectNode::translate2( Codegen_LLVM *g ){
 #endif
 
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void SelectNode::translate3( Codegen_C *g ){
+	Type *ty = expr->sem_type;
+
+	// Store the expression value in the temp variable
+	sem_temp->store3( g, expr->translate3( g ) );
+
+	std::vector<std::string> caseLabels;
+	std::string brkLabel = g->getLabel( "select_end" );
+
+	// Generate labels for each case
+	for( int k = 0; k < cases.size(); ++k ){
+		caseLabels.push_back( g->getLabel( "case" ) );
+	}
+
+	// Generate condition checks for each case
+	for( int k = 0; k < cases.size(); ++k ){
+		CaseNode *c = cases[k];
+		for( int j = 0; j < c->exprs->size(); ++j ){
+			ExprNode *e = c->exprs->exprs[j];
+			std::string tempLoad = sem_temp->load3( g );
+			std::string exprVal = e->translate3( g );
+
+			// Compare based on type
+			if( ty->stringType() ){
+				g->emitLine( "if (!_bbStrCompare(" + tempLoad + ", " + exprVal + ")) goto " + caseLabels[k] + ";" );
+			}else{
+				g->emitLine( "if ((" + tempLoad + ") == (" + exprVal + ")) goto " + caseLabels[k] + ";" );
+			}
+		}
+	}
+
+	// Default case (if no match)
+	if( defStmts ){
+		defStmts->translate3( g );
+	}
+	g->emitLine( "goto " + brkLabel + ";" );
+
+	// Generate code for each case body
+	for( int k = 0; k < cases.size(); ++k ){
+		CaseNode *c = cases[k];
+		g->emitLabel( caseLabels[k] );
+		c->stmts->translate3( g );
+		g->emitLine( "goto " + brkLabel + ";" );
+	}
+
+	g->emitLabel( brkLabel );
+}
+#endif
+
 json SelectNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="SelectNode";
 	tree["pos"]=pos;

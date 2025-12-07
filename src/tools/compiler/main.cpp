@@ -37,6 +37,11 @@
 #include "jit_orc/jit_orc.h"
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "codegen_c/codegen_c.h"
+#include "linker_gcc/linker_gcc.h"
+#endif
+
 #if defined(WIN32) && !defined(__MINGW32__)
 #define DEBUGGER "debugger"
 #else
@@ -333,8 +338,13 @@ int main( int argc,char *argv[] ){
 	bool dumpkeys=false,dumphelp=false,showhelp=false,dumpasm=false,dumptree=false;
 #if defined(USE_LLVM) && !defined(BB_WIN32)
 	bool usellvm=true;
+	bool usegcc=false;
+#elif defined(USE_GCC_BACKEND)
+	bool usellvm=false;
+	bool usegcc=true;
 #else
 	bool usellvm=false;
+	bool usegcc=false;
 #endif
 	bool versinfo=false,rtinfo=false;
 
@@ -364,7 +374,11 @@ int main( int argc,char *argv[] ){
 			dumpkeys=dumphelp=true;
 		}else if( t=="-llvm" ){
 			usellvm=true;
+			usegcc=false;
 		}else if( t=="-llvm=off" ){
+			usellvm=false;
+		}else if( t=="-gcc" ){
+			usegcc=true;
 			usellvm=false;
 		}else if( t=="-v" ){
 			versinfo=true;
@@ -493,6 +507,9 @@ int main( int argc,char *argv[] ){
 	Environ *env=0;
 	Module *module=0;
 	BundleInfo bundle;
+#ifdef USE_GCC_BACKEND
+	std::string c_code;
+#endif
 
 	// Get absolute path of source directory for asset bundling
 	char absSrcDir[PATH_MAX];
@@ -536,6 +553,10 @@ int main( int argc,char *argv[] ){
 		Codegen_LLVM codegen2( debug );
 		codegen2.SetTarget( target );
 #endif
+#ifdef USE_GCC_BACKEND
+		Codegen_C codegen3( debug );
+		codegen3.SetTarget( target );
+#endif
 
 		if ( usellvm ) {
 #ifdef USE_LLVM
@@ -548,6 +569,15 @@ int main( int argc,char *argv[] ){
 
 			if( dumpasm ){
 				codegen2.dumpToStderr();
+			}
+#endif
+		} else if ( usegcc ) {
+#ifdef USE_GCC_BACKEND
+			prog->translate3( &codegen3,userFuncs );
+			c_code = codegen3.generateOutput();
+
+			if( dumpasm ){
+				std::cout<<std::endl<<c_code<<std::endl;
 			}
 #endif
 		} else {
@@ -570,6 +600,10 @@ int main( int argc,char *argv[] ){
 		if ( usellvm ) {
 #ifdef USE_LLVM
 			codegen2.dumpToObj( obj_code );
+#endif
+		} else if ( usegcc ) {
+#ifdef USE_GCC_BACKEND
+			// C code is already in c_code string, will be written during linking
 #endif
 		} else {
 			module=linkerLib->createModule();
@@ -597,6 +631,27 @@ int main( int argc,char *argv[] ){
 			std::cerr<<"llvm support was not compiled in"<<std::endl;
 			abort();
 #endif
+		}else if( usegcc ) {
+#ifdef USE_GCC_BACKEND
+			// Write C code to file and compile with gcc/clang
+			std::string cFile = out_file + ".c";
+			std::ofstream cOut( cFile );
+			if( !cOut ){
+				std::cerr<<"Error: Cannot create "<<cFile<<std::endl;
+				exit(1);
+			}
+			cOut << c_code;
+			cOut.close();
+
+			Linker_GCC linker( home );
+			ret = linker.createExe( debug,rt,target,cFile,out_file );
+			if( ret != 0 ){
+				std::cerr<<"Error: Compilation failed"<<std::endl;
+			}
+#else
+			std::cerr<<"gcc backend was not compiled in"<<std::endl;
+			abort();
+#endif
 		}else{
 #ifdef WIN32
 			char buff[MAX_PATH];
@@ -621,6 +676,11 @@ int main( int argc,char *argv[] ){
 #else
 			std::cerr<<"llvm support was not compiled in"<<std::endl;
 			abort();
+#endif
+		} else if ( usegcc ) {
+#ifdef USE_GCC_BACKEND
+			std::cerr<<"JIT execution not supported with GCC backend. Use -o to create an executable."<<std::endl;
+			return 1;
 #endif
 		} else {
 			entry=module->link( runtimeModule );

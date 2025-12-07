@@ -136,6 +136,55 @@ void StructDeclNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void StructDeclNode::translate3( Codegen_C *g ){
+	// Generate BBObjType initializer that matches runtime's blitz.h
+	// BBObjType = { bb_int_t type, BBObj used, BBObj free, bb_int_t fieldCnt, BBType* fieldTypes[N] }
+	// BBObj = { fields, next, prev, type, ref_cnt }
+	// The struct is forward declared in prognode.cpp, here we just initialize it
+
+	std::string typeName = "_t" + g->toCSafeName( ident );
+	int fieldCnt = sem_type->fields->size();
+
+	// Build field types array - each field needs a pointer to its BBType
+	std::vector<std::string> fieldTypeRefs;
+	for( int k=0; k<fieldCnt; ++k ){
+		Decl *field = sem_type->fields->decls[k];
+		Type *type = field->type;
+		std::string t;
+		if( type==Type::int_type ) t = "&_bbIntType";
+		else if( type==Type::float_type ) t = "&_bbFltType";
+		else if( type==Type::string_type ) t = "&_bbStrType";
+		else if( StructType *s=type->structType() ) t = "(BBType*)&_t" + g->toCSafeName( s->ident );
+		else if( VectorType *v=type->vectorType() ) t = "(BBType*)&" + g->toCSafeName( v->label );
+		else t = "&_bbIntType"; // default to int for unknown types
+		fieldTypeRefs.push_back( t );
+	}
+
+	// Use a constructor function to initialize since we can't use initializer with forward-declared static
+	g->globals << "static void __init" << typeName << "(void) __attribute__((constructor));\n";
+	g->globals << "static void __init" << typeName << "(void) {\n";
+	g->globals << "    " << typeName << ".type = 5;\n"; // BBTYPE_OBJ = 5
+	g->globals << "    " << typeName << ".used.fields = 0;\n";
+	g->globals << "    " << typeName << ".used.next = (BBObj*)&" << typeName << ".used;\n";
+	g->globals << "    " << typeName << ".used.prev = (BBObj*)&" << typeName << ".used;\n";
+	g->globals << "    " << typeName << ".used.type = 0;\n";
+	g->globals << "    " << typeName << ".used.ref_cnt = -1;\n";
+	g->globals << "    " << typeName << ".free.fields = 0;\n";
+	g->globals << "    " << typeName << ".free.next = (BBObj*)&" << typeName << ".free;\n";
+	g->globals << "    " << typeName << ".free.prev = (BBObj*)&" << typeName << ".free;\n";
+	g->globals << "    " << typeName << ".free.type = 0;\n";
+	g->globals << "    " << typeName << ".free.ref_cnt = -1;\n";
+	g->globals << "    " << typeName << ".fieldCnt = " << fieldCnt << ";\n";
+	for( int k=0; k<fieldCnt; ++k ){
+		g->globals << "    " << typeName << ".fieldTypes[" << k << "] = " << fieldTypeRefs[k] << ";\n";
+	}
+	g->globals << "}\n";
+}
+#endif
+
 json StructDeclNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="StructDeclNode";
 	tree["pos"]=pos;

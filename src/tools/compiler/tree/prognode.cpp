@@ -261,3 +261,153 @@ json ProgNode::toJSON( bool dbg ){
 	debug = dbg;
 	return toJSON( sem_env );
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../codegen_c/codegen_c.h"
+
+void ProgNode::translate3( Codegen_C *g, const std::vector<UserFunc> &userfuncs ){
+	// Generate C code from the AST
+
+	// Forward declare all struct types (needed for cross-references)
+	for( int k=0; k<sem_env->types.size(); ++k ){
+		Type *type = sem_env->types[k];
+		StructType *st = type->structType();
+		if( !st ) continue;
+
+		std::string typeName = "_t" + g->toCSafeName( st->ident );
+		int fieldCnt = st->fields->size();
+		// Just forward declare the type - definition comes later
+		if( fieldCnt > 1 ){
+			g->globals << "static struct _struct" << typeName << " { bb_int_t type; BBObj used, free; bb_int_t fieldCnt; BBType *fieldTypes[" << fieldCnt << "]; } " << typeName << ";\n";
+		} else {
+			g->globals << "static BBObjType " << typeName << ";\n";
+		}
+	}
+
+	// Forward declare all vector types (needed for cross-references)
+	for( int k=0; k<sem_env->types.size(); ++k ){
+		Type *type = sem_env->types[k];
+		VectorType *vt = type->vectorType();
+		if( !vt ) continue;
+
+		std::string label = g->toCSafeName( vt->label );
+		g->globals << "static BBVecType " << label << ";\n";
+	}
+
+	// Now emit struct type initializers
+	structs->translate3( g );
+
+	// Emit BBVecType initializers for all VectorTypes used in the program
+	for( int k=0; k<sem_env->types.size(); ++k ){
+		Type *type = sem_env->types[k];
+		VectorType *vt = type->vectorType();
+		if( !vt ) continue;
+
+		std::string label = g->toCSafeName( vt->label );
+
+		// Calculate total size
+		int sz = 1;
+		for( int i=0; i<(int)vt->sizes.size(); ++i ) sz *= vt->sizes[i];
+
+		// Get element type reference
+		std::string elementTypeRef;
+		Type *elemType = vt->elementType;
+		if( elemType == Type::int_type ) elementTypeRef = "&_bbIntType";
+		else if( elemType == Type::float_type ) elementTypeRef = "&_bbFltType";
+		else if( elemType == Type::string_type ) elementTypeRef = "&_bbStrType";
+		else if( StructType *s = elemType->structType() ) elementTypeRef = "(BBType*)&_t" + g->toCSafeName( s->ident );
+		else if( VectorType *v2 = elemType->vectorType() ) elementTypeRef = "(BBType*)&" + g->toCSafeName( v2->label );
+		else elementTypeRef = "&_bbIntType";
+
+		// Emit initializer assignment - use compound literal for assignment
+		g->globals << "static void __init_" << label << "(void) __attribute__((constructor));\n";
+		g->globals << "static void __init_" << label << "(void) { " << label << " = (BBVecType){ .base = { .type = 6 }, .size = "
+			<< sz << ", .elementType = " << elementTypeRef << " }; }\n";
+	}
+
+	// Declare global variables
+	for( int k=0; k<sem_env->decls->size(); ++k ){
+		Decl *d = sem_env->decls->decls[k];
+		if( d->kind != DECL_GLOBAL ) continue;
+
+		std::string ctype;
+		std::string initVal = "0";
+		if( d->type == Type::int_type ){
+			ctype = "bb_int_t";
+			if( d->defType && d->defType->valueType == Type::int_type ){
+				initVal = std::to_string( d->defType->intValue ) + "LL";
+			}
+		}
+		else if( d->type == Type::float_type ){
+			ctype = "bb_float_t";
+			if( d->defType && d->defType->valueType == Type::float_type ){
+				initVal = std::to_string( d->defType->floatValue );
+			}
+		}
+		else if( d->type == Type::string_type ){
+			ctype = "bb_string_t";
+			// String initialization handled separately
+		}
+		else if( d->type->structType() ){
+			ctype = "bb_obj_t";
+		}
+		else{
+			ctype = "bb_int_t";
+		}
+
+		std::string name = g->toCSafeName( "_v" + d->name );
+		g->globals << "static " << ctype << " " << name << " = " << initVal << ";\n";
+	}
+
+	// Emit forward declarations for all user-defined functions
+	g->globals << "\n/* Forward declarations */\n";
+	for( int k=0; k<sem_env->funcDecls->size(); ++k ){
+		Decl *d = sem_env->funcDecls->decls[k];
+		if( d->kind != DECL_FUNC ) continue;
+		FuncType *ft = d->type->funcType();
+		if( !ft ) continue;
+
+		// Get return type
+		std::string retType;
+		if( ft->returnType == Type::int_type ) retType = "bb_int_t";
+		else if( ft->returnType == Type::float_type ) retType = "bb_float_t";
+		else if( ft->returnType == Type::string_type ) retType = "bb_string_t";
+		else if( ft->returnType->structType() ) retType = "bb_obj_t";
+		else retType = "bb_int_t";
+
+		// Build parameter list
+		std::string params;
+		for( int p=0; p<ft->params->size(); ++p ){
+			if( p > 0 ) params += ", ";
+			Decl *pd = ft->params->decls[p];
+			if( pd->type == Type::int_type ) params += "bb_int_t";
+			else if( pd->type == Type::float_type ) params += "bb_float_t";
+			else if( pd->type == Type::string_type ) params += "bb_string_t";
+			else if( pd->type->structType() ) params += "bb_obj_t";
+			else params += "bb_int_t";
+		}
+		if( params.empty() ) params = "void";
+
+		std::string funcName = g->toCSafeName( "f" + d->name );
+		g->globals << retType << " " << funcName << "(" << params << ");\n";
+	}
+	g->globals << "\n";
+
+	// Translate user-defined functions
+	funcs->translate3( g );
+
+	// Generate main function
+	g->beginMain();
+
+	// Declare local variables
+	createVars3( sem_env, g );
+
+	// Reset data pointer
+	g->emitLine( "_bbRestore(bbData);" );
+
+	// Translate statements
+	stmts->translate3( g );
+
+	g->endMain();
+}
+#endif

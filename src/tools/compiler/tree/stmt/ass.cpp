@@ -28,3 +28,12 @@ json AssNode::toJSON( Environ *e ){
 	tree["expr"]=expr->toJSON( e );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void AssNode::translate3( Codegen_C *g ){
+	std::string value = expr->translate3( g );
+	var->store3( g, value );
+}
+#endif

@@ -16,7 +16,7 @@ if (TARGET wxstc AND TARGET wxwebview)
     main.cpp
   )
   target_output_to_bin(ide2)
-  target_link_libraries(ide2 wxwebview wxstc toml11)
+  target_link_libraries(ide2 wxwebview wxstc wxaui wxcore wxbase toml11)
 
   if(BB_MSVC)
     # TODO: find out why wxUSE_DPI_AWARE_MANIFEST isn't working...

@@ -7,6 +7,7 @@
 #endif
 
 #include <wx/notebook.h>
+#include <wx/aui/auibook.h>
 #include <wx/filedlg.h>
 #include <wx/filename.h>
 #include <wx/splitter.h>
@@ -30,7 +31,7 @@ private:
 	wxMenuBar *menuBar;
 	wxToolBar *toolbar;
 	HtmlHelp *help;
-	wxNotebook *nb;
+	wxAuiNotebook *nb;
 	CodePanel *codePanel;
 	wxSplitterWindow *splitter;
 	FileView *buildFile;
@@ -68,6 +69,7 @@ private:
 	void OnForward( wxCommandEvent& event );
 
 	void OnPageChanged( wxBookCtrlEvent& event );
+	void OnPageClose( wxAuiNotebookEvent& event );
 
 	wxDECLARE_EVENT_TABLE();
 };

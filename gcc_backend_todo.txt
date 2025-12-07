@@ -1,0 +1,71 @@
+GCC Backend TODO List
+=====================
+Created: 2025-12-07
+
+COMPLETED:
+----------
+[x] Basic compilation (variables, functions, loops, conditions)
+[x] 3D Graphics (BirdDemo, Castle, Dragon work)
+[x] Color/Light functions - fixed float/int type mismatch
+[x] Input$ real-time display - added bbFlip calls
+[x] Text/Print cursor positioning - Text now updates curs_y
+[x] Joystick functions (JoyX, JoyY, JoyZ, JoyXDir, JoyYDir, JoyDown, JoyHit)
+[x] Terrain functions (TerrainSize)
+[x] Mesh functions (FitMesh, CreateMirror)
+[x] Input function declaration
+[x] startPrinting/bbLocate use current buffer (gx_canvas)
+
+HIGH PRIORITY - OOP Implementation:
+-----------------------------------
+[ ] MethodCallNode - method calls (obj\Method(), Self\field, Super\Method())
+[ ] ClassDeclNode - class declarations (Class/End Class)
+[ ] NewNode - object creation (New ClassName())
+[ ] Field access for class instances
+[ ] Inheritance (Extends keyword)
+[ ] Self keyword
+[ ] Super keyword for parent method calls
+
+MEDIUM PRIORITY - Missing Runtime Declarations:
+-----------------------------------------------
+[ ] Test more demos to find missing function declarations
+[ ] Each new demo typically reveals 2-3 missing declarations
+[ ] Pattern: grep for "warning" during compilation to find them
+[ ] Add declarations to codegen_c.cpp header section
+
+MEDIUM PRIORITY - Types/Collections:
+------------------------------------
+[ ] For Each iteration over custom types
+[ ] First(TypeName), Last(TypeName)
+[ ] Insert Before/After
+[ ] Delete object
+
+LOW PRIORITY - Additional Features:
+-----------------------------------
+[ ] Audio 3D (EmitSound, listener positioning)
+[ ] Networking (socket functions)
+[ ] Array edge cases (multidimensional)
+[ ] String conversion edge cases
+
+TESTING STATUS:
+---------------
+Working demos (GCC backend):
+- BirdDemo - OK
+- Castle - OK
+- Dragon - OK (after adding FitMesh, CreateMirror)
+- XFighter - compiles, needs joystick to test fully
+
+Not working:
+- OOP samples (test_super.bb, etc.) - needs MethodCallNode implementation
+
+NOTES:
+------
+- Frontend/BackCanvas are same pointer in OpenGL SDL (single surface)
+- Type mismatch was root cause of green tint bug (color params need float)
+- codegen_c.cpp has hardcoded extern declarations - add new ones there
+- Look at codegen_llvm for reference when implementing OOP
+
+ESTIMATED COMPLETION:
+--------------------
+- Current state: ~80-85% functional for non-OOP code
+- OOP implementation: 1-2 sessions
+- Full coverage: 3-5 sessions total

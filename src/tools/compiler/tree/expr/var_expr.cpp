@@ -29,3 +29,11 @@ json VarExprNode::toJSON( Environ *e ){
 	tree["var"]=var->toJSON( e );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string VarExprNode::translate3( Codegen_C *g ){
+	return var->load3( g );
+}
+#endif

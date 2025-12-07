@@ -76,3 +76,27 @@ llvm::Value *UniExprNode::translate2( Codegen_LLVM *g ){
 	return nullptr;
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string UniExprNode::translate3( Codegen_C *g ){
+	std::string l = expr->translate3( g );
+	if( sem_type == Type::int_type ){
+		switch( op ){
+		case '+': return l;
+		case '-': return "(-(" + l + "))";
+		case ABS: return "_bbAbs(" + l + ")";
+		case SGN: return "_bbSgn(" + l + ")";
+		}
+	}else{
+		switch( op ){
+		case '+': return l;
+		case '-': return "(-(" + l + "))";
+		case ABS: return "_bbFAbs(" + l + ")";
+		case SGN: return "_bbFSgn(" + l + ")";
+		}
+	}
+	return l;
+}
+#endif

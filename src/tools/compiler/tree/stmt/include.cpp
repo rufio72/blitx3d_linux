@@ -13,6 +13,14 @@ void IncludeNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void IncludeNode::translate3( Codegen_C *g ){
+	stmts->translate3( g );
+}
+#endif
+
 json IncludeNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="IncludeNode";
 	tree["pos"]=pos;

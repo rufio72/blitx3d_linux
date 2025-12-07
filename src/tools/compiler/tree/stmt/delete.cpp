@@ -50,3 +50,20 @@ void DeleteNode::translate2( Codegen_LLVM *g ){
 	g->CallIntrinsic( "_bbObjDelete",ty,1,t );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void DeleteNode::translate3( Codegen_C *g ){
+	std::string obj = expr->translate3( g );
+
+	// Call destructor if it exists
+	if( dtor_decl ){
+		StructType *st = expr->sem_type->structType();
+		std::string dtorName = g->toCSafeName( "f" + st->ident + "_destructor" );
+		g->emitLine( dtorName + "(" + obj + ");" );
+	}
+
+	g->emitLine( "_bbObjDelete((bb_obj_t)" + obj + ");" );
+}
+#endif

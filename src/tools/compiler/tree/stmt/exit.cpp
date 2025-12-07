@@ -26,6 +26,17 @@ void ExitNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void ExitNode::translate3( Codegen_C *g ){
+	// Get the break label from the stack (set by the enclosing loop)
+	if( !g->breakLabelStack.empty() ){
+		g->emitLine( "goto " + g->breakLabelStack.back() + ";" );
+	}
+}
+#endif
+
 json ExitNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="ExitNode";
 	tree["pos"]=pos;

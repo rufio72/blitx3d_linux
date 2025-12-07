@@ -99,3 +99,40 @@ json CastNode::toJSON( Environ *e ){
 	tree["expr"]=expr->toJSON( e );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string CastNode::translate3( Codegen_C *g ){
+	std::string t = expr->translate3( g );
+	if( expr->sem_type==Type::float_type && sem_type==Type::int_type ){
+		//float->int
+		return "(bb_int_t)(" + t + ")";
+	}
+	if( expr->sem_type==Type::int_type && sem_type==Type::float_type ){
+		//int->float
+		return "(bb_float_t)(" + t + ")";
+	}
+	if( expr->sem_type==Type::string_type && sem_type==Type::int_type ){
+		//str->int
+		return "_bbStrToInt(" + t + ")";
+	}
+	if( expr->sem_type==Type::int_type && sem_type==Type::string_type ){
+		//int->str
+		return "_bbStrFromInt(" + t + ")";
+	}
+	if( expr->sem_type==Type::string_type && sem_type==Type::float_type ){
+		//str->float
+		return "_bbStrToFloat(" + t + ")";
+	}
+	if( expr->sem_type==Type::float_type && sem_type==Type::string_type ){
+		//float->str
+		return "_bbStrFromFloat(" + t + ")";
+	}
+	if( expr->sem_type->structType() && sem_type==Type::string_type ){
+		//obj->str
+		return "_bbObjToStr(" + t + ")";
+	}
+	return t;
+}
+#endif

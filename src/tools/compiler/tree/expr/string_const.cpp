@@ -22,6 +22,15 @@ llvm::Value *StringConstNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string StringConstNode::translate3( Codegen_C *g ){
+	std::string strName = g->constantString( value );
+	return "_bbStrConst(" + strName + ")";
+}
+#endif
+
 int StringConstNode::intValue(){
 	return atoi( value );
 }

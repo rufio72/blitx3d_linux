@@ -3,6 +3,10 @@
 
 #include "../node.h"
 
+#ifdef USE_GCC_BACKEND
+class Codegen_C;
+#endif
+
 struct ConstNode;	//is constant int,float or string
 
 struct ExprNode : public Node{
@@ -21,6 +25,9 @@ struct ExprNode : public Node{
 
 #ifdef USE_LLVM
 	virtual llvm::Value *translate2( Codegen_LLVM *g );
+#endif
+#ifdef USE_GCC_BACKEND
+	virtual std::string translate3( Codegen_C *g );
 #endif
 };
 

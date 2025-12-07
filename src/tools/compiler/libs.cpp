@@ -11,6 +11,7 @@
 #define LIBPATH "\\bin\\" RUNTIMENAME "."+rt+"." LIBSUFFIX
 #else
 #include <dlfcn.h>
+#include <limits.h>
 #define OPENLIB( path ) dlopen( path,RTLD_LAZY )
 #define CLOSELIB( handle ) dlclose( handle )
 #define LIBSYM( handle,sym ) dlsym( handle,sym );

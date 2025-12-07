@@ -69,6 +69,43 @@ void RepeatNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+#include "../expr/const.h"
+
+void RepeatNode::translate3( Codegen_C *g ){
+	std::string loopLabel = g->getLabel( "repeat" );
+	std::string brkLabel = g->getLabel( sem_brk );
+
+	// Push break label for Exit statements
+	g->breakLabelStack.push_back( brkLabel );
+
+	g->emitLabel( loopLabel );
+	stmts->translate3( g );
+
+	// Pop break label
+	g->breakLabelStack.pop_back();
+
+	if( ConstNode *c = expr ? expr->constNode() : 0 ){
+		// Constant condition
+		if( !c->intValue() ){
+			// Constant false = keep looping
+			g->emitLine( "goto " + loopLabel + ";" );
+		}
+		// Constant true = exit loop (fall through to break)
+	}else{
+		if( expr ){
+			// Until condition: exit loop if true
+			g->emitLine( "if (!(" + expr->translate3( g ) + ")) goto " + loopLabel + ";" );
+		}else{
+			// Forever loop (no condition)
+			g->emitLine( "goto " + loopLabel + ";" );
+		}
+	}
+	g->emitLabel( brkLabel );
+}
+#endif
+
 json RepeatNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="RepeatNode";
 	tree["pos"]=pos;

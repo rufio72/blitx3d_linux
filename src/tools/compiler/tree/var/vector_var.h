@@ -17,6 +17,11 @@ struct VectorVarNode : public VarNode{
 #ifdef USE_LLVM
 	llvm::Value *translate2( Codegen_LLVM *g );
 #endif
+#ifdef USE_GCC_BACKEND
+	std::string translate3( Codegen_C *g );
+	std::string load3( Codegen_C *g );
+	void store3( Codegen_C *g, const std::string &value );
+#endif
 };
 
 #endif

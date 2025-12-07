@@ -77,6 +77,20 @@ void ReturnNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void ReturnNode::translate3( Codegen_C *g ){
+	if( expr ){
+		std::string val = expr->translate3( g );
+		g->emitLine( "return " + val + ";" );
+	} else {
+		// Return from main program (End statement) or gosub return
+		g->emitLine( "return;" );
+	}
+}
+#endif
+
 json ReturnNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="ReturnNode";
 	tree["pos"]=pos;

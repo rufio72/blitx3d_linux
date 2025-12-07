@@ -123,6 +123,54 @@ void Node::createVars2( Environ *e, Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../codegen_c/codegen_c.h"
+
+void Node::createVars3( Environ *e, Codegen_C *g ){
+	// Declare and initialize local variables
+	for( int k=0; k<e->decls->size(); ++k ){
+		Decl *d = e->decls->decls[k];
+		if( d->kind != DECL_LOCAL ) continue;
+		if( d->type->vectorType() ) continue;
+
+		std::string ctype;
+		std::string init = "0";
+		if( d->type == Type::int_type ){
+			ctype = "bb_int_t";
+			init = "0";
+		} else if( d->type == Type::float_type ){
+			ctype = "bb_float_t";
+			init = "0.0";
+		} else if( d->type == Type::string_type ){
+			ctype = "bb_string_t";
+			init = "0";
+		} else if( d->type->structType() ){
+			ctype = "bb_obj_t";
+			init = "0";
+		} else {
+			ctype = "bb_int_t";
+			init = "0";
+		}
+
+		std::string varName = g->toCSafeName( "_l" + d->name );
+		g->emitLine( ctype + " " + varName + " = " + init + ";" );
+	}
+
+	// Declare and initialize local vectors
+	for( int k=0; k<e->decls->size(); ++k ){
+		Decl *d = e->decls->decls[k];
+		if( d->kind == DECL_PARAM ) continue;
+		VectorType *v = d->type->vectorType();
+		if( !v ) continue;
+
+		std::string varName = g->toCSafeName( "_l" + d->name );
+		std::string vecLabel = g->toCSafeName( v->label );
+		// Allocate the vector using the runtime function
+		g->emitLine( "void *" + varName + " = _bbVecAlloc((BBVecType*)&" + vecLabel + ");" );
+	}
+}
+#endif
+
 ////////////////////////
 // release local vars //
 ////////////////////////

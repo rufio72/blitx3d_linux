@@ -17,3 +17,11 @@ llvm::Value *NullNode::translate2( Codegen_LLVM *g ){
 	return llvm::ConstantPointerNull::get( llvm::PointerType::get( g->bbObj,0 ) );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string NullNode::translate3( Codegen_C *g ){
+	return "0";
+}
+#endif

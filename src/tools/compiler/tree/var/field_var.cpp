@@ -47,6 +47,73 @@ llvm::Value *FieldVarNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string FieldVarNode::translate3( Codegen_C *g ){
+	// Get the object pointer
+	std::string objPtr = expr->translate3( g );
+	// Access field through BBObj->fields pointer
+	// sem_field->offset is field_index * 4 (from old 32-bit code)
+	// Fields are stored in obj->fields which points to memory right after BBObj header
+	int fieldIndex = sem_field->offset / 4; // Convert byte offset to field index
+	std::string baseAccess = "((BBObj*)" + objPtr + ")->fields[" + std::to_string( fieldIndex ) + "]";
+
+	// Return the appropriate union member based on type
+	if( sem_type == Type::int_type ){
+		return baseAccess + ".INT";
+	}else if( sem_type == Type::float_type ){
+		return baseAccess + ".FLT";
+	}else if( sem_type == Type::string_type ){
+		return baseAccess + ".STR";
+	}else if( sem_type->structType() ){
+		return baseAccess + ".OBJ";
+	}else if( sem_type->vectorType() ){
+		return baseAccess + ".VEC";
+	}
+	return baseAccess + ".INT";
+}
+
+std::string FieldVarNode::load3( Codegen_C *g ){
+	std::string objPtr = expr->translate3( g );
+	int fieldIndex = sem_field->offset / 4;
+	std::string baseAccess = "((BBObj*)" + objPtr + ")->fields[" + std::to_string( fieldIndex ) + "]";
+
+	if( sem_type == Type::int_type ){
+		return baseAccess + ".INT";
+	}else if( sem_type == Type::float_type ){
+		return baseAccess + ".FLT";
+	}else if( sem_type == Type::string_type ){
+		return "_bbStrLoad((bb_string_t*)&" + baseAccess + ".STR)";
+	}else if( sem_type->structType() ){
+		return "(bb_obj_t)" + baseAccess + ".OBJ";
+	}else if( sem_type->vectorType() ){
+		return baseAccess + ".VEC";
+	}
+	return baseAccess + ".INT";
+}
+
+void FieldVarNode::store3( Codegen_C *g, const std::string &value ){
+	std::string objPtr = expr->translate3( g );
+	int fieldIndex = sem_field->offset / 4;
+	std::string baseAccess = "((BBObj*)" + objPtr + ")->fields[" + std::to_string( fieldIndex ) + "]";
+
+	if( sem_type == Type::int_type ){
+		g->emitLine( baseAccess + ".INT = " + value + ";" );
+	}else if( sem_type == Type::float_type ){
+		g->emitLine( baseAccess + ".FLT = " + value + ";" );
+	}else if( sem_type == Type::string_type ){
+		g->emitLine( "_bbStrStore((bb_string_t*)&" + baseAccess + ".STR, " + value + ");" );
+	}else if( sem_type->structType() ){
+		g->emitLine( "_bbObjStore((void**)&" + baseAccess + ".OBJ, " + value + ");" );
+	}else if( sem_type->vectorType() ){
+		g->emitLine( baseAccess + ".VEC = " + value + ";" );
+	}else{
+		g->emitLine( baseAccess + ".INT = " + value + ";" );
+	}
+}
+#endif
+
 json FieldVarNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="FieldVarNode";
 	tree["sem_type"]=sem_type->toJSON();

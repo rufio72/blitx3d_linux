@@ -58,6 +58,33 @@ llvm::Value *CallNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string CallNode::translate3( Codegen_C *g ){
+	FuncType *f = sem_decl->type->funcType();
+
+	// Get the C symbol name
+	// Runtime functions have symbol set (e.g., "bbPrint")
+	// User-defined functions use the safe name pattern
+	std::string funcName = f->symbol;
+	if( funcName.empty() ){
+		// User-defined function - use same naming as FuncDeclNode
+		funcName = g->toCSafeName( "f" + ident );
+	}
+
+	std::string result = funcName + "(";
+
+	for( int i=0; i<exprs->size(); i++ ){
+		if( i > 0 ) result += ", ";
+		result += exprs->exprs[i]->translate3( g );
+	}
+	result += ")";
+
+	return result;
+}
+#endif
+
 json CallNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="CallNode";
 	tree["sem_type"]=sem_type->toJSON();

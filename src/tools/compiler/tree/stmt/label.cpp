@@ -26,3 +26,11 @@ void LabelNode::translate2( Codegen_LLVM *g ){
 	g->builder->SetInsertPoint( block );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void LabelNode::translate3( Codegen_C *g ){
+	g->emitLabel( "_l" + g->toCSafeName( ident ) );
+}
+#endif

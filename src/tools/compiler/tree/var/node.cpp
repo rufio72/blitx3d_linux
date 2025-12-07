@@ -50,3 +50,32 @@ llvm::Value *VarNode::translate2( Codegen_LLVM *g ){
 	abort();
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string VarNode::load3( Codegen_C *g ){
+	std::string varName = translate3( g );
+	if( sem_type == Type::string_type ){
+		return "_bbStrLoad(&" + varName + ")";
+	}
+	return varName;
+}
+
+void VarNode::store3( Codegen_C *g, const std::string &value ){
+	std::string varName = translate3( g );
+	if( sem_type->structType() ){
+		g->emitLine( "_bbObjStore(&" + varName + ", " + value + ");" );
+	} else if( sem_type == Type::string_type ){
+		g->emitLine( "_bbStrStore(&" + varName + ", " + value + ");" );
+	} else {
+		g->emitLine( varName + " = " + value + ";" );
+	}
+}
+
+std::string VarNode::translate3( Codegen_C *g ){
+	std::cerr<<"translate3 missing implementation for "<<typeid(*this).name()<<std::endl;
+	abort();
+	return "";
+}
+#endif

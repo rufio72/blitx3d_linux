@@ -98,3 +98,33 @@ json ArrayVarNode::toJSON( Environ *e ){
 	tree["sem_decl"]=sem_decl->toJSON();
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string ArrayVarNode::translate3( Codegen_C *g ){
+	std::string arrayName = g->toCSafeName( "_a" + ident );
+
+	// Get element type for casting
+	std::string elemType;
+	if( sem_type == Type::int_type ) elemType = "bb_int_t";
+	else if( sem_type == Type::float_type ) elemType = "bb_float_t";
+	else if( sem_type == Type::string_type ) elemType = "bb_string_t";
+	else elemType = "bb_obj_t";
+
+	// Calculate linear index for multi-dimensional arrays
+	std::string indexExpr;
+	for( int k = 0; k < (int)exprs->size(); ++k ){
+		std::string idx = exprs->exprs[k]->translate3( g );
+		if( k == 0 ){
+			indexExpr = idx;
+		} else {
+			// Multiply by the size of this dimension and add
+			indexExpr = "(" + indexExpr + " * " + arrayName + ".sizes[" + std::to_string(k) + "] + " + idx + ")";
+		}
+	}
+
+	// Return the array element access: ((type*)array.data)[index]
+	return "((" + elemType + "*)" + arrayName + ".data)[" + indexExpr + "]";
+}
+#endif

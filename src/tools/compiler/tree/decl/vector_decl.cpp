@@ -64,3 +64,37 @@ json VectorDeclNode::toJSON( Environ *e ){
 	tree["sem_type"]=sem_type->toJSON();
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void VectorDeclNode::translate3( Codegen_C *g ){
+	// Generate BBVecType structure for this vector type
+	VectorType *v = sem_type->vectorType();
+	std::string label = g->toCSafeName( v->label );
+
+	// Calculate total size
+	int sz = 1;
+	for( int k = 0; k < (int)v->sizes.size(); ++k ) sz *= v->sizes[k];
+
+	// Get element type reference
+	std::string elementTypeRef;
+	Type *type = v->elementType;
+	if( type == Type::int_type ) elementTypeRef = "&_bbIntType";
+	else if( type == Type::float_type ) elementTypeRef = "&_bbFltType";
+	else if( type == Type::string_type ) elementTypeRef = "&_bbStrType";
+	else if( StructType *s = type->structType() ) elementTypeRef = "(BBType*)&_t" + g->toCSafeName( s->ident );
+	else if( VectorType *vt = type->vectorType() ) elementTypeRef = "(BBType*)&" + g->toCSafeName( vt->label );
+	else elementTypeRef = "&_bbIntType";
+
+	// Emit the BBVecType structure
+	// BBVecType has: base.type, size, elementType
+	g->emitGlobal( "static BBVecType " + label + " = { .base = { .type = 6 }, .size = " +
+		std::to_string( sz ) + ", .elementType = " + elementTypeRef + " };" );
+
+	// If this is a global vector, also declare the global variable to hold the pointer
+	if( kind == DECL_GLOBAL ){
+		g->emitGlobal( "static void *" + g->toCSafeName( "_v" + ident ) + " = 0;" );
+	}
+}
+#endif

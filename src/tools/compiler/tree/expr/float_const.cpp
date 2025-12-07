@@ -48,3 +48,11 @@ json FloatConstNode::toJSON( Environ *e ){
 	tree["value"]=value;
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string FloatConstNode::translate3( Codegen_C *g ){
+	return g->constantFloat( value );
+}
+#endif

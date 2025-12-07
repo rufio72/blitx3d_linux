@@ -168,3 +168,19 @@ blitzcc -target arm64-android-24 -o game.apk game.bb
 - Uses android-34/android.jar for Java compilation
 - Default package: `com.blitz3dng.game`
 - Default app name: `Blitz3D Game`
+
+## Future Enhancements (TODO)
+
+### Bootstrap Icons Font for Games
+Add Bootstrap Icons as a TTF font for use in Blitz3D games:
+- Include `bootstrap-icons.ttf` in `_release/fonts/` or similar
+- Create a `.bb` include file with constants for icon Unicode codepoints
+- Example usage:
+  ```blitz3d
+  Include "bootstrap-icons.bb"
+  font = LoadFont("bootstrap-icons.ttf", 32)
+  SetFont font
+  Text 100, 100, ICON_PLAY   ; Play button icon
+  Text 150, 100, ICON_GEAR   ; Settings icon
+  ```
+- Benefits: Scalable vector icons, single file, easy UI creation for games

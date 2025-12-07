@@ -4,6 +4,10 @@
 
 #include "../node.h"
 
+#ifdef USE_GCC_BACKEND
+class Codegen_C;
+#endif
+
 struct StmtNode : public Node{
 	int pos;	//offset in source stream
 	StmtNode():pos(-1){}
@@ -16,6 +20,9 @@ struct StmtNode : public Node{
 	virtual void translate( Codegen *g ){}
 #ifdef USE_LLVM
 	virtual void translate2( Codegen_LLVM *g );
+#endif
+#ifdef USE_GCC_BACKEND
+	virtual void translate3( Codegen_C *g );
 #endif
 };
 

@@ -147,8 +147,10 @@ void main() {
       nDotHV = max( 0.0,dot( bbVertex_Normal,vec3( halfVector )));
       pf = pow( nDotHV,100.0 )*float(nDotVP!=0.0);
 
-      Diffuse  += LS.Light[i].Color * nDotVP;
-      Specular += LS.Light[i].Color * pf;
+      // Limit light contribution to prevent over-saturation
+      vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
+      Diffuse  += lightColor * nDotVP;
+      Specular += lightColor * pf;
     }
 
     bbVertex_Color = RS.Ambient * bbMaterialColor +

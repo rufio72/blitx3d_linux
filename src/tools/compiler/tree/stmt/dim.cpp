@@ -99,3 +99,39 @@ json DimNode::toJSON( Environ *e ){
 	if( sem_decl ) tree["sem_decl"]=sem_decl->toJSON();
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void DimNode::translate3( Codegen_C *g ){
+	std::string arrayName = g->toCSafeName( "_a" + ident );
+
+	// Get element type
+	int et;
+	Type *ty = sem_type->arrayType()->elementType;
+	if( ty == Type::int_type ) et = 1;
+	else if( ty == Type::float_type ) et = 2;
+	else if( ty == Type::string_type ) et = 3;
+	else et = 5;
+
+	// Declare array if this is the first Dim (sem_decl is set)
+	if( sem_decl ){
+		// Declare the array structure
+		g->emitGlobal( "static struct { void *data; bb_int_t type; bb_int_t dims; bb_int_t sizes[" +
+			std::to_string(exprs->size()) + "]; } " + arrayName + " = {0, " +
+			std::to_string(et) + ", " + std::to_string(exprs->size()) + ", {0}};" );
+	}
+
+	// Undim the array
+	g->emitLine( "_bbUndimArray((BBArray*)&" + arrayName + ");" );
+
+	// Set dimension sizes
+	for( int k = 0; k < (int)exprs->size(); ++k ){
+		std::string dimVal = exprs->exprs[k]->translate3( g );
+		g->emitLine( arrayName + ".sizes[" + std::to_string(k) + "] = " + dimVal + ";" );
+	}
+
+	// Dim the array
+	g->emitLine( "_bbDimArray((BBArray*)&" + arrayName + ");" );
+}
+#endif

@@ -129,3 +129,36 @@ json ArithExprNode::toJSON( Environ *e ){
 	tree["rhs"]=rhs->toJSON( e );
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string ArithExprNode::translate3( Codegen_C *g ){
+	std::string l = lhs->translate3( g );
+	std::string r = rhs->translate3( g );
+
+	if( sem_type == Type::string_type ){
+		return "_bbStrConcat(" + l + ", " + r + ")";
+	}
+
+	if( sem_type == Type::int_type ){
+		switch( op ){
+		case '+': return "(" + l + " + " + r + ")";
+		case '-': return "(" + l + " - " + r + ")";
+		case '*': return "(" + l + " * " + r + ")";
+		case '/': return "(" + l + " / " + r + ")";
+		case MOD: return "_bbMod(" + l + ", " + r + ")";
+		}
+	} else {
+		switch( op ){
+		case '+': return "(" + l + " + " + r + ")";
+		case '-': return "(" + l + " - " + r + ")";
+		case '*': return "(" + l + " * " + r + ")";
+		case '/': return "(" + l + " / " + r + ")";
+		case MOD: return "_bbFMod(" + l + ", " + r + ")";
+		case '^': return "_bbFPow(" + l + ", " + r + ")";
+		}
+	}
+	return "0"; // Should not reach here
+}
+#endif

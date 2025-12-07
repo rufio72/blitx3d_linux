@@ -11,6 +11,9 @@
 
 struct VarNode;
 struct ConstNode;
+#ifdef USE_GCC_BACKEND
+class Codegen_C;
+#endif
 
 #define DEFAULT_NODE_JSON( name ) virtual json toJSON( Environ *e ){ json tree;tree["@class"]=#name; return tree; }
 
@@ -61,6 +64,9 @@ struct Node{
 #ifdef USE_LLVM
 	static llvm::Value *compare2( int op,llvm::Value *l,llvm::Value *r,Type *ty,Codegen_LLVM *g );
 	static void createVars2( Environ *e, Codegen_LLVM *g );
+#endif
+#ifdef USE_GCC_BACKEND
+	static void createVars3( Environ *e, Codegen_C *g );
 #endif
 };
 

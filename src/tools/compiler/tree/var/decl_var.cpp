@@ -42,3 +42,19 @@ json DeclVarNode::toJSON( Environ *e ){
 	tree["sem_decl"]=sem_decl->toJSON();
 	return tree;
 }
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string DeclVarNode::translate3( Codegen_C *g ){
+	// Global variables use _v prefix, locals use _l prefix
+	if( sem_decl->kind == DECL_GLOBAL ){
+		return g->toCSafeName( "_v" + sem_decl->name );
+	} else if( sem_decl->kind == DECL_LOCAL ){
+		return g->toCSafeName( "_l" + sem_decl->name );
+	} else if( sem_decl->kind == DECL_PARAM ){
+		return g->toCSafeName( "_p" + sem_decl->name );
+	}
+	return g->toCSafeName( sem_decl->name );
+}
+#endif

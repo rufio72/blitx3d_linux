@@ -3,6 +3,10 @@
 
 #include "../node.h"
 
+#ifdef USE_GCC_BACKEND
+class Codegen_C;
+#endif
+
 struct VarNode : public Node{
 	Type *sem_type;
 
@@ -19,6 +23,11 @@ struct VarNode : public Node{
 	virtual llvm::Value *load2( Codegen_LLVM *g );
 	virtual void store2( Codegen_LLVM *g,llvm::Value *v );
 	virtual llvm::Value *translate2( Codegen_LLVM *g ); // TODO: make abstract once everything is implemented
+#endif
+#ifdef USE_GCC_BACKEND
+	virtual std::string load3( Codegen_C *g );
+	virtual void store3( Codegen_C *g, const std::string &value );
+	virtual std::string translate3( Codegen_C *g ); // returns the variable name/address
 #endif
 };
 

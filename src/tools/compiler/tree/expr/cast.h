@@ -14,6 +14,9 @@ struct CastNode : public ExprNode{
 #ifdef USE_LLVM
 	llvm::Value *translate2( Codegen_LLVM *g );
 #endif
+#ifdef USE_GCC_BACKEND
+	std::string translate3( Codegen_C *g );
+#endif
 };
 
 #endif

@@ -14,6 +14,9 @@ struct DeclStmtNode : public StmtNode{
 #ifdef USE_LLVM
 	virtual void translate2( Codegen_LLVM *g );
 #endif
+#ifdef USE_GCC_BACKEND
+	void translate3( Codegen_C *g );
+#endif
 };
 
 #endif

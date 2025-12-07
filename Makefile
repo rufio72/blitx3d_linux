@@ -110,8 +110,11 @@ install-unit-test:
 	cp _release/toolchains/mingw32/bin/unit_test.dll ~/.wine/drive_c/Program\ Files/Blitz3D/userlibs/
 	cp src/modules/bb/unit-test/unit_test.decls ~/.wine/drive_c/Program\ Files/Blitz3D/userlibs/
 
-help:
+help-ruby:
 	(cd src/help && bundle && bundle exec ./build.rb)
+
+docs:
+	_release/src/tools/docgen/docgen -s . -o _release/help
 
 dist-pkg:
 	mv _release blitz3d-ng
@@ -134,4 +137,4 @@ clean:
 	rm -rf coverage
 	rm -rf tmp
 
-.PHONY: build llvm install-unit-test help clean emscripten
+.PHONY: build llvm install-unit-test help-ruby docs clean emscripten

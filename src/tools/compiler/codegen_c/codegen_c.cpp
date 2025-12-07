@@ -384,7 +384,9 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbTerrainDetail(bb_int_t terrain, bb_int_t detail, bb_int_t morph);\n";
     header << "extern bb_int_t bbCreateSurface(bb_int_t mesh, bb_int_t brush);\n";
     header << "extern void bbScaleMesh(bb_int_t mesh, bb_float_t x, bb_float_t y, bb_float_t z);\n";
+    header << "extern void bbFitMesh(bb_int_t mesh, bb_float_t x, bb_float_t y, bb_float_t z, bb_float_t width, bb_float_t height, bb_float_t depth, bb_int_t uniform);\n";
     header << "extern void bbFlipMesh(bb_int_t mesh);\n";
+    header << "extern bb_int_t bbCreateMirror(bb_int_t parent);\n";
     header << "extern void bbChangeDir(bb_string_t dir);\n";
     header << "extern bb_int_t bbCreateListener(bb_int_t parent, bb_float_t rolloff, bb_float_t doppler, bb_float_t dist);\n";
     header << "extern void bbCaptureWorld(void);\n";
@@ -396,6 +398,21 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_float_t bbMD2AnimTime(bb_int_t entity);\n";
     header << "extern bb_int_t bbMD2AnimLength(bb_int_t entity);\n";
     header << "extern bb_int_t bbMD2Animating(bb_int_t entity);\n";
+    header << "\n";
+    header << "/* Joystick functions */\n";
+    header << "extern bb_int_t bbJoyXDir(bb_int_t port);\n";
+    header << "extern bb_int_t bbJoyYDir(bb_int_t port);\n";
+    header << "extern bb_int_t bbJoyDown(bb_int_t button, bb_int_t port);\n";
+    header << "extern bb_int_t bbJoyHit(bb_int_t button, bb_int_t port);\n";
+    header << "extern bb_float_t bbJoyX(bb_int_t port);\n";
+    header << "extern bb_float_t bbJoyY(bb_int_t port);\n";
+    header << "extern bb_float_t bbJoyZ(bb_int_t port);\n";
+    header << "\n";
+    header << "/* Terrain functions */\n";
+    header << "extern bb_int_t bbTerrainSize(bb_int_t terrain);\n";
+    header << "\n";
+    header << "/* Input functions */\n";
+    header << "extern bb_string_t bbInput(bb_string_t prompt);\n";
     header << "\n";
 }
 

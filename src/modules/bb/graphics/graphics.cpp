@@ -72,6 +72,15 @@ static inline void debugCanvas( BBCanvas *c ){
 
 void blitz2d_open();
 void blitz2d_reset();
+
+// Auto-initialize console mode if font not yet initialized
+static void ensureConsoleMode() {
+	if( !curr_font && gx_graphics ) {
+		// Graphics is initialized but font isn't - initialize 2D mode
+		blitz2d_open();
+		bbSetBuffer( bbFrontBuffer() );
+	}
+}
 void blitz2d_close();
 void blitz3d_open( BBGraphics *graphics );
 void blitz3d_close();
@@ -1080,6 +1089,7 @@ static void endPrinting( BBCanvas *c ){
 }
 
 void BBCALL bbWrite( BBStr *str ){
+	ensureConsoleMode();
 	if( !curr_font ) return;
 	BBCanvas *c=startPrinting();
 	c->text( curs_x,curs_y,*str );
@@ -1089,6 +1099,7 @@ void BBCALL bbWrite( BBStr *str ){
 }
 
 void BBCALL bbPrint( BBStr *str ){
+	ensureConsoleMode();
 	if( !curr_font ) return;
 	BBCanvas *c=startPrinting();
 	c->text( curs_x,curs_y,*str );
@@ -1099,6 +1110,7 @@ void BBCALL bbPrint( BBStr *str ){
 }
 
 BBStr * BBCALL bbInput( BBStr *prompt ){
+	ensureConsoleMode();
 	if( !curr_font ) return d_new BBStr( "" );
 	BBCanvas *c=startPrinting();
 	std::string t=*prompt;delete prompt;
@@ -1152,6 +1164,7 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 					c->setColor( curr_color );
 				}
 				c->text( cx,curs_y,str.substr( curs,1 ) );
+				bbFlip(0);  // Flip to show cursor updates in OpenGL
 			}
 			if( (key=bbGetKey( false )) ){
 				if( int asc=gx_input->toAscii( key ) ){
@@ -1220,6 +1233,7 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 		p_canvas->text( curs_x,curr_font->getHeight(),str );
 		c->set();
 		c->blit( 0,curs_y,p_canvas,0,curr_font->getHeight(),c->getWidth(),curr_font->getHeight(),true );
+		bbFlip(0);  // Flip to show typed characters in OpenGL
 	}
 
 	curs_x=0;

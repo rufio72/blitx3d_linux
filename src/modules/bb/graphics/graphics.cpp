@@ -690,6 +690,13 @@ void BBCALL bbText( bb_int_t x,bb_int_t y,BBStr *str,bb_int_t centre_x,bb_int_t 
 	if( centre_x ) x-=curr_font->getWidth( *str )/2;
 	if( centre_y ) y-=curr_font->getHeight()/2;
 	gx_canvas->text( x,y,*str );
+	// Update cursor position if text is below current cursor
+	// This helps Input$ to not overwrite previous Text output
+	int text_bottom = y + curr_font->getHeight();
+	if( text_bottom > curs_y ){
+		curs_y = text_bottom;
+		curs_x = 0;
+	}
 	delete str;
 }
 
@@ -1052,7 +1059,9 @@ static int p_ox,p_oy,p_hx,p_hy,p_vpx,p_vpy,p_vpw,p_vph;
 
 static BBCanvas *startPrinting(){
 
-	BBCanvas *c=gx_graphics->getFrontCanvas();
+	// Use current buffer (gx_canvas) instead of always FrontCanvas
+	// This allows Print/Input to work correctly with BackBuffer
+	BBCanvas *c=gx_canvas ? gx_canvas : gx_graphics->getFrontCanvas();
 
 	c->lock();
 	c->unlock();
@@ -1118,7 +1127,7 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 	float sx,sy;
 	c->getScale(&sx,&sy);
 
-	//get temp canvas
+	//get temp canvas for input line
 	if( !p_canvas || p_canvas->getWidth()<c->getWidth() || p_canvas->getHeight()<curr_font->getHeight()*2 ){
 		if( p_canvas ) gx_graphics->freeCanvas( p_canvas );
 		p_canvas=gx_graphics->createCanvas( c->getWidth()*sx,curr_font->getHeight()*2*sy,0 );
@@ -1128,6 +1137,7 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 			return d_new BBStr();
 		}
 	}
+
 	//draw prompt
 	c->text( curs_x,curs_y,t );
 	curs_x+=curr_font->getWidth( t );
@@ -1135,6 +1145,11 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 	p_canvas->setFont( curr_font );
 	p_canvas->setColor( curr_color );
 	p_canvas->blit( 0,0,c,0,curs_y,c->getWidth(),curr_font->getHeight(),true );
+
+	// Backup full screen content before any flip
+	if( screen_backup ){
+		screen_backup->blit( 0,0,c,0,0,c->getWidth(),c->getHeight(),true );
+	}
 
 	std::string str;
 	bool go=true;
@@ -1243,7 +1258,7 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 }
 
 void BBCALL bbLocate( bb_int_t x,bb_int_t y ){
-	BBCanvas *c=gx_graphics->getFrontCanvas();
+	BBCanvas *c=gx_canvas ? gx_canvas : gx_graphics->getFrontCanvas();
 	curs_x=x<0 ? 0 : (x > c->getWidth() ? c->getWidth() : x);
 	curs_y=y<0 ? 0 : (y > c->getHeight() ? c->getHeight() : y);
 }

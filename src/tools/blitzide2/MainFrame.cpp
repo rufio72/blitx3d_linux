@@ -58,6 +58,7 @@ wxEND_EVENT_TABLE()
 MainFrame::MainFrame( const wxString& title )
 	: wxFrame( NULL,wxID_ANY,title,wxDefaultPosition,wxDefaultSize,wxDEFAULT_FRAME_STYLE|wxNO_FULL_REPAINT_ON_RESIZE )
 {
+
 #ifdef BB_MSVC
 	SetIcon( wxIcon("IDI_ICON1") );
 #else
@@ -128,13 +129,29 @@ MainFrame::MainFrame( const wxString& title )
 	platformMenu->Bind( wxEVT_MENU,&MainFrame::OnTarget,this,wxID_ANY );
 	deviceIdx=0;
 
+  // IMPORTANT: Create splitter and notebook BEFORE toolbar to avoid crash on Linux/GTK
+  // The first AddPage MUST happen before any Bind() calls on the notebook
+  splitter = new wxSplitterWindow( this,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxSP_3D|wxSP_LIVE_UPDATE );
+  splitter->SetSashGravity( 1.0 );
+  splitter->SetMinimumPaneSize( 250 );
+
+  // Use CLOSE_ON_ACTIVE_TAB so close button only appears on active tab
+  // Combined with Veto in OnPageClose for page 0, this prevents closing Help tab
+  nb = new wxAuiNotebook( splitter,wxID_ANY,wxDefaultPosition,wxDefaultSize,
+    wxAUI_NB_TOP | wxAUI_NB_CLOSE_ON_ACTIVE_TAB );
+
+  // Add help page IMMEDIATELY after creating notebook (before Bind calls)
+  help = new HtmlHelp( nb,wxID_ANY );
+  nb->AddPage( help,wxT("Help") );
+
+  nb->Bind( wxEVT_AUINOTEBOOK_PAGE_CHANGED,&MainFrame::OnPageChanged,this,wxID_ANY );
+  nb->Bind( wxEVT_AUINOTEBOOK_PAGE_CLOSE,&MainFrame::OnPageClose,this,wxID_ANY );
+
   wxImage::AddHandler( new wxPNGHandler );
 
   wxImage icons(blitzpath + "/cfg/ide_toolbar.bmp", wxBITMAP_TYPE_BMP);
   icons.SetMask( true );
   icons.SetMaskColour( 0xc0,0xc0,0xc0 );
-
-  wxSize iconSize=wxSize( 16,16 );
 
   wxImage icon_new     = wxImage(icons).Resize(wxSize(16,16),wxPoint(-16*0,0));
   wxImage icon_open    = wxImage(icons).Resize(wxSize(16,16),wxPoint(-16*1,0));
@@ -150,40 +167,33 @@ MainFrame::MainFrame( const wxString& title )
   wxImage icon_forward = wxImage(icons).Resize(wxSize(16,16),wxPoint(-16*11,0));
 
 #ifdef BB_MACOS
-	toolbar = 0;
+  toolbar = 0;
 #else
   toolbar = CreateToolBar();
-  toolbar->AddTool( ID_NEW,wxT("New"),icon_new );
-  toolbar->AddTool( ID_OPEN,wxT("Open"),icon_open );
-  toolbar->AddTool( ID_SAVE,wxT("Save"),icon_save );
-  toolbar->AddTool( ID_CLOSE,wxT("Close"),icon_close );
-  toolbar->AddTool( ID_CUT,wxT("Cut"),icon_cut );
-  toolbar->AddTool( ID_COPY,wxT("Copy"),icon_copy );
-  toolbar->AddTool( ID_PASTE,wxT("Paste"),icon_paste );
-  toolbar->AddTool( ID_FIND,wxT("Find"),icon_find );
-  toolbar->AddTool( ID_RUN,wxT("Run"),icon_run );
-  toolbar->AddTool( ID_HOME,wxT("Home"),icon_home );
-  toolbar->AddTool( ID_BACK,wxT("Back"),icon_back );
-  toolbar->AddTool( ID_FORWARD,wxT("Forward"),icon_forward );
+  toolbar->AddTool( ID_NEW,wxT("New"),icon_new,wxT("Create new file (Ctrl+N)") );
+  toolbar->AddTool( ID_OPEN,wxT("Open"),icon_open,wxT("Open file (Ctrl+O)") );
+  toolbar->AddTool( ID_SAVE,wxT("Save"),icon_save,wxT("Save file (Ctrl+S)") );
+  toolbar->AddTool( ID_CLOSE,wxT("Close"),icon_close,wxT("Close file (Ctrl+W)") );
+  toolbar->AddSeparator();
+  toolbar->AddTool( ID_CUT,wxT("Cut"),icon_cut,wxT("Cut (Ctrl+X)") );
+  toolbar->AddTool( ID_COPY,wxT("Copy"),icon_copy,wxT("Copy (Ctrl+C)") );
+  toolbar->AddTool( ID_PASTE,wxT("Paste"),icon_paste,wxT("Paste (Ctrl+V)") );
+  toolbar->AddTool( ID_FIND,wxT("Find"),icon_find,wxT("Find (Ctrl+F)") );
+  toolbar->AddSeparator();
+  toolbar->AddTool( ID_RUN,wxT("Run"),icon_run,wxT("Run program (Ctrl+R)") );
+  toolbar->AddSeparator();
+  toolbar->AddTool( ID_HOME,wxT("Home"),icon_home,wxT("Help home page") );
+  toolbar->AddTool( ID_BACK,wxT("Back"),icon_back,wxT("Go back") );
+  toolbar->AddTool( ID_FORWARD,wxT("Forward"),icon_forward,wxT("Go forward") );
   toolbar->Realize();
 #endif
 
   CreateStatusBar();
-  // SetStatusText( "" );
 
-  splitter = new wxSplitterWindow( this,wxID_ANY,wxDefaultPosition,wxDefaultSize,wxSP_3D|wxSP_LIVE_UPDATE );
-  splitter->SetSashGravity( 1.0 );
-  splitter->SetMinimumPaneSize( 250 );
+  // Create code panel and layout
+  codePanel = new CodePanel( splitter );
 
-  nb = new wxNotebook( splitter,wxID_ANY );
-  nb->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED,&MainFrame::OnPageChanged,this,wxID_ANY );
-
-  help = new HtmlHelp( nb,wxID_ANY );
-  nb->AddPage( help,wxT("Help") );
-
-  codePanel=new CodePanel( splitter );
-
-  wxBoxSizer *sizer=new wxBoxSizer( wxVERTICAL );
+  wxBoxSizer *sizer = new wxBoxSizer( wxVERTICAL );
   sizer->Add( splitter,1,wxEXPAND,0 );
 
   splitter->SplitVertically( nb,codePanel );
@@ -217,7 +227,7 @@ void MainFrame::AddFiles( wxArrayString &paths ){
 	}
 	nb->SetSelection( nb->GetPageCount()-1 );
 	FileView *file=dynamic_cast<FileView*>( nb->GetCurrentPage() );
-	codePanel->updateLists( file->GetSource() );
+	if( codePanel ) codePanel->updateLists( file->GetSource() );
 }
 
 void MainFrame::UpdateToolbar( int pageIndex ){
@@ -230,8 +240,8 @@ void MainFrame::UpdateToolbar( int pageIndex ){
 	toolbar->EnableTool( ID_PASTE,pageIndex>0 );
 	toolbar->EnableTool( ID_FIND,pageIndex>0 );
 	toolbar->EnableTool( ID_RUN,pageIndex>0 );
-	toolbar->EnableTool( ID_BACK,pageIndex==0 && help->CanGoBack() );
-	toolbar->EnableTool( ID_FORWARD,pageIndex==0 && help->CanGoForward() );
+	toolbar->EnableTool( ID_BACK,pageIndex==0 && help && help->CanGoBack() );
+	toolbar->EnableTool( ID_FORWARD,pageIndex==0 && help && help->CanGoForward() );
 }
 
 void MainFrame::UpdateMenu( int pageIndex ){
@@ -515,15 +525,15 @@ void MainFrame::OnUnlockFile( wxCommandEvent& WXUNUSED(event) ){
 
 void MainFrame::OnHome( wxCommandEvent& WXUNUSED(event) ){
   nb->SetSelection( 0 );
-  help->GoHome();
+  if(help) help->GoHome();
 }
 
 void MainFrame::OnBack( wxCommandEvent& WXUNUSED(event) ){
-  help->GoBack();
+  if(help) help->GoBack();
 }
 
 void MainFrame::OnForward( wxCommandEvent& WXUNUSED(event) ){
-  help->GoForward();
+  if(help) help->GoForward();
 }
 
 void MainFrame::OnPageChanged( wxBookCtrlEvent& event ){
@@ -537,4 +547,42 @@ void MainFrame::OnPageChanged( wxBookCtrlEvent& event ){
 
 	UpdateToolbar( event.GetSelection() );
 	UpdateMenu( event.GetSelection() );
+}
+
+void MainFrame::OnPageClose( wxAuiNotebookEvent& event ){
+	int page = event.GetSelection();
+
+	// Don't allow closing the Help tab
+	if( page == 0 ){
+		event.Veto();
+		return;
+	}
+
+	FileView *file = dynamic_cast<FileView*>( nb->GetPage(page) );
+	if( file && file->IsDirty() ){
+		wxMessageDialog* dialog = new wxMessageDialog(NULL,
+			"File " + file->GetPath() + " has been modified! Save changes before closing?",
+			_("Save changes?"),
+			wxYES_NO | wxCANCEL | wxCANCEL_DEFAULT | wxICON_WARNING );
+
+		switch( dialog->ShowModal() ){
+		case wxID_YES:
+			file->Save();
+			break;
+		case wxID_NO:
+			break;
+		default:
+			event.Veto();
+			return;
+		};
+	}
+
+	// If this was the build file, unlock it
+	if( file == buildFile ){
+		buildFile = 0;
+	}
+
+	// Update toolbar after close
+	int newPage = (page > 0) ? page - 1 : 0;
+	UpdateToolbar( newPage );
 }

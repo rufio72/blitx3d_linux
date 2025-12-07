@@ -2,7 +2,9 @@ Global info1$="Birds Demo, by Adam Gore"
 Global info2$="A small Blitz3D compatibility test"
 Global info3$="Spline data imported from Lightwave"
 
-Include "../start.bb"
+; Include "../start.bb"  ; Disabled - uses console I/O not supported on Linux
+Graphics3D 640,480,0,2
+SetBuffer BackBuffer()
 
 Include "KBSplines.bb"
 

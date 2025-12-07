@@ -28,6 +28,9 @@ protected:
 	wxProcess *proc;
 
 	int Monitor();
+#ifndef BB_MSVC
+	int RunCommand( const wxString &cmd, wxString &bundleId );
+#endif
 public:
 	BlitzCC( wxEvtHandler *dest,const wxString &blitzpath );
 	~BlitzCC();

@@ -19,7 +19,9 @@ if(ANDROID)
   find_package(Java 1.8 REQUIRED COMPONENTS Development)
   include(UseJava)
   set(CMAKE_JAVA_COMPILE_FLAGS -source 1.8 -target 1.8)
-  set(ANDROID_JAR $ENV{ANDROID_HOME}/platforms/android-${ANDROID_PLATFORM}/android.jar)
+  # Use android-34 for Java compilation (to have all SDK APIs available)
+  # The actual minSdk (ANDROID_PLATFORM) is used for native code
+  set(ANDROID_JAR $ENV{ANDROID_HOME}/platforms/android-34/android.jar)
   # Disable outline atomics globally for all targets to fix __aarch64_* symbol errors on older Android devices
   if(ANDROID_ABI STREQUAL "arm64-v8a")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mno-outline-atomics")

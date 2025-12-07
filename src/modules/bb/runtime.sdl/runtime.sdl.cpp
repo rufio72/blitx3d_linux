@@ -181,6 +181,41 @@ bool SDLRuntime::idle(){
 				BBEvent ev=BBEvent( BBEVENT_CHAR,*(c++) );
 				bbOnEvent.run( &ev );
 			}
+		}else if( event.type==SDL_FINGERDOWN ){
+			// Map touch to mouse - convert normalized coordinates to screen coordinates
+			auto graphics=(SDLGraphics*)((SDLContextDriver*)bbContextDriver)->getGraphics();
+			if( graphics ){
+				int w,h;
+				SDL_GetWindowSize( graphics->wnd,&w,&h );
+				int x=(int)(event.tfinger.x * w);
+				int y=(int)(event.tfinger.y * h);
+				BBEvent ev1( BBEVENT_MOUSEMOVE,1,x,y );
+				bbOnEvent.run( &ev1 );
+				BBEvent ev2( BBEVENT_MOUSEDOWN,1 ); // left click
+				bbOnEvent.run( &ev2 );
+			}
+		}else if( event.type==SDL_FINGERUP ){
+			auto graphics=(SDLGraphics*)((SDLContextDriver*)bbContextDriver)->getGraphics();
+			if( graphics ){
+				int w,h;
+				SDL_GetWindowSize( graphics->wnd,&w,&h );
+				int x=(int)(event.tfinger.x * w);
+				int y=(int)(event.tfinger.y * h);
+				BBEvent ev1( BBEVENT_MOUSEMOVE,0,x,y );
+				bbOnEvent.run( &ev1 );
+				BBEvent ev2( BBEVENT_MOUSEUP,1 ); // left click release
+				bbOnEvent.run( &ev2 );
+			}
+		}else if( event.type==SDL_FINGERMOTION ){
+			auto graphics=(SDLGraphics*)((SDLContextDriver*)bbContextDriver)->getGraphics();
+			if( graphics ){
+				int w,h;
+				SDL_GetWindowSize( graphics->wnd,&w,&h );
+				int x=(int)(event.tfinger.x * w);
+				int y=(int)(event.tfinger.y * h);
+				BBEvent ev( BBEVENT_MOUSEMOVE,1,x,y );
+				bbOnEvent.run( &ev );
+			}
 		}
 	}
 

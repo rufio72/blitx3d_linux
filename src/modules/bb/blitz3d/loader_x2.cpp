@@ -220,6 +220,24 @@ public:
 				// std::string tex( child->data()+4,cnt );
 				tex=std::string( child->data()+4,cnt );
 
+				// Convert backslashes to forward slashes for cross-platform compatibility
+				// Also handle double backslashes (\\) which represent a single backslash
+				std::string fixed;
+				for( size_t i=0;i<tex.size();++i ){
+					if( tex[i]=='\\' || tex[i]=='/' ){
+						// Skip consecutive slashes
+						if( fixed.empty() || (fixed.back()!='/' && fixed.back()!='\\') ){
+							fixed += '/';
+						}
+					}else{
+						fixed += tex[i];
+					}
+				}
+				tex = fixed;
+				#ifdef BB_ANDROID
+				__android_log_print(ANDROID_LOG_INFO, "blitz3d", "loader_x2: Loading texture: %s", tex.c_str());
+			#endif
+
 				brush.setTexture( 0,Texture( tex,0 ),0 );
 				brush.setColor( Vector( 1,1,1 ) );
 			}

@@ -1,6 +1,13 @@
 #include "../../../stdutil/stdutil.h"
 #include "graphics.sdl.h"
 
+#ifdef BB_ANDROID
+// On Android, SDL only supports one window (created by SDLActivity)
+// We cache it to reuse across Graphics calls
+static SDL_Window* s_cachedWindow = nullptr;
+static SDL_GLContext s_cachedContext = nullptr;
+#endif
+
 void SDLGraphics::onAppChange( void *data,void *context ){
 	SDLGraphics *graphics=(SDLGraphics*)context;
 	SDL_SetWindowTitle( graphics->wnd,bbApp().title.c_str() );
@@ -17,8 +24,15 @@ SDLGraphics::SDLGraphics( SDL_Window *wnd,SDL_GLContext ctx ):wnd(wnd),context(c
 SDLGraphics::~SDLGraphics(){
 	bbAppOnChange.remove( onAppChange,this );
 
+#ifdef BB_ANDROID
+	// On Android, don't destroy window/context - they belong to SDLActivity
+	// Just keep references for reuse
+	s_cachedWindow = wnd;
+	s_cachedContext = context;
+#else
 	SDL_GL_DeleteContext( context );
 	SDL_DestroyWindow( wnd );wnd=0;
+#endif
 }
 
 void SDLGraphics::resize(){
@@ -111,56 +125,77 @@ void SDLContextDriver::windowedModeInfo( int *c ){
 BBGraphics *SDLContextDriver::openGraphics( int w,int h,int d,int driver,int flags ){
 	if( graphics ) return 0;
 
-	bool inited=false;
-	if( !inited ){
-		if( SDL_Init(SDL_INIT_VIDEO)<0 ){
-			LOGD( "%s","failed to init sdl" );
+	SDL_Window* wnd = nullptr;
+	SDL_GLContext context = nullptr;
+	bool windowed = flags & BBGraphics::GRAPHICS_WINDOWED ? true : false;
+
+#ifdef BB_ANDROID
+	// On Android, reuse cached window/context if available
+	if( s_cachedWindow && s_cachedContext ){
+		wnd = s_cachedWindow;
+		context = s_cachedContext;
+		s_cachedWindow = nullptr;
+		s_cachedContext = nullptr;
+		LOGD( "%s","Reusing cached Android window/context" );
+
+		// Make sure context is current
+		if( SDL_GL_MakeCurrent( wnd,context ) ){
+			LOGD( "%s",SDL_GetError() );
+			return 0;
+		}
+	} else {
+#endif
+		bool inited=false;
+		if( !inited ){
+			if( SDL_Init(SDL_INIT_VIDEO)<0 ){
+				LOGD( "%s","failed to init sdl" );
+				return 0;
+			}
+
+#ifdef BB_DESKTOP
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_CORE );
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION,3 );
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION,3 );
+#else
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION,3 );
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION,0 );
+#endif
+			inited=true;
+		}
+
+		wnd=SDL_CreateWindow( bbApp().title.c_str(),SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,1,1,SDL_WINDOW_OPENGL|SDL_WINDOW_ALLOW_HIGHDPI );
+		if( wnd==NULL ){
+			LOGD( "%s","failed to create window" );
 			return 0;
 		}
 
-#ifdef BB_DESKTOP
-		SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK,SDL_GL_CONTEXT_PROFILE_CORE );
-		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION,3 );
-		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION,3 );
-#else
-		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION,3 );
-		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION,0 );
-#endif
-		inited=true;
-	}
-
-	SDL_Window* wnd=SDL_CreateWindow( bbApp().title.c_str(),SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,1,1,SDL_WINDOW_OPENGL|SDL_WINDOW_ALLOW_HIGHDPI );
-	if( wnd==NULL ){
-		LOGD( "%s","failed to create window" );
-		return 0;
-	}
-
-	bool windowed=flags & BBGraphics::GRAPHICS_WINDOWED ? true : false;
-	bool scaled=windowed && (flags & BBGraphics::GRAPHICS_SCALED ? true : false);
+		bool scaled=windowed && (flags & BBGraphics::GRAPHICS_SCALED ? true : false);
 
 #ifndef BB_DESKTOP
-	// no point in 'windowed' on mobile, right?
-	windowed=false;
-	scaled=false;
+		// no point in 'windowed' on mobile, right?
+		windowed=false;
+		scaled=false;
 #else
-	SDL_DisplayMode mode;
-	SDL_GetCurrentDisplayMode( 0,&mode );
-	SDL_SetWindowPosition( wnd,(mode.w-w)/2.0f,(mode.h-h)/2.0f );
-	SDL_SetWindowSize( wnd,w,h );
-	SDL_SetWindowResizable( wnd,scaled?SDL_TRUE:SDL_FALSE );
+		SDL_DisplayMode mode;
+		SDL_GetCurrentDisplayMode( 0,&mode );
+		SDL_SetWindowPosition( wnd,(mode.w-w)/2.0f,(mode.h-h)/2.0f );
+		SDL_SetWindowSize( wnd,w,h );
+		SDL_SetWindowResizable( wnd,scaled?SDL_TRUE:SDL_FALSE );
 #endif
-	SDL_ShowWindow( wnd );
+		SDL_ShowWindow( wnd );
 
-	SDL_GLContext context;
-	if( !(context=SDL_GL_CreateContext( wnd )) ){
-		LOGD( "%s",SDL_GetError() );
-		return 0;
-	}
+		if( !(context=SDL_GL_CreateContext( wnd )) ){
+			LOGD( "%s",SDL_GetError() );
+			return 0;
+		}
 
-	if( SDL_GL_MakeCurrent( wnd,context ) ){
-		LOGD( "%s",SDL_GetError() );
-		return 0;
+		if( SDL_GL_MakeCurrent( wnd,context ) ){
+			LOGD( "%s",SDL_GetError() );
+			return 0;
+		}
+#ifdef BB_ANDROID
 	}
+#endif
 
 	int screen_w,screen_h;
 	int drawableW,drawableH;

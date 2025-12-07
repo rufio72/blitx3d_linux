@@ -480,17 +480,26 @@ int main( int argc,char *argv[] ){
 		std::cout<<"Compiling \""<<in_file<<"\""<<std::endl;
 	}
 
+	std::string sourceDir=".";
 	int n=in_file.rfind( '/' );
 	if( n==std::string::npos ) n=in_file.rfind( '\\' );
 	if( n!=std::string::npos ){
 		if( !n || in_file[n-1]==':' ) ++n;
-		chdir( in_file.substr(0,n).c_str() );
+		sourceDir=in_file.substr(0,n);
+		chdir( sourceDir.c_str() );
 	}
 
 	ProgNode *prog=0;
 	Environ *env=0;
 	Module *module=0;
 	BundleInfo bundle;
+
+	// Get absolute path of source directory for asset bundling
+	char absSrcDir[PATH_MAX];
+	std::string srcDirPath;
+	if( realpath( ".", absSrcDir ) ){
+		srcDirPath=absSrcDir;
+	}
 
 #ifdef USE_LLVM
 	std::string obj_code;
@@ -506,6 +515,7 @@ int main( int argc,char *argv[] ){
 		bundle=parser.bundle;
 		bundle.signerId = signerId;
 		bundle.teamId = teamId;
+		bundle.sourceDir = srcDirPath;
 
 		//semant
 		if( !veryquiet ) std::cout<<"Generating..."<<std::endl;

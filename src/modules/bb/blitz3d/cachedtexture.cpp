@@ -110,10 +110,27 @@ CachedTexture::CachedTexture( const std::string &f_,int flags,int w,int h,int fi
 	std::string f=canonicalpath( f_ );
 	if( f.substr(0,2)=="." OS_FS_SEP ) f=f.substr(2);
 	if( path.size() ){
-#ifdef BB_WINDOWS // TODO: decide if tolower should get pushed into filenamefile/fullfilename
-		std::string t=path+tolower( filenamefile( f ) );
+		// First try with the full relative path (e.g., path + "Textures/Rock.bmp")
+		// This handles textures in subdirectories referenced by .x files
+#ifdef BB_WINDOWS
+		std::string t=path+tolower( f );
 #else
-		std::string t=path+filenamefile( f );
+		std::string t=path+f;
+#endif
+		if( (rep=findRep( t,flags,w,h,first,cnt )) ) return;
+		rep=d_new Rep( t,flags,w,h,first,cnt );
+		if( rep->frames.size() ){
+			rep_set.insert( rep );
+			return;
+		}
+		delete rep;
+
+		// Fallback: try with just the filename (e.g., path + "Rock.bmp")
+		// This maintains backwards compatibility for textures in the same directory
+#ifdef BB_WINDOWS
+		t=path+tolower( filenamefile( f ) );
+#else
+		t=path+filenamefile( f );
 #endif
 		if( (rep=findRep( t,flags,w,h,first,cnt )) ) return;
 		rep=d_new Rep( t,flags,w,h,first,cnt );

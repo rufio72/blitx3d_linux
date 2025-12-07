@@ -17,6 +17,7 @@ struct BundleInfo {
 	std::string appName; // label used wherever a human readable title is needed
 	std::vector<BundleFile> files; // files to copy into the bundle
 	std::string signerId,teamId;
+	std::string sourceDir; // directory containing the source .bb file (for auto-bundling assets)
 };
 
 void bundleFiles( const BundleInfo &bundle,const std::string &path );

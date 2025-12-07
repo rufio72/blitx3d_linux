@@ -126,6 +126,20 @@ void createApk( const std::string &out,const std::string &tmpdir,const std::stri
 	RUN( "mkdir -p "+tmpdir+"/assets" );
 	bundleFiles( bundle,tmpdir+"/assets" );
 
+	// Auto-bundle all files from source directory (excluding .bb, .decls, tmp/, and hidden files)
+	if( !bundle.sourceDir.empty() ){
+		std::cout<<"Bundling assets from "<<bundle.sourceDir<<"..."<<std::endl;
+		// Use rsync-like copy: all files except .bb, .decls, tmp/, .git, etc.
+		RUN( "find "+bundle.sourceDir+" -maxdepth 10 -type f "
+			"! -name '*.bb' ! -name '*.decls' ! -name '.*' "
+			"! -path '*/tmp/*' ! -path '*/.git/*' ! -path '*/.*' "
+			"-exec sh -c 'for f; do "
+			"  rel=\"${f#"+bundle.sourceDir+"/}\"; "
+			"  mkdir -p \""+tmpdir+"/assets/$(dirname \"$rel\")\"; "
+			"  cp \"$f\" \""+tmpdir+"/assets/$rel\"; "
+			"done' _ {} +" );
+	}
+
 	// build the apk...
 	std::string jars="";
 

@@ -58,7 +58,14 @@ wxEND_EVENT_TABLE()
 MainFrame::MainFrame( const wxString& title )
 	: wxFrame( NULL,wxID_ANY,title,wxDefaultPosition,wxDefaultSize,wxDEFAULT_FRAME_STYLE|wxNO_FULL_REPAINT_ON_RESIZE )
 {
+#ifdef BB_MSVC
 	SetIcon( wxIcon("IDI_ICON1") );
+#else
+	wxIcon icon;
+	if( icon.LoadFile( blitzpath + "/cfg/bbexe.png", wxBITMAP_TYPE_PNG ) ){
+		SetIcon( icon );
+	}
+#endif
 
 	prefs.Load( blitzpath );
 
@@ -119,7 +126,6 @@ MainFrame::MainFrame( const wxString& title )
   SetMenuBar( menuBar );
 
 	platformMenu->Bind( wxEVT_MENU,&MainFrame::OnTarget,this,wxID_ANY );
-	platformMenu->Check( ID_TARGET,true );
 	deviceIdx=0;
 
   wxImage::AddHandler( new wxPNGHandler );
@@ -341,6 +347,11 @@ void MainFrame::EnumerateDevices(){
 		if( devices[i].emulator ){
 			platformMenu->AppendCheckItem( ID_TARGET+i,devices[i].name );
 		}
+	}
+
+	// Check the first device by default
+	if( platformMenu->FindItem(ID_TARGET) ){
+		platformMenu->Check( ID_TARGET,true );
 	}
 }
 

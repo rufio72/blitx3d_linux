@@ -39,7 +39,7 @@ End Function
 ; Lens stuff...
 ; ---------------------------------------------------------------
 
-Global lensDiameter = 25
+Global lensDiameter = 40
 Include "incs/lensIncs.bb"
 
 ; ---------------------------------------------------------------
@@ -206,7 +206,7 @@ wadeChannel = PlaySound (wade)
 ; ---------------------------------------------------------------
 
 diameter = lensDiameter
-magnification = 5
+magnification = 8
 
 CreateLens (diameter, magnification)
 

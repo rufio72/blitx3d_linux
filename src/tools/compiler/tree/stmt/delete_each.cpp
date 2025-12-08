@@ -1,4 +1,5 @@
 #include "delete_each.h"
+#include "../../codegen_c/codegen_c.h"
 
 ///////////////////////////
 // Delete each of a type //
@@ -19,3 +20,7 @@ void DeleteEachNode::translate2( Codegen_LLVM *g ){
 	g->CallIntrinsic( "_bbObjDeleteEach",g->voidTy,1,objty );
 }
 #endif
+
+void DeleteEachNode::translate3( Codegen_C *g ){
+	g->emit( "_bbObjDeleteEach((BBObjType*)&_tbb_" + typeIdent + ");" );
+}

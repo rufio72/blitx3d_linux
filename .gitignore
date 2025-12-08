@@ -69,3 +69,4 @@ _release/**/*.manifest
 /ovr-sdk
 
 /tmp
+/private

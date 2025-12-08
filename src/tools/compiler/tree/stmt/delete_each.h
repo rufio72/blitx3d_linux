@@ -12,6 +12,7 @@ struct DeleteEachNode : public StmtNode{
 #ifdef USE_LLVM
 	virtual void translate2( Codegen_LLVM *g );
 #endif
+	virtual void translate3( Codegen_C *g );
 
 	json toJSON( Environ *e ){
 		json tree;tree["@class"]="DeleteEachNode";

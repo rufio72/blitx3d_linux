@@ -66,8 +66,8 @@ json VarDeclNode::toJSON( Environ *e ){
 #include "../../codegen_c/codegen_c.h"
 
 void VarDeclNode::translate3( Codegen_C *g ){
-	// Generate assignment for global variables with initial values
-	if( expr && (kind & DECL_GLOBAL) ){
+	// Generate assignment for variables with initial values (both Global and Local)
+	if( expr ){
 		std::string varName = sem_var->translate3( g );
 		std::string value = expr->translate3( g );
 		g->emitLine( varName + " = " + value + ";" );

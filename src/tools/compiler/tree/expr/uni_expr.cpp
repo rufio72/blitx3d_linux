@@ -93,8 +93,8 @@ std::string UniExprNode::translate3( Codegen_C *g ){
 		switch( op ){
 		case '+': return l;
 		case '-': return "(-(" + l + "))";
-		case ABS: return "_bbFAbs(" + l + ")";
-		case SGN: return "_bbFSgn(" + l + ")";
+		case ABS: return "fabs(" + l + ")";
+		case SGN: return "(((" + l + ") > 0) ? 1.0 : (((" + l + ") < 0) ? -1.0 : 0.0))";
 		}
 	}
 	return l;

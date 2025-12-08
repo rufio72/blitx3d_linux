@@ -23,6 +23,7 @@ End Function
 
 Function DrawLens (x, y, diameter)
 	LockBuffer BackBuffer ()
+	cx = 1
 	For i = x To (x + diameter) - 1
 		For j = y To (y + diameter) - 1
 			rgb = ReadPixelFast (i, j)
@@ -39,7 +40,6 @@ Function DrawLens (x, y, diameter)
 			Dest (cx, 2) = Org (Tfm (cx), 2)
 			Dest (cx, 3) = Org (Tfm (cx), 3)
 			WritePixelFast i, j, Dest (cx, 3) Or (Dest (cx, 2) Shl 8) Or (Dest (cx, 1) Shl 16)
-			Plot (i, j)
 			cx = cx + 1
 		Next
 	Next

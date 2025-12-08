@@ -509,9 +509,11 @@ bool GLCanvas::rect_collide( int x,int y,int rect_x,int rect_y,int rect_w,int re
 bool GLCanvas::lock(){
 	if( pixels ) return false;
 
+	// Flush all pending GL commands before reading pixels
+	GL( glFinish() );
+
 	pixels=new unsigned char[width*height*4];
 	downloadData();
-	// RTEX( "GLCanvas::lock not implemented" );
 	return true;
 }
 
@@ -525,7 +527,16 @@ void GLCanvas::setPixel( int x,int y,unsigned argb ){
 #define UC(c) static_cast<unsigned char>(c)
 
 void GLCanvas::setPixelFast( int x,int y,unsigned argb ){
-	// RTEX( "GLCanvas::setPixelFast not implemented" );
+	if( !pixels ) return;
+	if( x<0 || x>=width || y<0 || y>=height ) return;
+	// pixels is BGRA format, Y is flipped (OpenGL origin is bottom-left)
+	int fy = height - 1 - y;
+	unsigned char *p = pixels + (fy * width + x) * 4;
+	// argb is 0xAARRGGBB, store as BGRA
+	p[0] = argb & 0xFF;        // B
+	p[1] = (argb >> 8) & 0xFF; // G
+	p[2] = (argb >> 16) & 0xFF; // R
+	p[3] = (argb >> 24) & 0xFF; // A
 }
 
 void GLCanvas::copyPixel( int x,int y,BBCanvas *src,int src_x,int src_y ){
@@ -537,21 +548,70 @@ void GLCanvas::copyPixelFast( int x,int y,BBCanvas *src,int src_x,int src_y ){
 }
 
 unsigned GLCanvas::getPixel( int x,int y ){
-	// RTEX( "GLCanvas::getPixel not implemented" );
-	return 0;
+	lock();
+	unsigned result = getPixelFast( x, y );
+	unlock();
+	return result;
 }
 
 unsigned GLCanvas::getPixelFast( int x,int y ){
-	// RTEX( "GLCanvas::getPixelFast not implemented" );
-	return 0;
+	if( !pixels ) return 0;
+	if( x<0 || x>=width || y<0 || y>=height ) return 0;
+	// pixels is BGRA format, Y is flipped (OpenGL origin is bottom-left)
+	int fy = height - 1 - y;
+	unsigned char *p = pixels + (fy * width + x) * 4;
+	// Return as 0xAARRGGBB
+	return (p[3] << 24) | (p[2] << 16) | (p[1] << 8) | p[0];
 }
 
 void GLCanvas::unlock(){
 	if( !pixels ) return;
 
-	// RTEX( "GLCanvas::unlock not implemented" );
-	uploadData();
-	delete[] pixels;pixels=0;
+	// For framebuffer-based canvas (like BackBuffer), we need to write pixels back
+	if( !texture && framebuffer != (unsigned)-1 ){
+		// Use texture + glBlitFramebuffer approach (works in Core Profile)
+		// pixels is in BGRA format, convert to RGBA for texture upload
+		unsigned char *rgba = new unsigned char[width * height * 4];
+		for( int i = 0; i < width * height; i++ ){
+			rgba[i*4 + 0] = pixels[i*4 + 2]; // R
+			rgba[i*4 + 1] = pixels[i*4 + 1]; // G
+			rgba[i*4 + 2] = pixels[i*4 + 0]; // B
+			rgba[i*4 + 3] = 255; // A
+		}
+
+		// Create temporary texture and framebuffer for blitting
+		GLuint tempTex, tempFbo;
+		GL( glGenTextures( 1, &tempTex ) );
+		GL( glBindTexture( GL_TEXTURE_2D, tempTex ) );
+		GL( glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba ) );
+		GL( glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST ) );
+		GL( glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST ) );
+
+		GL( glGenFramebuffers( 1, &tempFbo ) );
+		GL( glBindFramebuffer( GL_READ_FRAMEBUFFER, tempFbo ) );
+		GL( glFramebufferTexture2D( GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tempTex, 0 ) );
+
+		// Bind destination framebuffer
+		GL( glBindFramebuffer( GL_DRAW_FRAMEBUFFER, framebuffer ) );
+		if( framebuffer == 0 ){
+			GL( glDrawBuffer( mode ) );
+		}
+
+		// Blit from temp texture to target framebuffer
+		GL( glBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST ) );
+
+		// Cleanup
+		GL( glBindFramebuffer( GL_FRAMEBUFFER, framebuffer ) );
+		GL( glDeleteFramebuffers( 1, &tempFbo ) );
+		GL( glDeleteTextures( 1, &tempTex ) );
+
+		delete[] rgba;
+	} else {
+		// Regular texture canvas
+		uploadData();
+	}
+	delete[] pixels;
+	pixels = 0;
 }
 
 void GLCanvas::setCubeMode( int mode ){
@@ -706,21 +766,14 @@ void GLCanvas::uploadData(){
 }
 
 void GLCanvas::downloadData(){
-	// BBPixmap *pm=d_new BBPixmap();
-	// pm->trans=true;
-	// pm->format=PF_RGBA;
-	// pm->width=width;
-	// pm->height=height;
-	// pm->pitch=4;
-	// pm->bpp=4;
-	// int size=pm->width*pm->bpp*pm->height;
-	// pm->bits=new unsigned char[size];
-	// pixmap=pm;
-
 	void *bits=pixmap?pixmap->bits:pixels;
 	if( bits ){
 		GL( glBindFramebuffer( GL_FRAMEBUFFER,framebufferId() ) );
-		GL( glReadPixels( 0,0,width,height,GL_BGRA,GL_UNSIGNED_BYTE,bits  ) );
+		// For default framebuffer (0), need to set read buffer
+		if( framebufferId() == 0 ){
+			GL( glReadBuffer( mode ) );  // GL_FRONT or GL_BACK
+		}
+		GL( glReadPixels( 0,0,width,height,GL_BGRA,GL_UNSIGNED_BYTE,bits ) );
 	}
 }
 

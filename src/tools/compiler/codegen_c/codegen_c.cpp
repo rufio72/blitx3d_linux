@@ -156,6 +156,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbMaskImage(bb_int_t image, bb_int_t r, bb_int_t g, bb_int_t b);\n";
     header << "extern bb_int_t bbCreateImage(bb_int_t w, bb_int_t h, bb_int_t frames);\n";
     header << "extern void bbGrabImage(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t frame);\n";
+    header << "extern bb_int_t bbSaveImage(bb_int_t image, bb_string_t filename, bb_int_t frame);\n";
     header << "extern bb_int_t bbLoadFont(bb_string_t name, bb_int_t height, bb_int_t bold, bb_int_t italic, bb_int_t underline);\n";
     header << "extern void bbSetFont(bb_int_t font);\n";
     header << "extern void bbFreeFont(bb_int_t font);\n";
@@ -174,7 +175,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "/* Input functions */\n";
     header << "extern bb_int_t bbKeyDown(bb_int_t key);\n";
     header << "extern bb_int_t bbKeyHit(bb_int_t key);\n";
-    header << "extern bb_int_t bbGetKey(void);\n";
+    header << "extern bb_int_t bbGetKey(bb_int_t ascii);\n";
     header << "extern void bbFlushKeys(void);\n";
     header << "extern bb_int_t bbMouseDown(bb_int_t button);\n";
     header << "extern bb_int_t bbMouseHit(bb_int_t button);\n";
@@ -240,6 +241,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbTextureWidth(bb_int_t texture);\n";
     header << "extern bb_int_t bbTextureHeight(bb_int_t texture);\n";
     header << "extern bb_int_t bbTextureBuffer(bb_int_t texture, bb_int_t frame);\n";
+    header << "extern void bbTextureBlend(bb_int_t texture, bb_int_t blend);\n";
     header << "extern void bbRenderWorld(bb_float_t tween);\n";
     header << "extern void bbUpdateWorld(bb_float_t elapsed);\n";
     header << "extern void bbCameraViewport(bb_int_t camera, bb_int_t x, bb_int_t y, bb_int_t w, bb_int_t h);\n";

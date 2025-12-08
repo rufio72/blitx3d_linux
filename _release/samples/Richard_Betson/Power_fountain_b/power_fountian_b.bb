@@ -55,7 +55,7 @@ CameraFogRange camera,60,90		;Visible fog range
 ; Create Sparks
 ;----------------------------------
 ;spark_pivot=CreatePivot()
-spark=LoadSprite("spark.bmp",1)  ;Load bitmap for sprite "1" colored
+spark=LoadSprite("spark.BMP",1)  ;Load bitmap for sprite "1" colored
 ScaleSprite spark,.7,.7			 ;Scale the sprite a little smaller
 If spark=0 Then End				 ;If the sprite did not load function error
 

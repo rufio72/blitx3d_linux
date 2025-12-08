@@ -75,7 +75,7 @@ Next
 ;----------------------------------
 ; Create Sun
 ;----------------------------------
-sun=LoadSprite("bigspark.bmp",8)
+sun=LoadSprite("Bigspark.BMP",8)
 ScaleSprite sun,.2,.2
 
 

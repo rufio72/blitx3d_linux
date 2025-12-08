@@ -74,12 +74,23 @@ static inline void debugCanvas( BBCanvas *c ){
 void blitz2d_open();
 void blitz2d_reset();
 
+static bool console_mode_auto=false;  // Track if we auto-created console window
+static int gx_driver=0;	//current graphics driver (forward declaration for ensureConsoleMode)
+
 // Auto-initialize console mode if font not yet initialized
 static void ensureConsoleMode() {
-	if( !curr_font && gx_graphics ) {
+	if( !gx_graphics && bbContextDriver ) {
+		// No graphics - create a console window automatically
+		gx_graphics = bbContextDriver->openGraphics( 400,300,0,gx_driver,BBGraphics::GRAPHICS_WINDOWED );
+		if( gx_graphics ){
+			console_mode_auto = true;
+			blitz2d_open();
+			bbSetBuffer( gx_graphics->getFrontCanvas() );
+		}
+	} else if( !curr_font && gx_graphics ) {
 		// Graphics is initialized but font isn't - initialize 2D mode
 		blitz2d_open();
-		bbSetBuffer( bbFrontBuffer() );
+		bbSetBuffer( gx_graphics->getFrontCanvas() );
 	}
 }
 void blitz2d_close();
@@ -94,8 +105,6 @@ BBCanvas *gx_canvas=0;
 struct GfxMode{
 	int w,h,d,caps;
 };
-
-static int gx_driver=0;	//current graphics driver
 
 static std::vector<GfxMode> gfx_modes;
 
@@ -1169,14 +1178,21 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 	}
 
 	//draw prompt
+	int prompt_x = curs_x;  // Save prompt position for redraw after flip
+	std::string prompt_str = t;  // Save prompt string for redraw after flip
 	c->text( curs_x,curs_y,t );
 	curs_x+=curr_font->getWidth( t );
+	int input_x = curs_x;  // Save input start position
 
 	p_canvas->setFont( curr_font );
 	p_canvas->setColor( curr_color );
 	p_canvas->blit( 0,0,c,0,curs_y,c->getWidth(),curr_font->getHeight(),true );
 
-	// Backup full screen content before any flip
+	// Allocate and backup full screen content before any flip (for console mode)
+	if( !screen_backup ){
+		screen_backup = gx_graphics->createCanvas( c->getWidth()*sx, c->getHeight()*sy, 0 );
+		if( screen_backup ) screen_backup->setScale( sx, sy );
+	}
 	if( screen_backup ){
 		screen_backup->blit( 0,0,c,0,0,c->getWidth(),c->getHeight(),true );
 	}
@@ -1210,6 +1226,14 @@ BBStr * BBCALL bbInput( BBStr *prompt ){
 				}
 				c->text( cx,curs_y,str.substr( curs,1 ) );
 				bbFlip(0);  // Flip to show cursor updates in OpenGL
+				// Restore screen content after flip (double buffering swaps buffers)
+				if( screen_backup ){
+					c->blit( 0,0,screen_backup,0,0,c->getWidth(),c->getHeight(),true );
+					// Redraw the current input line (prompt + typed text)
+					c->setColor( curr_color );
+					c->text( prompt_x, curs_y, prompt_str );  // prompt
+					c->text( input_x, curs_y, str );  // typed text
+				}
 			}
 			if( (key=bbGetKey( false )) ){
 				if( int asc=gx_input->toAscii( key ) ){

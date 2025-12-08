@@ -428,6 +428,18 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "/* Input functions */\n";
     header << "extern bb_string_t bbInput(bb_string_t prompt);\n";
     header << "\n";
+    header << "/* Timer functions */\n";
+    header << "extern bb_int_t bbCreateTimer(bb_int_t hertz);\n";
+    header << "extern bb_int_t bbWaitTimer(bb_int_t timer);\n";
+    header << "extern void bbFreeTimer(bb_int_t timer);\n";
+    header << "\n";
+    header << "/* Mesh functions */\n";
+    header << "extern void bbRotateMesh(bb_int_t mesh, bb_float_t pitch, bb_float_t yaw, bb_float_t roll);\n";
+    header << "extern void bbPositionMesh(bb_int_t mesh, bb_float_t x, bb_float_t y, bb_float_t z);\n";
+    header << "\n";
+    header << "/* Buffer functions */\n";
+    header << "extern void bbSaveBuffer(bb_int_t buffer, bb_string_t filename);\n";
+    header << "\n";
 }
 
 Codegen_C::~Codegen_C() {

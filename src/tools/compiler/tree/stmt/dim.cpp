@@ -116,8 +116,8 @@ void DimNode::translate3( Codegen_C *g ){
 
 	// Declare array if this is the first Dim (sem_decl is set)
 	if( sem_decl ){
-		// Declare the array structure
-		g->emitGlobal( "static struct { void *data; bb_int_t type; bb_int_t dims; bb_int_t sizes[" +
+		// Declare the array structure - must match runtime's BBArray: {data, elementType, dims, scales[]}
+		g->emitGlobal( "static struct { void *data; bb_int_t elementType; bb_int_t dims; bb_int_t scales[" +
 			std::to_string(exprs->size()) + "]; } " + arrayName + " = {0, " +
 			std::to_string(et) + ", " + std::to_string(exprs->size()) + ", {0}};" );
 	}
@@ -125,10 +125,10 @@ void DimNode::translate3( Codegen_C *g ){
 	// Undim the array
 	g->emitLine( "_bbUndimArray((BBArray*)&" + arrayName + ");" );
 
-	// Set dimension sizes
+	// Set dimension scales
 	for( int k = 0; k < (int)exprs->size(); ++k ){
 		std::string dimVal = exprs->exprs[k]->translate3( g );
-		g->emitLine( arrayName + ".sizes[" + std::to_string(k) + "] = " + dimVal + ";" );
+		g->emitLine( arrayName + ".scales[" + std::to_string(k) + "] = " + dimVal + ";" );
 	}
 
 	// Dim the array

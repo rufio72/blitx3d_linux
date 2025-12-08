@@ -108,7 +108,7 @@ static void handle_segfault(int sig) {
 
 static void showInfo(){
 	const int major=(VERSION&0xffff)/100,minor=(VERSION&0xffff)%100;
-	std::cout<<"Blitz3D-NG V"<<major<<"."<<std::setfill('0')<<std::setw(2)<<minor<<std::endl;
+	std::cout<<"Rufio V"<<major<<"."<<std::setfill('0')<<std::setw(2)<<minor<<std::endl;
 }
 
 static void showUsage(){

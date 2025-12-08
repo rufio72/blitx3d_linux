@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 
-#define BASE_VER	200
+#define BASE_VER	100
 
 #ifdef	PRO
 #define	PRO_F	0x010000

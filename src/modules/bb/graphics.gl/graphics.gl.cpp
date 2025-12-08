@@ -138,7 +138,7 @@ GLGraphics::GLGraphics():fb(&res,BBCanvas::CANVAS_TEX_VIDMEM),bb(&res,BBCanvas::
 	front_canvas=&fb;
 
 	bb.setFramebuffer( framebuffer,GL_BACK );
-	back_canvas=&fb;
+	back_canvas=&bb;
 
 	GL( glDisable( GL_DEPTH_TEST ) );
 	GL( glEnable( GL_SCISSOR_TEST ) );

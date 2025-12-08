@@ -50,6 +50,7 @@ static BBCanvas *p_canvas=0;
 /*static*/ BBFont *curr_font=0;
 /*static*/ unsigned curr_color=0;
 /*static*/ unsigned curr_clsColor=0;
+static BBCanvas *screen_backup=0;
 
 static inline void debugImage( BBImage *i,int frame=0 ){
 	if( bb_env.debug ){
@@ -565,48 +566,77 @@ static BBCanvas *tformCanvas( BBCanvas *c,float m[2][2],int x_handle,int y_handl
 }
 
 static bool saveCanvas( BBCanvas *c,const std::string &f ){
-#ifndef WIN32 // FIXME: port to posix
-	return false;
-#else
 	std::ofstream out( f.c_str(),std::ios::binary );
 	if( !out.good() ) return false;
 
-	int tempsize=(c->getWidth()*3+3)&~3;
+	int width = c->getWidth();
+	int height = c->getHeight();
+	int tempsize = (width * 3 + 3) & ~3;  // Row size padded to 4 bytes
 
-	BITMAPFILEHEADER bf;
-	memset( &bf,0,sizeof(bf) );
-	bf.bfType='MB';
-	bf.bfSize=sizeof(BITMAPFILEHEADER)+sizeof(BITMAPINFOHEADER)+tempsize*c->getHeight();
-	bf.bfOffBits=sizeof(BITMAPFILEHEADER)+sizeof(BITMAPINFOHEADER);
-	BITMAPINFOHEADER bi;memset( &bi,0,sizeof(bi) );
-	bi.biSize=sizeof(bi);
-	bi.biWidth=c->getWidth();
-	bi.biHeight=c->getHeight();
-	bi.biPlanes=1;
-	bi.biBitCount=24;
-	out.write( (char*)&bf,sizeof(bf) );
-	out.write( (char*)&bi,sizeof(bi) );
+	// BMP File Header (14 bytes)
+	unsigned char bfHeader[14] = {
+		'B', 'M',           // Signature
+		0, 0, 0, 0,         // File size (filled below)
+		0, 0, 0, 0,         // Reserved
+		54, 0, 0, 0         // Offset to pixel data (14 + 40 = 54)
+	};
 
-	unsigned char *temp=d_new unsigned char[ tempsize ];
-	memset( temp,0,tempsize );
+	// BMP Info Header (40 bytes)
+	unsigned char biHeader[40] = {
+		40, 0, 0, 0,        // Header size
+		0, 0, 0, 0,         // Width (filled below)
+		0, 0, 0, 0,         // Height (filled below)
+		1, 0,               // Planes
+		24, 0,              // Bits per pixel
+		0, 0, 0, 0,         // Compression (none)
+		0, 0, 0, 0,         // Image size (can be 0 for uncompressed)
+		0, 0, 0, 0,         // X pixels per meter
+		0, 0, 0, 0,         // Y pixels per meter
+		0, 0, 0, 0,         // Colors used
+		0, 0, 0, 0          // Important colors
+	};
+
+	// Fill in file size
+	unsigned int fileSize = 54 + tempsize * height;
+	bfHeader[2] = fileSize & 0xFF;
+	bfHeader[3] = (fileSize >> 8) & 0xFF;
+	bfHeader[4] = (fileSize >> 16) & 0xFF;
+	bfHeader[5] = (fileSize >> 24) & 0xFF;
+
+	// Fill in width
+	biHeader[4] = width & 0xFF;
+	biHeader[5] = (width >> 8) & 0xFF;
+	biHeader[6] = (width >> 16) & 0xFF;
+	biHeader[7] = (width >> 24) & 0xFF;
+
+	// Fill in height
+	biHeader[8] = height & 0xFF;
+	biHeader[9] = (height >> 8) & 0xFF;
+	biHeader[10] = (height >> 16) & 0xFF;
+	biHeader[11] = (height >> 24) & 0xFF;
+
+	out.write( (char*)bfHeader, 14 );
+	out.write( (char*)biHeader, 40 );
+
+	unsigned char *temp = d_new unsigned char[ tempsize ];
+	memset( temp, 0, tempsize );
 
 	c->lock();
-	for( int y=c->getHeight()-1;y>=0;--y ){
-		unsigned char *dest=temp;
-		for( int x=0;x<c->getWidth();++x ){
-			unsigned rgb=c->getPixelFast( x,y );
-			*dest++=rgb&0xff;
-			*dest++=(rgb>>8)&0xff;
-			*dest++=(rgb>>16)&0xff;
+	for( int y = height - 1; y >= 0; --y ){
+		unsigned char *dest = temp;
+		for( int x = 0; x < width; ++x ){
+			unsigned rgb = c->getPixelFast( x, y );
+			*dest++ = rgb & 0xff;         // Blue
+			*dest++ = (rgb >> 8) & 0xff;  // Green
+			*dest++ = (rgb >> 16) & 0xff; // Red
 		}
-		out.write( (char*)temp,tempsize );
+		out.write( (char*)temp, tempsize );
 	}
 	c->unlock();
 
 	delete [] temp;
 
 	return out.good();
-#endif
 }
 
 bb_int_t BBCALL bbLoadBuffer( BBCanvas *c,BBStr *str ){

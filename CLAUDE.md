@@ -8,6 +8,19 @@ Blitz3D "NG" (Next Generation) is a modernization of the classic Blitz3D game de
 
 ## Build Commands
 
+### Compiling Blitz3D Programs (GCC Backend)
+
+When using the GCC backend, the `-o` option must come **before** the source file:
+```bash
+# Correct order:
+blitzcc -o output_file source.bb
+
+# Wrong order (will fail with "JIT execution not supported" error):
+blitzcc source.bb -o output_file
+```
+
+**Note**: The GCC backend does not support JIT execution. You must always use `-o` to create an executable.
+
 ### Prerequisites
 - CMake 3.24+ (note: the Makefile says 3.16+ but LLVM 19 requires 3.20+, and root CMakeLists.txt requires 3.24)
 - Ninja build system

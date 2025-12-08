@@ -23,6 +23,9 @@ struct MethodCallNode : public ExprNode{
 #ifdef USE_LLVM
 	llvm::Value *translate2( Codegen_LLVM *g );
 #endif
+#ifdef USE_GCC_BACKEND
+	std::string translate3( Codegen_C *g );
+#endif
 };
 
 // Super method call node: Super\Method(args)
@@ -44,6 +47,9 @@ struct SuperMethodCallNode : public ExprNode{
 	json toJSON( Environ *e );
 #ifdef USE_LLVM
 	llvm::Value *translate2( Codegen_LLVM *g );
+#endif
+#ifdef USE_GCC_BACKEND
+	std::string translate3( Codegen_C *g );
 #endif
 };
 

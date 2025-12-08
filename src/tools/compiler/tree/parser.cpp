@@ -880,7 +880,16 @@ ExprNode *Parser::parseExpr1( bool opt ){
 	for(;;){
 		int c=toker->curr();
 		if( c!=AND && c!=OR && c!=XOR ) return lhs.release();
-		toker->next();ExprNode *rhs=parseExpr2( false );
+		toker->next();
+		// After AND/OR/XOR, allow Not operator by calling parseUnaryNot
+		ExprNode *rhs;
+		if( toker->curr()==NOT ){
+			toker->next();
+			rhs=parseExpr2( false );
+			rhs=d_new RelExprNode( '=',rhs,d_new IntConstNode( 0 ) );
+		}else{
+			rhs=parseExpr2( false );
+		}
 		lhs=d_new BinExprNode( c,lhs.release(),rhs );
 	}
 }

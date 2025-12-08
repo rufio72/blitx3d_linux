@@ -57,4 +57,39 @@ std::string DeclVarNode::translate3( Codegen_C *g ){
 	}
 	return g->toCSafeName( sem_decl->name );
 }
+
+std::string DeclVarNode::load3( Codegen_C *g ){
+	std::string varName = translate3( g );
+
+	// For string parameters, we need to make a copy because Blitz string functions
+	// consume (delete) their arguments. Use _bbStrCopy for parameters.
+	if( sem_decl->kind == DECL_PARAM ){
+		if( sem_type == Type::string_type ){
+			// Copy the parameter string to avoid double-free when used in expressions
+			return "_bbStrCopy(" + varName + ")";
+		}
+		// Non-string parameters are passed by value, just return directly
+		return varName;
+	}
+
+	// For local/global string variables, use _bbStrLoad for reference counting
+	if( sem_type == Type::string_type ){
+		return "_bbStrLoad(&" + varName + ")";
+	}
+	return varName;
+}
+
+void DeclVarNode::store3( Codegen_C *g, const std::string &value ){
+	std::string varName = translate3( g );
+
+	// For parameters, we should not modify them (copy-on-write semantics)
+	// But if we do need to store, treat them like locals
+	if( sem_type->structType() ){
+		g->emitLine( "_bbObjStore(&" + varName + ", " + value + ");" );
+	} else if( sem_type == Type::string_type ){
+		g->emitLine( "_bbStrStore(&" + varName + ", " + value + ");" );
+	} else {
+		g->emitLine( varName + " = " + value + ";" );
+	}
+}
 #endif

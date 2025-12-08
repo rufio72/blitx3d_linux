@@ -113,14 +113,17 @@ std::string ArrayVarNode::translate3( Codegen_C *g ){
 	else elemType = "bb_obj_t";
 
 	// Calculate linear index for multi-dimensional arrays
+	// Formula: idx[0] + idx[1]*scales[0] + idx[2]*scales[1] + ...
+	// where scales[k] is the cumulative product after _bbDimArray
+	// scales[0] = dim0+1, scales[1] = (dim0+1)*(dim1+1), etc.
 	std::string indexExpr;
 	for( int k = 0; k < (int)exprs->size(); ++k ){
 		std::string idx = exprs->exprs[k]->translate3( g );
 		if( k == 0 ){
 			indexExpr = idx;
 		} else {
-			// Multiply by the size of this dimension and add
-			indexExpr = "(" + indexExpr + " * " + arrayName + ".sizes[" + std::to_string(k) + "] + " + idx + ")";
+			// Add idx[k] * scales[k-1] to the accumulated index
+			indexExpr = "(" + indexExpr + " + " + idx + " * " + arrayName + ".scales[" + std::to_string(k-1) + "])";
 		}
 	}
 

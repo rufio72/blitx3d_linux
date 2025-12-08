@@ -252,6 +252,8 @@ void SDLRuntime::moveMouse( int x,int y ){
 
 void SDLRuntime::setPointerVisible( bool vis ){
 	SDL_ShowCursor( vis?SDL_ENABLE:SDL_DISABLE );
+	// Enable relative mouse mode when hiding pointer for FPS-style controls
+	SDL_SetRelativeMouseMode( vis?SDL_FALSE:SDL_TRUE );
 }
 
 void SDLRuntime::_refreshTitle( void *data,void *context ){

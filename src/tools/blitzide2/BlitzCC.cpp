@@ -97,6 +97,15 @@ wxThread::ExitCode BlitzCC::Entry(){
 		}
 		args += " -target "+target.platform+" -o "+out.GetFullPath();
 	}
+#ifndef BB_MSVC
+	else {
+		// Non-Windows: GCC backend doesn't support JIT, compile to temp exe and run it
+		wxFileName tempExe( path );
+		tempExe.ClearExt();
+		tempExe.Normalize( wxPATH_NORM_ABSOLUTE );
+		args += " -o " + tempExe.GetFullPath();
+	}
+#endif
 	args += " "+path;
 
 	wxString bundleId;
@@ -158,6 +167,21 @@ wxThread::ExitCode BlitzCC::Entry(){
 		RunCommand( "ios-deploy --bundle "+out.GetFullPath()+" 2>&1", dummy );
 #endif
 	}
+#ifndef BB_MSVC
+	else if( target.host ){
+		// Non-Windows: run the compiled executable
+		wxFileName tempExe( path );
+		tempExe.ClearExt();
+		tempExe.Normalize( wxPATH_NORM_ABSOLUTE );
+
+		// Change to the source file directory so relative paths work
+		wxString sourceDir = wxFileName( path ).GetPath();
+		wxString runCmd = "cd \"" + sourceDir + "\" && blitzpath=\"" + blitzpath + "\" \"" + tempExe.GetFullPath() + "\" 2>&1";
+
+		wxString dummy;
+		RunCommand( runCmd, dummy );
+	}
+#endif
 
 	wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
 

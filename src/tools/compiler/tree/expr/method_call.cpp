@@ -120,6 +120,31 @@ llvm::Value *MethodCallNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string MethodCallNode::translate3( Codegen_C *g ){
+	FuncType *f = sem_decl->type->funcType();
+
+	// Method is compiled as ClassName_MethodName(self, args...)
+	std::string funcName = g->toCSafeName( "f" + resolved_ident );
+
+	std::string result = funcName + "(";
+
+	// First argument is the object (self)
+	result += obj->translate3( g );
+
+	// Then the rest of the arguments
+	for( int i = 0; i < exprs->size(); i++ ){
+		result += ", ";
+		result += exprs->exprs[i]->translate3( g );
+	}
+	result += ")";
+
+	return result;
+}
+#endif
+
 json MethodCallNode::toJSON( Environ *e ){
 	json tree;
 	tree["@class"] = "MethodCallNode";
@@ -224,6 +249,29 @@ llvm::Value *SuperMethodCallNode::translate2( Codegen_LLVM *g ){
 	}
 
 	return g->builder->CreateCall( func, args );
+}
+#endif
+
+#ifdef USE_GCC_BACKEND
+std::string SuperMethodCallNode::translate3( Codegen_C *g ){
+	FuncType *f = sem_decl->type->funcType();
+
+	// Super method call: ParentClass_MethodName(self, args...)
+	std::string funcName = g->toCSafeName( "f" + resolved_ident );
+
+	std::string result = funcName + "(";
+
+	// First argument is self
+	result += "self";
+
+	// Then the rest of the arguments
+	for( int i = 0; i < exprs->size(); i++ ){
+		result += ", ";
+		result += exprs->exprs[i]->translate3( g );
+	}
+	result += ")";
+
+	return result;
 }
 #endif
 

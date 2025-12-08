@@ -70,12 +70,23 @@ struct q3_brushside{
 	int texture;
 };
 
-struct q3_direntry{
-	union{
-		int offset;
-		char *lump;
-	};
+// File format structure (fixed size for reading from disk)
+struct q3_direntry_file{
+	int offset;
 	int length;
+};
+
+struct q3_header_file{
+	unsigned magic;
+	int version;
+	q3_direntry_file dir[17];
+};
+
+// Memory structure (can hold pointers)
+struct q3_direntry{
+	int offset;
+	int length;
+	char *lump;
 };
 
 struct q3_header{
@@ -573,10 +584,25 @@ Q3BSPRep::Q3BSPRep( const std::string &f,float gam ):root_node(0),vis_sz(0),vis_
 
 	gamma_adj=1-gam;
 
-	FILE *buf=fopen( f.c_str(),"rb" );if( !buf ) return;
+	log( "BSP: Opening file: "+f );
+	FILE *buf=fopen( f.c_str(),"rb" );if( !buf ){ log("BSP: Failed to open file"); return; }
 
-	fread( &header,sizeof(header),1,buf );
+	// Read fixed-size file header (144 bytes on disk)
+	q3_header_file file_header;
+	fread( &file_header,sizeof(file_header),1,buf );
+
+	// Copy to memory header
+	header.magic = file_header.magic;
+	header.version = file_header.version;
+	for(int i=0;i<17;++i){
+		header.dir[i].offset = file_header.dir[i].offset;
+		header.dir[i].length = file_header.dir[i].length;
+		header.dir[i].lump = 0;
+	}
+
+	log( "BSP: magic="+itoa(header.magic)+", version="+itoa(header.version) );
 	if( header.magic!='PSBI' || header.version!=0x2e ){
+		log( "BSP: Invalid magic or version" );
 		fclose( buf );return;
 	}
 
@@ -589,22 +615,29 @@ Q3BSPRep::Q3BSPRep( const std::string &f,float gam ):root_node(0),vis_sz(0),vis_
 			fseek( buf,header.dir[k].offset,SEEK_SET );
 			header.dir[k].lump=d_new char[header.dir[k].length];
 			fread( header.dir[k].lump,header.dir[k].length,1,buf );
+			log( "BSP: lump["+itoa(k)+"]="+itoa(header.dir[k].length)+" bytes" );
 		}else{
 			header.dir[k].lump=0;
 		}
 	}
 
+	log( "BSP: Creating node tree..." );
 	//create root of BSP tree
 	root_node=createNode( 0 );
 
+	log( "BSP: Creating collider..." );
 	createCollider();
 
+	log( "BSP: Creating textures..." );
 	createTextures();
 
+	log( "BSP: Creating lightmaps..." );
 	createLightMaps();
 
+	log( "BSP: Creating surfs..." );
 	createSurfs();
 
+	log( "BSP: Creating vis..." );
 	createVis();
 
 	//unload all lumps...
@@ -732,14 +765,14 @@ void Q3BSPRep::setLighting( bool lmap ){
 			Q3BSPSurf *s=surfs[k];
 			if( s->lm_index>=0 ){
 				//has a lightmap...
-				s->brush.setFX( fx );
+				s->brush.setFX( fx|BBScene::FX_VERTEXCOLOR );
 				s->brush.setTexture( 0,light_maps[s->lm_index],0 );
-				if( s->texture>=0 ){
+				if( s->texture>=0 && textures[s->texture].getCanvas(0) ){
 					s->brush.setTexture( 1,textures[s->texture],0 );
 				}
 			}else{
-				s->brush.setFX( fx|BBScene::FX_EMISSIVE );
-				if( s->texture>=0 ){
+				s->brush.setFX( fx|BBScene::FX_EMISSIVE|BBScene::FX_VERTEXCOLOR );
+				if( s->texture>=0 && textures[s->texture].getCanvas(0) ){
 					s->brush.setTexture( 0,textures[s->texture],0 );
 				}
 			}
@@ -749,8 +782,8 @@ void Q3BSPRep::setLighting( bool lmap ){
 		Texture tex;
 		for( k=0;k<surfs.size();++k ){
 			Q3BSPSurf *s=surfs[k];
-			s->brush.setFX( fx|BBScene::FX_EMISSIVE );
-			if( s->texture>=0 ){
+			s->brush.setFX( fx|BBScene::FX_EMISSIVE|BBScene::FX_VERTEXCOLOR );
+			if( s->texture>=0 && textures[s->texture].getCanvas(0) ){
 				s->brush.setTexture( 0,textures[s->texture],0 );
 			}else{
 				s->brush.setTexture( 0,tex,0 );

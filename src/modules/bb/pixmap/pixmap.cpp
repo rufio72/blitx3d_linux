@@ -50,7 +50,9 @@ BBPixmap *bbLoadPixmap( const std::string &file ){
 void BBPixmap::mask( int r,int g,int b ){
 	for( int i=0;i<width*height;i++ ){
 		unsigned char *p=&bits[bpp*i];
-		if( p[2]==r && p[1]==g && p[0]==b ) p[3]=0.0f;
+		if( p[2]==r && p[1]==g && p[0]==b ){
+			p[3]=0;
+		}
 	}
 }
 

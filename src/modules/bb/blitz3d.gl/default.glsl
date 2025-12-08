@@ -222,7 +222,7 @@ void main() {
     bbFragColor=mix( bbFragColor,fogColor,bbVertex_FogFactor );
   }
 
-  if( RS.AlphaTest==1 && bbFragColor.a==0.0 ){
+  if( RS.AlphaTest==1 && bbFragColor.a < 0.5 ){
     discard;
   }
 }

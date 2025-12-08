@@ -7,7 +7,7 @@ Include "../start.bb"
 Global gwidth = 640
 Global gheight = 480
 Global length = 16			;up this if you have a *very* fast computer
-Global ystep# = .005
+Global ystep# = .008	;reduced spacing for denser grass
 Global an#
 
 Dim plane( length-1 )
@@ -28,8 +28,8 @@ ClearTextureFilters
 
 tex=LoadTexture( "Data\Ground.bmp",9 )
 ScaleTexture tex,4,4
-tex1=LoadTexture( "Data\GrassClip.bmp",10 )
-ScaleTexture tex1,1.5,1.5
+tex1=LoadTexture( "Data\GrassBlades.bmp",12 )	;4+8 = Mask+Mipmap - new grass texture
+ScaleTexture tex1,2,2
 ground = CreatePlane(1)
 EntityTexture ground,tex : PositionEntity ground,0,-1-.005,0
 EntityOrder ground,9
@@ -47,7 +47,7 @@ For a#=0 To length-1
  EntityTexture plane(a),tex1
  PositionEntity plane(a),0,-1 + (a * ystep),0
  EntityColor plane(a),32,96+((a/(length-1))*96),0
- EntityAlpha plane(a),.5+((1-(a/(length-1)))*2)
+ EntityAlpha plane(a),.7+((a/(length-1))*.3)	;slight transparency, more opaque at top
  EntityOrder plane(a),8
 Next
 

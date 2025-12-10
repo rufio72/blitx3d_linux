@@ -30,7 +30,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern BBType _bbIntType, _bbFltType, _bbStrType;\n";
     header << "\n";
     header << "/* Runtime function declarations */\n";
-    header << "extern void bbStart(int argc, char **argv, void (*main)(void));\n";
+    header << "extern int bbStart(int argc, char **argv, void (*main)(void), int debug);\n";
     header << "extern void _bbRestore(bb_int_t *data);\n";
     header << "extern void __bbLoadLibs(void *libs);\n";
     header << "extern bb_string_t _bbStrConst(const char *s);\n";
@@ -639,7 +639,7 @@ std::string Codegen_C::generateOutput() {
     output << mainCode.str();
     output << "\n/* Entry point */\n";
     output << "int main(int argc, char **argv) {\n";
-    output << "    bbStart(argc, argv, bbMain);\n";
+    output << "    bbStart(argc, argv, bbMain, " << (debug ? "1" : "0") << ");\n";
     output << "    return 0;\n";
     output << "}\n";
 

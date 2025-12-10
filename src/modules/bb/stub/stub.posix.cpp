@@ -75,7 +75,7 @@ void dump_backtrace(int sig) {
 #endif
 
 extern "C"
-int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain ) {
+int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain, bool debug ) {
 #ifdef BB_BACKTRACE
 	// signal(SIGSEGV, dump_backtrace);
 #endif
@@ -104,10 +104,5 @@ int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain ) {
 	StdioDebugger debugger( trace );
 	bbAttachDebugger( &debugger );
 
-#ifdef BB_DEBUG
-	bool debug=true;
-#else
-	bool debug=false;
-#endif
 	return bbruntime_run( bbMain,debug )?0:1;
 }

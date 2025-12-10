@@ -27,6 +27,15 @@ llvm::Value *BeforeNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string BeforeNode::translate3( Codegen_C *g ){
+	std::string obj = expr->translate3( g );
+	return "_bbObjPrev((bb_obj_t)" + obj + ")";
+}
+#endif
+
 json BeforeNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="BeforeNode";
 	tree["sem_type"]=sem_type->toJSON();

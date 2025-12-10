@@ -12,7 +12,7 @@
 ; Some default values, change these if you like...
 Const RESOLUTION_DEFAULT_WIDTH  = 640
 Const RESOLUTION_DEFAULT_HEIGHT = 480
-Const RESOLUTION_DEFAULT_DEPTH  = 16
+Const RESOLUTION_DEFAULT_DEPTH  = 0
 
 ; This is the command line..
 Global sCL$ = Upper(CommandLine())
@@ -37,15 +37,9 @@ iBitsPerPixel = bblGetOption("BPP",Str(RESOLUTION_DEFAULT_DEPTH))
 iAdditional = bblGetOption("ADDIT",-1)
 
 ; Work with the details!
-If GfxMode3DExists(iScreenResX,iScreenResY,iBitsPerPixel)
-	Graphics3D iScreenResX,iScreenResY,iBitsPerPixel,iScreenMode
-	SetBuffer BackBuffer()
-Else
-	; Fire it back out to the launcher cos screen res is unsupported...
-	ExecFile "Launcher.exe"
-	RuntimeError "The graphics card in this machine does not support the selected screenmode!" + Chr(10) + Chr(13) + "Please select another..."
-	End
-EndIf
+; Try windowed mode first (mode 2), fallback to fullscreen
+Graphics3D iScreenResX,iScreenResY,iBitsPerPixel,2
+SetBuffer BackBuffer()
 
 ; FUNCTIONS ->
 ;------------------

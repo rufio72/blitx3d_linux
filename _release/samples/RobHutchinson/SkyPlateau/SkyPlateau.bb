@@ -67,18 +67,18 @@ Global cammoving = 1
 
 ; Create some totem poles.
 Dim totems.totem(4)
-totems(0) = stCreateTotem("Models\totem.x","Graphics\flare.bmp",20,0,20,0,45*5,0,255,0,0)
+totems(0) = stCreateTotem("Models/totem.x","Graphics/flare.bmp",20,0,20,0,45*5,0,255,0,0)
 totems(1) = stCopyTotem(totems(0),-20,0,-20,0,45,0,0,255,0)
 totems(2) = stCopyTotem(totems(0),20,0,-20,0,45*3,0,0,0,255)
 totems(3) = stCopyTotem(totems(0),-20,0,20,0,45*7,0,0,255,255)
 
 ; Load up the plateau.
-Global ground = LoadAnimMesh("Models\Ground.x")
+Global ground = LoadAnimMesh("Models/ground.x")
 MoveEntity ground,0,-2,0
 
 ; Sky and lower
 Global skyplane1  = CreatePlane(iPlaneSegs)
-Global skyplane1t = LoadTexture("Graphics\sky.bmp")
+Global skyplane1t = LoadTexture("Graphics/sky.bmp")
 ScaleTexture skyplane1t,70,70
 EntityTexture skyplane1,skyplane1t
 TurnEntity skyplane1,0,0,180
@@ -87,20 +87,20 @@ EntityAlpha skyplane1,.8
 EntityBlend skyplane1,3
 
 Global skyplane2  = CreatePlane()
-Global skyplane2t = LoadTexture("Graphics\stars.bmp")
+Global skyplane2t = LoadTexture("Graphics/stars.bmp")
 ScaleTexture skyplane2t,22,22
 EntityTexture skyplane2,skyplane2t
 TurnEntity skyplane2,0,0,180
 MoveEntity skyplane2,0,-65.2,0
 
 Global skyplane3  = CreatePlane(4)
-Global skyplane3t = LoadTexture("Graphics\lower.bmp")
+Global skyplane3t = LoadTexture("Graphics/lower.bmp")
 ScaleTexture skyplane3t,70,70
 EntityTexture skyplane3,skyplane3t
 MoveEntity skyplane3,0,-10,0
 
 ; Logo
-logosp = LoadSprite("Graphics\logo.bmp",1,camgrp)
+logosp = LoadSprite("Graphics/logo.bmp",1,camgrp)
 EntityOrder logosp,-1
 
 ; SETUP SYSTEM
@@ -140,11 +140,11 @@ Global menufademax# = .5
 Global menufade#    = menufademax#
 Global menufadespd# = .02
 
-optssp = LoadSprite("Graphics\options.bmp",1,camgrp)
+optssp = LoadSprite("Graphics/options.bmp",1,camgrp)
 EntityOrder optssp,-1
 ScaleSprite optssp,1.5,.7
 
-optsbarsp = LoadSprite("Graphics\menubar.bmp",1,camgrp)
+optsbarsp = LoadSprite("Graphics/menubar.bmp",1,camgrp)
 EntityOrder optsbarsp,-1
 ScaleSprite optsbarsp,1.6,.19
 EntityAlpha optsbarsp,menufade#
@@ -194,7 +194,7 @@ End Type
 
 ; Setup the fireflies
 Global TopSpeed# = 2.5
-flyOrig = LoadSprite("Graphics\hyperflare.bmp",1)
+flyOrig = LoadSprite("Graphics/hyperflare.bmp",1)
 PositionEntity flyOrig,0,20,0
 ScaleSprite flyOrig,1.75,1.75
 HideEntity flyOrig
@@ -223,8 +223,8 @@ For a=0 To maxFlies							; Create a pile of flies
 Next
 
 ; the environment map.
-steela = LoadTexture("Graphics\env.bmp",64)
-surrounda = LoadTexture("Graphics\env2.bmp",64)
+steela = LoadTexture("Graphics/env.bmp",64)
+surrounda = LoadTexture("Graphics/env2.bmp",64)
 
 ; the center tubing computer thing-e-me-bob.. + the computer screens and up lighter...
 EntityAlpha GetChild(ground,6),.7
@@ -236,18 +236,18 @@ EntityBlend GetChild(ground,9),3
 Global iMouseLook = 0
 
 ; icon thing..
-iconmesh  = LoadAnimMesh("Models\icon.x")
+iconmesh  = LoadAnimMesh("Models/icon.x")
 icon      = GetChild(iconmesh,1)
 container = GetChild(iconmesh,2)
 ScaleEntity iconmesh,.2,.2,.2
 MoveEntity iconmesh,0,20,0
 EntityAlpha container,.2
-shieldsa = LoadTexture("Graphics\shields.bmp")
+shieldsa = LoadTexture("Graphics/shields.bmp")
 EntityTexture icon,steela
 EntityTexture container,shieldsa
 
 ; MD2 stuff.....
-myplant.plant = stCreateFourPlant("Models\Plantlife.md2","Graphics\Plantlife.bmp",11.8,-2.1,-10.2,0,0,0)
+myplant.plant = stCreateFourPlant("Models/plantlife.md2","Graphics/plantlife.bmp",11.8,-2.1,-10.2,0,0,0)
 planter1.plant = stCopyFourPlant(myplant,-40.6,1.4,7.0,-17.2,36.79,-7.4,4)
 planter2.plant = stCopyFourPlant(myplant,29,1.6,-49.2,4,0,9.9,4)
 planter3.plant = stCopyFourPlant(myplant,-11,-2.4,3.82,-6.39,-28.4,-2,1)
@@ -518,7 +518,7 @@ Function QWrap(Value#,Low#,High#)			; Remember this? where is the Blitz
 End Function 
 
 Function StartMusic()
-	Return PlayMusic("Music\atmos.mp3")
+	Return PlayMusic("Music/atmos.mp3")
 End Function
 
 Function CurveValue#(current#,destination#,curve)

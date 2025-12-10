@@ -20,10 +20,10 @@ Print "[Blox&Spheres V1.07]"
 Print "Written by Rob Hutchinson 2000 - 2001"
 
 ; Non program Vars
-Global Profiles$   = "Profiles\"
+Global Profiles$   = "Profiles/"
 Global ScreenFile$ = "_ScreenMode.def"
 Global DriverFile$ = "_Driver.def"
-Global TexDir$     = "Textures\"
+Global TexDir$     = "Textures/"
 
 ; Inital values
 Global ZoomFactor# = 1      ;

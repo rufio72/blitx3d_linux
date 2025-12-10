@@ -24,7 +24,7 @@ Include "start.bb"
 camera = CreateCamera()
 
 ; Load in our model
-mainmesh = LoadAnimMesh("models\facia.x")
+mainmesh = LoadAnimMesh("Models/facia.x")
 MoveEntity mainmesh,7,3,20
 TurnEntity mainmesh,180,0,0
 

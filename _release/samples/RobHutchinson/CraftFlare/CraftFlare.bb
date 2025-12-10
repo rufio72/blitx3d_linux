@@ -9,7 +9,7 @@
 ; LAST UPDATED: 18/08/2001
 ;
 
-Global obfile$ = "craft1.x"
+Global obfile$ = "Craft1.x"
 
 ; Sorry about this, switch screen mode if it doesn`t work..
 ; But this was only a small test.

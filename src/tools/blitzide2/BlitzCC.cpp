@@ -89,7 +89,7 @@ wxThread::ExitCode BlitzCC::Entry(){
 	out.SetExt( "app" );
 	out.Normalize( wxPATH_NORM_ABSOLUTE );
 
-	wxString args;
+	wxString args = " -d";  // Always enable debug mode
 	if( !target.host ){
 		args += " -c -sign "+prefs->signId;
 		if( target.platform=="ios" ){ // only need entitlement when deploying to real device

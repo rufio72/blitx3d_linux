@@ -222,7 +222,7 @@ void FileView::Kill(){
 void FileView::Build( wxString &out ){
 	wxProcess *build=new wxProcess( this );
 	build->Redirect();
-	wxExecute( blitzpath + "/bin/blitzcc -o "+out+" "+path,wxEXEC_ASYNC|wxEXEC_HIDE_CONSOLE,build );
+	wxExecute( blitzpath + "/bin/blitzcc -d -o "+out+" "+path,wxEXEC_ASYNC|wxEXEC_HIDE_CONSOLE,build );
 }
 
 void FileView::EmitDirtyEvent(){

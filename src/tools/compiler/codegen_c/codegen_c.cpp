@@ -324,7 +324,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbTFormNormal(bb_float_t x, bb_float_t y, bb_float_t z, bb_int_t src, bb_int_t dest);\n";
     header << "extern bb_int_t bbAddSurface(bb_int_t mesh);\n";
     header << "extern bb_int_t bbAddVertex(bb_int_t surface, bb_float_t x, bb_float_t y, bb_float_t z, bb_float_t u, bb_float_t v, bb_float_t w);\n";
-    header << "extern void bbAddTriangle(bb_int_t surface, bb_int_t v0, bb_int_t v1, bb_int_t v2);\n";
+    header << "extern bb_int_t bbAddTriangle(bb_int_t surface, bb_int_t v0, bb_int_t v1, bb_int_t v2);\n";
     header << "extern void bbVertexCoords(bb_int_t surface, bb_int_t index, bb_float_t x, bb_float_t y, bb_float_t z);\n";
     header << "extern void bbVertexColor(bb_int_t surface, bb_int_t index, bb_float_t r, bb_float_t g, bb_float_t b, bb_float_t a);\n";
     header << "extern void bbVertexNormal(bb_int_t surface, bb_int_t index, bb_float_t nx, bb_float_t ny, bb_float_t nz);\n";

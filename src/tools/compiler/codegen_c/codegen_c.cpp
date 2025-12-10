@@ -143,6 +143,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbGfxMode3DExists(bb_int_t w, bb_int_t h, bb_int_t d);\n";
     header << "extern void bbGraphics(bb_int_t w, bb_int_t h, bb_int_t d, bb_int_t mode);\n";
     header << "extern void bbGraphics3D(bb_int_t w, bb_int_t h, bb_int_t d, bb_int_t mode);\n";
+    header << "extern void bbHWMultiTex(bb_int_t enable);\n";
     header << "extern void bbSetBuffer(bb_int_t buffer);\n";
     header << "extern bb_int_t bbBackBuffer(void);\n";
     header << "extern bb_int_t bbFrontBuffer(void);\n";
@@ -162,6 +163,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbOrigin(bb_int_t x, bb_int_t y);\n";
     header << "extern void bbViewport(bb_int_t x, bb_int_t y, bb_int_t w, bb_int_t h);\n";
     header << "extern bb_int_t bbLoadImage(bb_string_t file);\n";
+    header << "extern bb_int_t bbLoadAnimImage(bb_string_t file, bb_int_t w, bb_int_t h, bb_int_t first, bb_int_t count);\n";
     header << "extern void bbDrawImage(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t frame);\n";
     header << "extern void bbFreeImage(bb_int_t image);\n";
     header << "extern bb_int_t bbImageWidth(bb_int_t image);\n";
@@ -246,6 +248,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbEntityOrder(bb_int_t entity, bb_int_t order);\n";
     header << "extern void bbEntityAutoFade(bb_int_t entity, bb_float_t near, bb_float_t far);\n";
     header << "extern bb_int_t bbLoadTexture(bb_string_t file, bb_int_t flags);\n";
+    header << "extern bb_int_t bbLoadAnimTexture(bb_string_t file, bb_int_t flags, bb_int_t w, bb_int_t h, bb_int_t first, bb_int_t count);\n";
     header << "extern bb_int_t bbCreateTexture(bb_int_t w, bb_int_t h, bb_int_t flags, bb_int_t frames);\n";
     header << "extern void bbFreeTexture(bb_int_t texture);\n";
     header << "extern void bbScaleTexture(bb_int_t texture, bb_float_t u, bb_float_t v);\n";

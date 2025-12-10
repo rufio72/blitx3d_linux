@@ -85,12 +85,18 @@ static void ensureConsoleMode() {
 		if( gx_graphics ){
 			console_mode_auto = true;
 			blitz2d_open();
-			bbSetBuffer( gx_graphics->getFrontCanvas() );
+			// Use back buffer for console - OpenGL requires double buffering
+			bbSetBuffer( gx_graphics->getBackCanvas() );
+			// Clear and flip to show black background
+			gx_canvas->cls();
+			bbContextDriver->flip( false );
+			gx_canvas->cls();  // Clear again for consistent double buffer
 		}
 	} else if( !curr_font && gx_graphics ) {
 		// Graphics is initialized but font isn't - initialize 2D mode
 		blitz2d_open();
-		bbSetBuffer( gx_graphics->getFrontCanvas() );
+		bbSetBuffer( gx_graphics->getBackCanvas() );
+		gx_canvas->cls();
 	}
 }
 void blitz2d_close();
@@ -1133,6 +1139,10 @@ static void endPrinting( BBCanvas *c ){
 	c->setHandle( p_hx,p_hy );
 	c->setOrigin( p_ox,p_oy );
 	if( c==gx_canvas ) c->setColor( curr_color );
+	// In console mode, flip to show the printed text
+	if( console_mode_auto && bbContextDriver ){
+		bbContextDriver->flip( false );
+	}
 	if( !bbRuntimeIdle() ) RTEX( 0 );
 }
 

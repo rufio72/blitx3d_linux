@@ -12,6 +12,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "#include <stdint.h>\n";
     header << "#include <stdlib.h>\n";
     header << "#include <string.h>\n";
+    header << "#include <math.h>\n";
     header << "\n";
     header << "/* Blitz3D Runtime types */\n";
     header << "typedef int64_t bb_int_t;\n";
@@ -242,6 +243,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbTextureHeight(bb_int_t texture);\n";
     header << "extern bb_int_t bbTextureBuffer(bb_int_t texture, bb_int_t frame);\n";
     header << "extern void bbTextureBlend(bb_int_t texture, bb_int_t blend);\n";
+    header << "extern void bbClearTextureFilters(void);\n";
     header << "extern void bbRenderWorld(bb_float_t tween);\n";
     header << "extern void bbUpdateWorld(bb_float_t elapsed);\n";
     header << "extern void bbCameraViewport(bb_int_t camera, bb_int_t x, bb_int_t y, bb_int_t w, bb_int_t h);\n";

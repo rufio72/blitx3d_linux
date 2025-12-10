@@ -1,0 +1,2 @@
+Si compila il file e si testa, se il file non funziona, si studia il risultato della compilazione, quindi il file c, si legge e si cerca di far funzionare il file c, quando si capisce l'errore si riporta la correzione sul compilatore.
+quindi se se c'è un errore non bisogna correggere il compilatore, ma bisogna prima riuscire a far funzionare il file c e capire profondamente perchè il file non funziona.

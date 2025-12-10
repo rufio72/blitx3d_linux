@@ -13,6 +13,18 @@ void GosubNode::translate( Codegen *g ){
 	g->code( jsr( "_l"+ident ) );
 }
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void GosubNode::translate3( Codegen_C *g ){
+	// Use GCC/Clang "labels as values" extension for computed goto
+	std::string ret_label = "_gosub_ret_" + std::to_string((intptr_t)this);
+	g->emitLine( "_bbPushGosub(&&" + ret_label + ");" );
+	g->emitLine( "goto _l" + g->toCSafeName(ident) + ";" );
+	g->emitLabel( ret_label );
+}
+#endif
+
 #ifdef USE_LLVM
 void GosubNode::translate2( Codegen_LLVM *g ){
 	g->gosubUsed=true;

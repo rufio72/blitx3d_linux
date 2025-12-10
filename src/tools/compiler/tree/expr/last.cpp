@@ -20,3 +20,12 @@ llvm::Value *LastNode::translate2( Codegen_LLVM *g ){
 	return g->builder->CreateBitOrPointerCast( t,llvm::PointerType::get( sem_type->structType()->structtype,0 ) );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string LastNode::translate3( Codegen_C *g ){
+	std::string typePtr = "_t" + g->toCSafeName( ident );
+	return "_bbObjLast((BBObjType*)&" + typePtr + ")";
+}
+#endif

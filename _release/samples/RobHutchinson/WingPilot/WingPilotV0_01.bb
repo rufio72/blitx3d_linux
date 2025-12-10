@@ -26,7 +26,7 @@ Graphics3D 640,480
 SetBuffer BackBuffer()
 
 ; Variables..
-Global dObjs$ = "objects\",dGfx$ = "graphics\",dSnd$ = "sounds\"
+Global dObjs$ = "objects/",dGfx$ = "graphics/",dSnd$ = "sounds/"
 
 Global cCamera,mShip,pRing,mRing,sLamp,tRing,mCent,tCent
 Global mCraft,sFlame1,sFlame2,pCraft,pCraftIn,mShields,mShields2,tShields
@@ -454,7 +454,7 @@ Function Setup()
 	; Create ship
 	pCraft = CreatePivot()
 	pCraftIn = CreatePivot(pCraft)
-	mCraft = LoadMesh("craft1.x",pCraftIn)
+	mCraft = LoadMesh("Craft1.x",pCraftIn)
 	ScaleEntity mCraft,.08,.08,.08
 	EntityType pCraft,T_CRAFT
 	pWeaponPoint1 = CreatePivot(pCraftIn)
@@ -509,7 +509,7 @@ Function Setup()
 	
 	; Setup the ground:
 	mFloor1 = CreatePlane(3)
-	tFloor1 = LoadTexture(dGfx$ + "lava3.bmp")
+	tFloor1 = LoadTexture(dGfx$ + "Lava3.bmp")
 	ScaleTexture tFloor1,30,30
 	EntityTexture mFloor1,tFloor1
 	EntityAlpha mFloor1,.3
@@ -522,8 +522,8 @@ Function Setup()
 	
 	; Setup the sky:
 	mSky1 = CreatePlane(3)
-	tSky1 = LoadTexture(dGfx$ + "marblate1.bmp")
-	tSky2 = LoadTexture(dGfx$ + "marblate1.bmp")
+	tSky1 = LoadTexture(dGfx$ + "Marblate1.bmp")
+	tSky2 = LoadTexture(dGfx$ + "Marblate1.bmp")
 	ScaleTexture tSky1,20,20
 	ScaleTexture tSky2,20,20
 	EntityTexture mSky1,tSky1

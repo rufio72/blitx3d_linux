@@ -85,8 +85,8 @@ void ReturnNode::translate3( Codegen_C *g ){
 		std::string val = expr->translate3( g );
 		g->emitLine( "return " + val + ";" );
 	} else {
-		// Return from main program (End statement) or gosub return
-		g->emitLine( "return;" );
+		// Gosub return - use computed goto with labels as values extension
+		g->emitLine( "goto *_bbPopGosub();" );
 	}
 }
 #endif

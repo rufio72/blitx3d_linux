@@ -112,7 +112,7 @@ findscreen()
 Global light=CreateLight(camera)
 ;TurnEntity light,45,45,0
 
-Global sphere=SoftLoadSprite("graphics\redspark.bmp")
+Global sphere=SoftLoadSprite("Graphics/redspark.bmp")
 SpriteViewMode sphere,1
 EntityShininess sphere,0.5
 ScaleSprite sphere,12,0.4

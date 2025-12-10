@@ -27,6 +27,15 @@ llvm::Value *AfterNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string AfterNode::translate3( Codegen_C *g ){
+	std::string obj = expr->translate3( g );
+	return "_bbObjNext((bb_obj_t)" + obj + ")";
+}
+#endif
+
 json AfterNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="AfterNode";
 	tree["sem_type"]=sem_type->toJSON();

@@ -39,6 +39,8 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_string_t bbStrFloat(bb_float_t n);\n";
     header << "extern void bbPrint(bb_string_t s);\n";
     header << "extern void bbEnd(void);\n";
+    header << "extern void _bbPushGosub(void *addr);\n";
+    header << "extern void *_bbPopGosub(void);\n";
     header << "extern bb_int_t bbMilliSecs(void);\n";
     header << "extern bb_float_t bbSin(bb_float_t n);\n";
     header << "extern bb_float_t bbCos(bb_float_t n);\n";
@@ -97,6 +99,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbInstr(bb_string_t s, bb_string_t find, bb_int_t start);\n";
     header << "extern bb_int_t bbAsc(bb_string_t s);\n";
     header << "extern bb_string_t bbChr(bb_int_t n);\n";
+    header << "extern bb_string_t bbString(bb_string_t s, bb_int_t n);\n";
     header << "extern bb_float_t _bbStrToFloat(bb_string_t s);\n";
     header << "\n";
     header << "/* File I/O */\n";
@@ -106,6 +109,11 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbWriteLine(bb_int_t handle, bb_string_t line);\n";
     header << "extern void bbCloseFile(bb_int_t handle);\n";
     header << "extern bb_int_t bbEof(bb_int_t handle);\n";
+    header << "extern bb_int_t bbFileType(bb_string_t file);\n";
+    header << "extern void bbDeleteFile(bb_string_t file);\n";
+    header << "extern bb_int_t bbReadDir(bb_string_t dir);\n";
+    header << "extern bb_string_t bbNextFile(bb_int_t handle);\n";
+    header << "extern void bbCloseDir(bb_int_t handle);\n";
     header << "\n";
     header << "/* System functions */\n";
     header << "extern void bbDelay(bb_int_t ms);\n";
@@ -130,6 +138,9 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbCountGfxDrivers(void);\n";
     header << "extern bb_string_t bbGfxDriverName(bb_int_t driver);\n";
     header << "extern void bbSetGfxDriver(bb_int_t driver);\n";
+    header << "extern bb_int_t bbCountGfxModes(void);\n";
+    header << "extern bb_int_t bbGfxMode3D(bb_int_t mode);\n";
+    header << "extern bb_int_t bbGfxMode3DExists(bb_int_t w, bb_int_t h, bb_int_t d);\n";
     header << "extern void bbGraphics(bb_int_t w, bb_int_t h, bb_int_t d, bb_int_t mode);\n";
     header << "extern void bbGraphics3D(bb_int_t w, bb_int_t h, bb_int_t d, bb_int_t mode);\n";
     header << "extern void bbSetBuffer(bb_int_t buffer);\n";
@@ -144,6 +155,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbLine(bb_int_t x1, bb_int_t y1, bb_int_t x2, bb_int_t y2);\n";
     header << "extern void bbPlot(bb_int_t x, bb_int_t y);\n";
     header << "extern void bbText(bb_int_t x, bb_int_t y, bb_string_t text, bb_int_t cx, bb_int_t cy);\n";
+    header << "extern void bbLocate(bb_int_t x, bb_int_t y);\n";
     header << "extern bb_int_t bbGraphicsWidth(void);\n";
     header << "extern bb_int_t bbGraphicsHeight(void);\n";
     header << "extern bb_int_t bbGraphicsDepth(void);\n";
@@ -389,12 +401,15 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbDrawBlock(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t frame);\n";
     header << "extern void bbRuntimeError(bb_string_t msg);\n";
     header << "extern void bbEndGraphics(void);\n";
+    header << "extern bb_string_t bbCommandLine(void);\n";
+    header << "extern bb_int_t bbExecFile(bb_string_t file);\n";
     header << "extern bb_int_t bbCopyEntity(bb_int_t entity, bb_int_t parent);\n";
     header << "extern bb_float_t bbTerrainHeight(bb_int_t terrain, bb_int_t x, bb_int_t z);\n";
     header << "extern bb_float_t bbTerrainY(bb_int_t terrain, bb_float_t x, bb_float_t y, bb_float_t z);\n";
     header << "extern void bbModifyTerrain(bb_int_t terrain, bb_int_t x, bb_int_t z, bb_float_t height, bb_int_t realtime);\n";
     header << "extern bb_int_t bbGetEntityType(bb_int_t entity);\n";
     header << "extern bb_int_t bbLoadTerrain(bb_string_t file, bb_int_t parent);\n";
+    header << "extern bb_int_t bbCreateTerrain(bb_int_t gridSize, bb_int_t parent);\n";
     header << "extern void bbTerrainShading(bb_int_t terrain, bb_int_t enable);\n";
     header << "extern void bbTerrainDetail(bb_int_t terrain, bb_int_t detail, bb_int_t morph);\n";
     header << "extern bb_int_t bbCreateSurface(bb_int_t mesh, bb_int_t brush);\n";
@@ -404,6 +419,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_float_t bbMeshHeight(bb_int_t mesh);\n";
     header << "extern bb_float_t bbMeshDepth(bb_int_t mesh);\n";
     header << "extern void bbFlipMesh(bb_int_t mesh);\n";
+    header << "extern void bbLightMesh(bb_int_t mesh, bb_float_t r, bb_float_t g, bb_float_t b, bb_float_t range, bb_float_t lr, bb_float_t lg, bb_float_t lb);\n";
     header << "extern bb_int_t bbCreateMirror(bb_int_t parent);\n";
     header << "extern void bbChangeDir(bb_string_t dir);\n";
     header << "extern bb_int_t bbCreateListener(bb_int_t parent, bb_float_t rolloff, bb_float_t doppler, bb_float_t dist);\n";

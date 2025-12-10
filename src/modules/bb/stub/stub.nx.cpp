@@ -46,11 +46,10 @@ public:
 };
 
 extern "C"
-int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain ) {
+int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain, bool debug ) {
 	std::string cmd_line="";
 	bbStartup( argv[0],cmd_line.c_str() );
 
-	bool debug=false;
 	StdioDebugger debugger( debug );
 	bbAttachDebugger( &debugger );
 

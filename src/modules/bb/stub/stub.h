@@ -21,6 +21,6 @@ void bbruntime_panic( const char *err );
 //start up error
 void sue( const char *t );
 
-extern "C" int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain );
+extern "C" int BBCALL bbStart( int argc,char *argv[], BBMAIN bbMain, bool debug );
 
 #endif

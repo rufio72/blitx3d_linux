@@ -508,10 +508,11 @@ static int getPixel( BBCanvas *c,float x,float y ){
 	float fx=floor(x),fy=floor(y);
 	int ix=fx,iy=fy;fx=x-fx;fy=y-fy;
 
-	int tl=c->getPixel( ix,iy );
-	int tr=c->getPixel( ix+1,iy );
-	int br=c->getPixel( ix+1,iy+1 );
-	int bl=c->getPixel( ix,iy+1 );
+	// Use getPixelFast since caller should have already called lock()
+	int tl=c->getPixelFast( ix,iy );
+	int tr=c->getPixelFast( ix+1,iy );
+	int br=c->getPixelFast( ix+1,iy+1 );
+	int bl=c->getPixelFast( ix,iy+1 );
 
 	float w1=(1-fx)*(1-fy),w2=fx*(1-fy),w3=(1-fx)*fy,w4=fx*fy;
 
@@ -569,8 +570,8 @@ static BBCanvas *tformCanvas( BBCanvas *c,float m[2][2],int x_handle,int y_handl
 		v.x=minx+.5f;
 		for( int x=0;x<iw;++v.x,++x ){
 			vec2 q=vrot(i,v);
-			unsigned rgb=filter ? getPixel( c,q.x+ox,q.y+oy ) : c->getPixel( floor(q.x+ox),floor(q.y+oy) );
-			t->setPixel( x,y,rgb );
+			unsigned rgb=filter ? getPixel( c,q.x+ox,q.y+oy ) : c->getPixelFast( floor(q.x+ox),floor(q.y+oy) );
+			t->setPixelFast( x,y,rgb );
 		}
 	}
 

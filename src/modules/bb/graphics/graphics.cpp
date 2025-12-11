@@ -497,6 +497,7 @@ void BBCALL bbCopyRect( bb_int_t sx,bb_int_t sy,bb_int_t w,bb_int_t h,bb_int_t d
 	dest->blit( dx,dy,src,sx,sy,w,h,true );
 }
 
+#define ALP(_X_) ( ((_X_)>>24) & 0xff )
 #define RED(_X_) ( ((_X_)>>16) & 0xff )
 #define GRN(_X_) ( ((_X_)>>8) & 0xff )
 #define BLU(_X_) ( (_X_) & 0xff )
@@ -516,11 +517,12 @@ static int getPixel( BBCanvas *c,float x,float y ){
 
 	float w1=(1-fx)*(1-fy),w2=fx*(1-fy),w3=(1-fx)*fy,w4=fx*fy;
 
+	float a=ALP(tl)*w1+ALP(tr)*w2+ALP(bl)*w3+ALP(br)*w4;
 	float r=RED(tl)*w1+RED(tr)*w2+RED(bl)*w3+RED(br)*w4;
 	float g=GRN(tl)*w1+GRN(tr)*w2+GRN(bl)*w3+GRN(br)*w4;
 	float b=BLU(tl)*w1+BLU(tr)*w2+BLU(bl)*w3+BLU(br)*w4;
 
-	return (int(r+.5f)<<16)|(int(g+.5f)<<8)|int(b+.5f);
+	return (int(a+.5f)<<24)|(int(r+.5f)<<16)|(int(g+.5f)<<8)|int(b+.5f);
 }
 
 struct vec2{ float x,y; };

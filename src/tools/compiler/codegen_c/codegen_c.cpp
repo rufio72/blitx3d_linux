@@ -32,6 +32,9 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "/* Runtime function declarations */\n";
     header << "extern int bbStart(int argc, char **argv, void (*main)(void), int debug);\n";
     header << "extern void _bbRestore(bb_int_t *data);\n";
+    header << "extern bb_int_t _bbReadInt(void);\n";
+    header << "extern bb_float_t _bbReadFloat(void);\n";
+    header << "extern bb_string_t _bbReadStr(void);\n";
     header << "extern void __bbLoadLibs(void *libs);\n";
     header << "extern bb_string_t _bbStrConst(const char *s);\n";
     header << "extern void _bbStrRelease(bb_string_t s);\n";
@@ -120,6 +123,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern void bbWaitKey(void);\n";
     header << "extern bb_float_t bbSqr(bb_float_t n);\n";
     header << "extern bb_float_t bbAbs(bb_float_t n);\n";
+    header << "extern bb_int_t _bbAbs(bb_int_t n);\n";
     header << "extern bb_float_t bbTan(bb_float_t n);\n";
     header << "extern bb_float_t bbASin(bb_float_t n);\n";
     header << "extern bb_float_t bbACos(bb_float_t n);\n";
@@ -172,6 +176,17 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbCreateImage(bb_int_t w, bb_int_t h, bb_int_t frames);\n";
     header << "extern void bbGrabImage(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t frame);\n";
     header << "extern bb_int_t bbSaveImage(bb_int_t image, bb_string_t filename, bb_int_t frame);\n";
+    header << "extern bb_int_t bbCopyImage(bb_int_t image);\n";
+    header << "extern bb_int_t bbImageBuffer(bb_int_t image, bb_int_t frame);\n";
+    header << "extern void bbTileImage(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t frame);\n";
+    header << "extern void bbTileBlock(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t frame);\n";
+    header << "extern void bbDrawImageRect(bb_int_t image, bb_int_t x, bb_int_t y, bb_int_t rx, bb_int_t ry, bb_int_t rw, bb_int_t rh, bb_int_t frame);\n";
+    header << "extern void bbAutoMidHandle(bb_int_t enable);\n";
+    header << "extern void bbScaleImage(bb_int_t image, bb_float_t xscale, bb_float_t yscale);\n";
+    header << "extern void bbResizeImage(bb_int_t image, bb_float_t width, bb_float_t height);\n";
+    header << "extern void bbRotateImage(bb_int_t image, bb_float_t angle);\n";
+    header << "extern bb_int_t bbImagesOverlap(bb_int_t img1, bb_int_t x1, bb_int_t y1, bb_int_t img2, bb_int_t x2, bb_int_t y2);\n";
+    header << "extern void bbCopyRect(bb_int_t sx, bb_int_t sy, bb_int_t w, bb_int_t h, bb_int_t dx, bb_int_t dy, bb_int_t src, bb_int_t dst);\n";
     header << "extern bb_int_t bbLoadFont(bb_string_t name, bb_int_t height, bb_int_t bold, bb_int_t italic, bb_int_t underline);\n";
     header << "extern void bbSetFont(bb_int_t font);\n";
     header << "extern void bbFreeFont(bb_int_t font);\n";

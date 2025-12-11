@@ -92,4 +92,15 @@ void DeclSeqNode::translate3( Codegen_C *g ){
 		}
 	}
 }
+
+void DeclSeqNode::transdata3( Codegen_C *g ){
+	for( int k=0;k<decls.size();++k ){
+		try{ decls[k]->transdata3( g ); }
+		catch( Ex &x ){
+			if( x.pos<0 ) x.pos=decls[k]->pos;
+			if(!x.file.size() ) x.file=decls[k]->file;
+			throw;
+		}
+	}
+}
 #endif

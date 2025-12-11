@@ -57,6 +57,39 @@ void DataDeclNode::transdata2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+#include <cstring>
+
+void DataDeclNode::translate3( Codegen_C *g ){
+	// Create string constants during translate phase
+	if( expr->sem_type==Type::string_type ){
+		ConstNode *c=expr->constNode();
+		str_label = g->constantString( c->stringValue() );
+	}
+}
+
+void DataDeclNode::transdata3( Codegen_C *g ){
+	ConstNode *c=expr->constNode();
+	if( expr->sem_type==Type::int_type ){
+		// Type 1 = int
+		g->dataValues.push_back( "1" );
+		g->dataValues.push_back( std::to_string( c->intValue() ) );
+	}else if( expr->sem_type==Type::float_type ){
+		// Type 2 = float (stored as int bits)
+		float n=c->floatValue();
+		int bits;
+		memcpy(&bits, &n, sizeof(bits));
+		g->dataValues.push_back( "2" );
+		g->dataValues.push_back( std::to_string( bits ) );
+	}else{
+		// Type 4 = string pointer
+		g->dataValues.push_back( "4" );
+		g->dataValues.push_back( "(bb_int_t)" + str_label );
+	}
+}
+#endif
+
 json DataDeclNode::toJSON( Environ *e ){
 	json tree;tree["@class"]="DataDeclNode";
 	tree["pos"]=pos;

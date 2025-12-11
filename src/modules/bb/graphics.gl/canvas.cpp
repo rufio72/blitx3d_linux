@@ -454,10 +454,23 @@ void GLCanvas::blit( int x,int y,BBCanvas *s,int src_x,int src_y,int src_w,int s
 	int srcY0=src->getHeight()-(src_h+src_y)*sy;
 	int srcX1=src_x*sx+src_w*sx;
 	int srcY1=src->getHeight()-src_y*sy;
-	int dstX0=x*dx;
-	int dstY0=getHeight()-(src_h+y)*dy;
-	int dstX1=(x+src_w)*dx;
-	int dstY1=getHeight()-y*dy;
+	int dstX0, dstX1, dstY0, dstY1;
+
+	// For texture targets, flip X to correct horizontal mirroring in 3D
+	// Textures use different coordinate system when mapped to 3D objects
+	if( texture && target != 0 ){
+		// Destination is a texture - flip X for correct UV mapping
+		dstX0=(x+src_w)*dx;
+		dstX1=x*dx;
+		dstY0=getHeight()-(src_h+y)*dy;
+		dstY1=getHeight()-y*dy;
+	}else{
+		// Destination is a framebuffer - normal coordinates
+		dstX0=x*dx;
+		dstX1=(x+src_w)*dx;
+		dstY0=getHeight()-(src_h+y)*dy;
+		dstY1=getHeight()-y*dy;
+	}
 
 	GL( glBindFramebuffer( GL_READ_FRAMEBUFFER,rfb ) );
 	GL( glBindFramebuffer( GL_DRAW_FRAMEBUFFER,dfb ) );

@@ -454,23 +454,10 @@ void GLCanvas::blit( int x,int y,BBCanvas *s,int src_x,int src_y,int src_w,int s
 	int srcY0=src->getHeight()-(src_h+src_y)*sy;
 	int srcX1=src_x*sx+src_w*sx;
 	int srcY1=src->getHeight()-src_y*sy;
-	int dstX0, dstX1, dstY0, dstY1;
-
-	// For texture targets, flip X to correct horizontal mirroring in 3D
-	// Textures use different coordinate system when mapped to 3D objects
-	if( texture && target != 0 ){
-		// Destination is a texture - flip X for correct UV mapping
-		dstX0=(x+src_w)*dx;
-		dstX1=x*dx;
-		dstY0=getHeight()-(src_h+y)*dy;
-		dstY1=getHeight()-y*dy;
-	}else{
-		// Destination is a framebuffer - normal coordinates
-		dstX0=x*dx;
-		dstX1=(x+src_w)*dx;
-		dstY0=getHeight()-(src_h+y)*dy;
-		dstY1=getHeight()-y*dy;
-	}
+	int dstX0=x*dx;
+	int dstY0=getHeight()-(src_h+y)*dy;
+	int dstX1=(x+src_w)*dx;
+	int dstY1=getHeight()-y*dy;
 
 	GL( glBindFramebuffer( GL_READ_FRAMEBUFFER,rfb ) );
 	GL( glBindFramebuffer( GL_DRAW_FRAMEBUFFER,dfb ) );
@@ -494,6 +481,7 @@ void GLCanvas::blit( int x,int y,BBCanvas *s,int src_x,int src_y,int src_w,int s
 void GLCanvas::image( BBCanvas *c,int x,int y,bool solid ){
 	GLCanvas *src=(GLCanvas*)c;
 
+
 	GL( glActiveTexture( GL_TEXTURE0 ) );
 	src->bind();
 
@@ -510,23 +498,53 @@ void GLCanvas::image( BBCanvas *c,int x,int y,bool solid ){
 }
 
 bool GLCanvas::collide( int x,int y,const BBCanvas *src,int src_x,int src_y,bool solid ){
-	RTEX( "GLCanvas::collide not implemented" );
-	return false;
+	const GLCanvas *s = (const GLCanvas*)src;
+
+	// Calculate bounding boxes using handle offsets
+	int x1 = x - handle_x;
+	int y1 = y - handle_y;
+	int x2 = src_x - s->handle_x;
+	int y2 = src_y - s->handle_y;
+
+	// Check if bounding boxes overlap
+	if (x1 + width <= x2) return false;
+	if (x2 + s->width <= x1) return false;
+	if (y1 + height <= y2) return false;
+	if (y2 + s->height <= y1) return false;
+
+	return true;
 }
 
 bool GLCanvas::rect_collide( int x,int y,int rect_x,int rect_y,int rect_w,int rect_h,bool solid ){
-	RTEX( "GLCanvas::rect_collide not implemented" );
-	return false;
+	// Calculate bounding box using handle offset
+	int x1 = x - handle_x;
+	int y1 = y - handle_y;
+
+	// Check if bounding boxes overlap
+	if (x1 + width <= rect_x) return false;
+	if (rect_x + rect_w <= x1) return false;
+	if (y1 + height <= rect_y) return false;
+	if (rect_y + rect_h <= y1) return false;
+
+	return true;
 }
 
 bool GLCanvas::lock(){
 	if( pixels ) return false;
 
-	// Flush all pending GL commands before reading pixels
-	GL( glFinish() );
-
 	pixels=new unsigned char[width*height*4];
-	downloadData();
+
+	// Only download data if this canvas has existing content
+	// For new canvases (no texture, not a framebuffer like BackBuffer),
+	// just initialize to zero - tformCanvas will fill it
+	if( texture || mode == GL_FRONT || mode == GL_BACK ){
+		// Flush all pending GL commands before reading pixels
+		GL( glFinish() );
+		downloadData();
+	} else {
+		// New canvas - initialize to transparent black
+		memset(pixels, 0, width*height*4);
+	}
 	return true;
 }
 
@@ -580,8 +598,12 @@ unsigned GLCanvas::getPixelFast( int x,int y ){
 void GLCanvas::unlock(){
 	if( !pixels ) return;
 
+
 	// For framebuffer-based canvas (like BackBuffer), we need to write pixels back
-	if( !texture && framebuffer != (unsigned)-1 ){
+	// Note: framebuffer=0 is the default framebuffer (BackBuffer), but for a canvas
+	// created with createCanvas, framebuffer starts at 0 too. We need to check mode
+	// to distinguish: mode is GL_FRONT or GL_BACK for default framebuffer.
+	if( !texture && (mode == GL_FRONT || mode == GL_BACK) ){
 		// Use texture + glBlitFramebuffer approach (works in Core Profile)
 		// pixels is in BGRA format, convert to RGBA for texture upload
 		unsigned char *rgba = new unsigned char[width * height * 4];
@@ -731,9 +753,13 @@ void GLCanvas::uploadData(){
 	BBPixmap *pm=0;
 	void *data=0;
 
+
 	// TODO: not super happy with this...
 	if( pixels ){
 		data=pixels;
+		// Check center pixel
+		int cx = width/2, cy = height/2;
+		unsigned char *pc = pixels + (cy * width + cx) * 4;
 	} else if( pixmap ){
 		pm=d_new BBPixmap;
 		memcpy( pm,pixmap,sizeof(BBPixmap) );
@@ -768,8 +794,17 @@ void GLCanvas::uploadData(){
 
 	GL( glActiveTexture( GL_TEXTURE0 ) );
 	GL( glBindTexture( target,texture ) );
+
+	// Determine pixel format based on source data
+	GLenum pixelFormat = GL_RGBA;
+	if( pixels ){
+		pixelFormat = GL_BGRA;  // pixels array is BGRA (from setPixelFast)
+	} else if( pm && pm->bpp == 3 ){
+		pixelFormat = GL_RGB;
+	}
+
 	for( int i=0;i<(target==GL_TEXTURE_2D?1:6);i++ ){
-		GL( glTexImage2D( target==GL_TEXTURE_2D?target:_cube_order[i],0,GL_RGBA,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,data ) );
+		GL( glTexImage2D( target==GL_TEXTURE_2D?target:_cube_order[i],0,GL_RGBA,width,height,0,pixelFormat,GL_UNSIGNED_BYTE,data ) );
 	}
 	GL( glGenerateMipmap( target ) );
 
@@ -779,14 +814,20 @@ void GLCanvas::uploadData(){
 }
 
 void GLCanvas::downloadData(){
-	void *bits=pixmap?pixmap->bits:pixels;
+	// Always read into pixels if it exists (for getPixelFast), otherwise pixmap->bits
+	void *bits=pixels?pixels:(pixmap?pixmap->bits:0);
 	if( bits ){
-		GL( glBindFramebuffer( GL_FRAMEBUFFER,framebufferId() ) );
+		unsigned int fbo = framebufferId();
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,fbo ) );
 		// For default framebuffer (0), need to set read buffer
-		if( framebufferId() == 0 ){
+		if( fbo == 0 ){
 			GL( glReadBuffer( mode ) );  // GL_FRONT or GL_BACK
 		}
 		GL( glReadPixels( 0,0,width,height,GL_BGRA,GL_UNSIGNED_BYTE,bits ) );
+		// Debug: check what was read - center pixel
+		unsigned char *p = (unsigned char*)bits;
+		int cx = width/2, cy = height/2;
+		unsigned char *pc = p + (cy * width + cx) * 4;
 	}
 }
 

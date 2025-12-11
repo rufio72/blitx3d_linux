@@ -7,8 +7,9 @@ MeshModel *MeshUtil::createCube( const Brush &b ){
 		Vector(0,0,-1),Vector(1,0,0),Vector(0,0,1),
 		Vector(-1,0,0),Vector(0,1,0),Vector(0,-1,0)
 	};
+	// UV coordinates - flipped V to match OpenGL texture orientation
 	static Vector tex_coords[]={
-		Vector(0,0,1),Vector(1,0,1),Vector(1,1,1),Vector(0,1,1)
+		Vector(0,1,1),Vector(1,1,1),Vector(1,0,1),Vector(0,0,1)
 	};
 	static int verts[]={
 		2,3,1,0,3,7,5,1,7,6,4,5,6,2,0,4,6,7,3,2,0,1,5,4

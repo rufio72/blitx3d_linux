@@ -393,6 +393,10 @@ void ProgNode::translate3( Codegen_C *g, const std::vector<UserFunc> &userfuncs 
 	}
 	g->globals << "\n";
 
+	// Process data declarations
+	datas->translate3( g );  // Create string constants
+	datas->transdata3( g );  // Populate dataValues array
+
 	// Translate user-defined functions
 	funcs->translate3( g );
 

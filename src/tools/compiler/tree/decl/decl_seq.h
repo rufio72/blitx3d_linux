@@ -22,6 +22,7 @@ struct DeclSeqNode : public Node{
 #endif
 #ifdef USE_GCC_BACKEND
 	void translate3( Codegen_C *g );
+	void transdata3( Codegen_C *g );
 #endif
 };
 

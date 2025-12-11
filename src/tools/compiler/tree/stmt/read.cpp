@@ -30,3 +30,16 @@ void ReadNode::translate2( Codegen_LLVM *g ){
 	var->store2( g,t );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+void ReadNode::translate3( Codegen_C *g ){
+	std::string func;
+	if( var->sem_type==Type::int_type ) func = "_bbReadInt";
+	else if( var->sem_type==Type::float_type ) func = "_bbReadFloat";
+	else func = "_bbReadStr";
+
+	std::string val = func + "()";
+	var->store3( g, val );
+}
+#endif

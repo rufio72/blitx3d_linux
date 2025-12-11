@@ -17,6 +17,7 @@ struct DeclNode : public Node{
 #endif
 #ifdef USE_GCC_BACKEND
 	virtual void translate3( Codegen_C *g ){}
+	virtual void transdata3( Codegen_C *g ){}
 #endif
 };
 

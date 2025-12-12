@@ -22,7 +22,6 @@ protected:
 	int handle_x,handle_y;
 	int mask;
 	float color[3];
-	BBPixmap *pixmap;
 	bool dirty;
 
 	void flush();
@@ -37,6 +36,7 @@ public:
 	int cube_face,cube_mode;
 	GLenum target;
 
+	BBPixmap *pixmap;
 	unsigned int texture,depthbuffer;
 	int twidth,theight;
 

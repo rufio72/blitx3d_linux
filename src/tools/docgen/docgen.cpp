@@ -1,5 +1,5 @@
 /*
- * docgen - Blitz3D NG Documentation Generator
+ * docgen - Blitz3D Documentation Generator
  * Generates HTML documentation from Markdown files
  * No external dependencies (Ruby, Python, etc.)
  */
@@ -245,7 +245,7 @@ private:
     void generateIndex(const std::vector<Module>& modules) {
         std::string content = R"(
 <div class="full-page">
-  <h2>Welcome To Blitz3D "NG"!</h2>
+  <h2>Welcome To Blitz3D!</h2>
   <p>To return to this page at any time, just click the 'home' icon in the toolbar.</p>
 
   <ul class="main-menu">
@@ -254,11 +254,11 @@ private:
     <li><a href="https://github.com/nickmckay/blitz3d-ng" target="_blank">GitHub</a> - source code and issue tracker</li>
   </ul>
 
-  <p>If you experience any problems running Blitz3D "NG", please file an issue on
+  <p>If you experience any problems running Blitz3D, please file an issue on
   <a href="https://github.com/nickmckay/blitz3d-ng/issues" target="_blank">GitHub</a>.</p>
 </div>
 )";
-        writeFile(outPath + "/index.html", wrapInLayout("Blitz3D NG Help", content, "./"));
+        writeFile(outPath + "/index.html", wrapInLayout("Blitz3D Help", content, "./"));
     }
 
     void generateReferenceIndex(const std::vector<Module>& modules) {
@@ -295,12 +295,12 @@ private:
         return R"(<!DOCTYPE html>
 <html>
 <head>
-  <title>)" + title + R"( - Blitz3D NG</title>
+  <title>)" + title + R"( - Blitz3D</title>
   <link rel="stylesheet" href=")" + rootPath + R"(assets/style.css" type="text/css" />
 </head>
 <body>
   <nav>
-    <h1>Blitz3D "NG" Docs</h1>
+    <h1>Blitz3D Docs</h1>
     <a href=")" + rootPath + R"(index.html">
       <img src=")" + rootPath + R"(b3dlogo.jpg" />
     </a>
@@ -484,7 +484,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    std::cout << "Blitz3D NG Documentation Generator\n";
+    std::cout << "Blitz3D Documentation Generator\n";
     std::cout << "Source: " << srcPath << "\n";
     std::cout << "Output: " << outPath << "\n\n";
 

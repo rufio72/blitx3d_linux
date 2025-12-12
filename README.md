@@ -158,12 +158,11 @@ $ adb install -r mygame.apk
 
 ## Documentation
 
-The original Blitz3D help is available in the [\_release/help](_release/help) directory in HTML form. We've
-started replacing it with a Markdown based system. You'll need a [ruby 3.1.2](https://www.ruby-lang.org/en/) install
-to generate the documentation.
+The original Blitz3D help is available in the [\_release/help](_release/help) directory in HTML form.
+Documentation is generated from Markdown files using the built-in `docgen` tool.
 
 ```bash
-$ make help
+$ make docs
 ```
 
 ## New Features

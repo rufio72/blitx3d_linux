@@ -26,6 +26,10 @@ public:
     int createExe(bool debug, const std::string &rt, const Target &target,
                   const std::string &cFile, const std::string &exeFile);
 
+    // Get the gcc command string without executing
+    std::string getGccCommand(bool debug, const std::string &rt, const Target &target,
+                              const std::string &cFile, const std::string &exeFile);
+
 private:
     // Get compiler command for target
     std::string getCompiler(const Target &target);

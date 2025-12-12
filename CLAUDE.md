@@ -55,7 +55,7 @@ make clean
 
 ### Documentation
 ```bash
-make help  # Requires Ruby 3.1.2
+make docs  # Uses built-in docgen tool
 ```
 
 ## Architecture

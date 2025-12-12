@@ -42,6 +42,8 @@ private:
 	std::vector<Target> devices;
 	int deviceIdx;
 
+	wxTimer *fileCheckTimer;  // Timer for external file modification check
+
 	void UnlockFile();
 	void EnumerateDevices();
 
@@ -61,6 +63,7 @@ private:
 	void OnBuildBegin( wxCommandEvent& event );
 	void OnBuildProgress( wxCommandEvent& event );
 	void OnBuildGccPhase( wxCommandEvent& event );
+	void OnBuildError( wxCommandEvent& event );
 	void OnBuildEnd( wxCommandEvent& event );
 	void OnBuildKill( wxCommandEvent& event );
 	void OnLockFile( wxCommandEvent& event );
@@ -71,6 +74,8 @@ private:
 
 	void OnPageChanged( wxBookCtrlEvent& event );
 	void OnPageClose( wxAuiNotebookEvent& event );
+
+	void OnFileCheckTimer( wxTimerEvent& event );  // Check for external file modifications
 
 	wxDECLARE_EVENT_TABLE();
 };

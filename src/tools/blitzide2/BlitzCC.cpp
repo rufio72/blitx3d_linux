@@ -8,15 +8,22 @@
 #ifndef BB_MSVC
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #endif
 
 wxDEFINE_EVENT( BUILD_BEGIN,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_PROGRESS,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_GCC_PHASE,wxCommandEvent );
+wxDEFINE_EVENT( BUILD_ERROR,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_END,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_KILL,wxCommandEvent );
 
 BlitzCC::BlitzCC( wxEvtHandler *dest,const wxString &blitzpath ):wxThread(wxTHREAD_DETACHED),dest(dest),blitzpath(blitzpath),proc(0){
+#ifndef BB_MSVC
+	childPid = 0;
+	shouldStop = false;
+#endif
 }
 
 BlitzCC::~BlitzCC(){
@@ -42,9 +49,16 @@ void BlitzCC::Execute( const wxString &p,const Target &t,const Preferences *pf )
 }
 
 void BlitzCC::Kill(){
+#ifndef BB_MSVC
+	// Linux/macOS: just set stop flag - the worker thread will handle the kill
+	// This avoids race conditions with childPid access
+	shouldStop = true;
+	std::cout << "Kill() called - stop flag set" << std::endl;
+#else
+	// Windows: use wxProcess
 	if( proc==0 ) return;
-
 	wxProcess::Kill( proc->GetPid() );
+#endif
 }
 
 int BlitzCC::Monitor(){
@@ -172,10 +186,40 @@ wxThread::ExitCode BlitzCC::Entry(){
 					event.SetString( line );
 					wxPostEvent( dest, event );
 
-					// Check for errors
+					// Check for errors and parse line number
+					// Format: "filepath":line:col:line:col:message
 					wxString lower = line.Lower();
 					if( lower.Contains("error") || lower.Contains("not found") ){
 						blitzError = true;
+
+						// Try to parse error line number
+						// Format: "filepath":line:col:line:col:message
+						if( line.StartsWith("\"") ){
+							// Find closing quote
+							size_t pos = 1;
+							while( pos < line.Length() && line[pos] != '"' ) pos++;
+							if( pos < line.Length() ){
+								pos++;  // Skip closing quote
+								if( pos < line.Length() && line[pos] == ':' ){
+									pos++;  // Skip colon
+									// Now we should be at the line number
+									wxString lineNumStr;
+									while( pos < line.Length() && line[pos] >= '0' && line[pos] <= '9' ){
+										lineNumStr += line[pos];
+										pos++;
+									}
+									if( !lineNumStr.IsEmpty() ){
+										long lineNum;
+										if( lineNumStr.ToLong( &lineNum ) ){
+											wxCommandEvent errorEvent( BUILD_ERROR );
+											errorEvent.SetInt( (int)lineNum );
+											errorEvent.SetString( line );
+											wxPostEvent( dest, errorEvent );
+										}
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -223,13 +267,47 @@ wxThread::ExitCode BlitzCC::Entry(){
 			return (wxThread::ExitCode)0;
 		}
 
-		// Phase 3: Run the executable
+		// Phase 3: Run the executable using fork() to track PID
 		if( wxFileExists( exePath ) ){
 			wxString sourceDir = wxFileName( path ).GetPath();
-			wxString runCmd = "cd \"" + sourceDir + "\" && blitzpath=\"" + blitzpath + "\" \"" + exePath + "\" 2>&1";
 
-			wxString dummy;
-			RunCommand( runCmd, dummy );
+			std::cout << "  Running executable: " << exePath.ToStdString() << std::endl;
+
+			// Reset stop flag
+			shouldStop = false;
+
+			// Fork to run the executable
+			childPid = fork();
+			if( childPid == 0 ){
+				// Child process
+				chdir( sourceDir.ToUTF8().data() );
+				setenv( "blitzpath", blitzpath.ToUTF8().data(), 1 );
+				execl( exePath.ToUTF8().data(), exePath.ToUTF8().data(), (char*)NULL );
+				_exit(1); // If exec fails
+			} else if( childPid > 0 ){
+				// Parent process - wait for child or stop signal
+				std::cout << "  Child process PID: " << childPid << std::endl;
+				int status;
+				while( !shouldStop ){
+					pid_t result = waitpid( childPid, &status, WNOHANG );
+					if( result == childPid ){
+						// Child exited
+						std::cout << "  Child process exited" << std::endl;
+						break;
+					} else if( result == -1 ){
+						// Error
+						break;
+					}
+					// Sleep a bit to avoid busy waiting
+					usleep( 100000 ); // 100ms
+				}
+				if( shouldStop ){
+					std::cout << "  Stop requested, killing child" << std::endl;
+					kill( childPid, SIGTERM );
+					waitpid( childPid, &status, 0 );
+				}
+				childPid = 0;
+			}
 		}
 
 		wxPostEvent( dest,wxCommandEvent( BUILD_END ) );

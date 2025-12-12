@@ -27,6 +27,7 @@ private:
 	bool hasErrors;
 	bool buildFinished;
 	bool inGccPhase;
+	wxWindow *parentWindow;  // Store parent reference since dialog has no parent
 
 	void OnTerminate( wxCommandEvent & event );
 	void OnClose( wxCommandEvent & event );

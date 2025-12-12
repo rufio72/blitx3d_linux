@@ -5,10 +5,16 @@
 
 #include <wx/thread.h>
 #include <wx/process.h>
+#include <atomic>
+#ifndef BB_MSVC
+#include <sys/types.h>
+#include <signal.h>
+#endif
 
 wxDECLARE_EVENT( BUILD_BEGIN,wxCommandEvent );
 wxDECLARE_EVENT( BUILD_PROGRESS,wxCommandEvent );
 wxDECLARE_EVENT( BUILD_GCC_PHASE,wxCommandEvent );  // Signal start of GCC compilation phase
+wxDECLARE_EVENT( BUILD_ERROR,wxCommandEvent );  // Error with line number for highlighting
 wxDECLARE_EVENT( BUILD_END,wxCommandEvent );
 wxDECLARE_EVENT( BUILD_KILL,wxCommandEvent );
 
@@ -27,6 +33,10 @@ protected:
 	Target target;
 	const Preferences *prefs;
 	wxProcess *proc;
+#ifndef BB_MSVC
+	pid_t childPid;
+	std::atomic<bool> shouldStop;
+#endif
 
 	int Monitor();
 #ifndef BB_MSVC

@@ -24,6 +24,7 @@ enum{
 	ID_HOME,
 	ID_BACK,
 	ID_FORWARD,
+	ID_FILE_CHECK_TIMER,
 
 	ID_TARGET=500
 };
@@ -52,8 +53,11 @@ wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
 	EVT_COMMAND (wxID_ANY, BUILD_BEGIN,     MainFrame::OnBuildBegin)
 	EVT_COMMAND (wxID_ANY, BUILD_PROGRESS,  MainFrame::OnBuildProgress)
 	EVT_COMMAND (wxID_ANY, BUILD_GCC_PHASE, MainFrame::OnBuildGccPhase)
+	EVT_COMMAND (wxID_ANY, BUILD_ERROR,     MainFrame::OnBuildError)
 	EVT_COMMAND (wxID_ANY, BUILD_END,       MainFrame::OnBuildEnd)
 	EVT_COMMAND (wxID_ANY, BUILD_KILL,      MainFrame::OnBuildKill)
+
+	EVT_TIMER(ID_FILE_CHECK_TIMER, MainFrame::OnFileCheckTimer)
 wxEND_EVENT_TABLE()
 
 MainFrame::MainFrame( const wxString& title )
@@ -210,6 +214,10 @@ MainFrame::MainFrame( const wxString& title )
 	UpdateToolbar( 0 );
 	UpdateMenu( 0 );
 	EnumerateDevices();
+
+	// Start timer for external file modification check (every 2 seconds)
+	fileCheckTimer = new wxTimer( this, ID_FILE_CHECK_TIMER );
+	fileCheckTimer->Start( 2000 );
 }
 
 void MainFrame::AddFile( wxString &path ){
@@ -490,8 +498,24 @@ void MainFrame::OnTarget( wxCommandEvent& event ){
 }
 
 void MainFrame::OnBuildBegin( wxCommandEvent& event ){
+	// Clear error highlights from all open files
+	for( size_t i = 1; i < nb->GetPageCount(); i++ ){
+		FileView *file = dynamic_cast<FileView*>( nb->GetPage( i ) );
+		if( file ){
+			file->ClearErrorHighlights();
+		}
+	}
+
 	buildDialog=new BuildDialog( this );
 	buildDialog->ShowModal();
+
+	// Return focus to IDE when dialog closes
+	Raise();
+	SetFocus();
+
+	// Clean up dialog
+	delete buildDialog;
+	buildDialog = nullptr;
 }
 
 void MainFrame::OnBuildProgress( wxCommandEvent& event ){
@@ -500,6 +524,20 @@ void MainFrame::OnBuildProgress( wxCommandEvent& event ){
 
 void MainFrame::OnBuildGccPhase( wxCommandEvent& event ){
 	buildDialog->StartGccPhase();
+}
+
+void MainFrame::OnBuildError( wxCommandEvent& event ){
+	int lineNum = event.GetInt();
+
+	// Find the current file and highlight the error line
+	size_t page = nb->GetSelection();
+	if( page > 0 ){  // page 0 is help, files start at 1
+		FileView *file = dynamic_cast<FileView*>( nb->GetCurrentPage() );
+		if( file ){
+			file->HighlightErrorLine( lineNum );
+			file->GotoLine( lineNum );
+		}
+	}
 }
 
 void MainFrame::OnBuildEnd( wxCommandEvent& event ){
@@ -597,4 +635,34 @@ void MainFrame::OnPageClose( wxAuiNotebookEvent& event ){
 	// Update toolbar after close
 	int newPage = (page > 0) ? page - 1 : 0;
 	UpdateToolbar( newPage );
+}
+
+void MainFrame::OnFileCheckTimer( wxTimerEvent& event ){
+	// Check all open files for external modifications
+	for( size_t i = 1; i < nb->GetPageCount(); i++ ){
+		FileView *file = dynamic_cast<FileView*>( nb->GetPage( i ) );
+		if( file && file->IsModifiedExternally() ){
+			// Stop timer temporarily to prevent multiple dialogs
+			fileCheckTimer->Stop();
+
+			wxString filename = file->GetTitle();
+			int result = wxMessageBox(
+				"Il file \"" + filename + "\" e' stato modificato esternamente.\n\nVuoi ricaricare il file?",
+				"File modificato",
+				wxYES_NO | wxICON_QUESTION,
+				this
+			);
+
+			if( result == wxYES ){
+				file->Reload();
+			} else {
+				// User chose not to reload - update stored time to avoid repeated prompts
+				file->UpdateStoredModTime();
+			}
+
+			// Restart timer
+			fileCheckTimer->Start( 2000 );
+			return;  // Check one file at a time to avoid dialog spam
+		}
+	}
 }

@@ -3,6 +3,7 @@
 
 #include "std.h"
 #include <wx/stc/stc.h>
+#include <wx/filename.h>
 #include "BlitzCC.h"
 
 class FileView : public wxPanel{
@@ -13,6 +14,8 @@ private:
 	wxStyledTextCtrl* text;
 	bool dirty;
 	BlitzCC *cc;
+	wxDateTime storedModTime;  // File modification time when loaded
+	bool checkingExternal;     // Prevent re-entry during reload prompt
 
 	void Open( wxString &path );
 
@@ -33,6 +36,16 @@ public:
 	void Execute( const Target &target,const Preferences *prefs );
 	void Kill();
 	void Build( wxString &out );
+
+	// Error highlighting
+	void HighlightErrorLine( int line );
+	void ClearErrorHighlights();
+	void GotoLine( int line );
+
+	// External modification detection
+	bool IsModifiedExternally();
+	void Reload();
+	void UpdateStoredModTime();
 };
 
 wxDECLARE_EVENT(FILE_VIEW_DIRTY_EVENT, wxCommandEvent);

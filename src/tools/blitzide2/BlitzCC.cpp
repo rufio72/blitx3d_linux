@@ -12,6 +12,7 @@
 
 wxDEFINE_EVENT( BUILD_BEGIN,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_PROGRESS,wxCommandEvent );
+wxDEFINE_EVENT( BUILD_GCC_PHASE,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_END,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_KILL,wxCommandEvent );
 
@@ -90,25 +91,125 @@ wxThread::ExitCode BlitzCC::Entry(){
 	out.Normalize( wxPATH_NORM_ABSOLUTE );
 
 	wxString args = " -d";  // Always enable debug mode
+	wxString exePath;  // Path to the executable we'll create
+
 	if( !target.host ){
 		args += " -c -sign "+prefs->signId;
 		if( target.platform=="ios" ){ // only need entitlement when deploying to real device
 			args +=" -team "+prefs->teamId;
 		}
 		args += " -target "+target.platform+" -o "+out.GetFullPath();
+		exePath = out.GetFullPath();
 	}
 #ifndef BB_MSVC
 	else {
-		// Non-Windows: GCC backend doesn't support JIT, compile to temp exe and run it
+		// Non-Windows: GCC backend - use two-phase compilation
 		wxFileName tempExe( path );
 		tempExe.ClearExt();
 		tempExe.Normalize( wxPATH_NORM_ABSOLUTE );
-		args += " -o " + tempExe.GetFullPath();
+		exePath = tempExe.GetFullPath();
+
+		// Delete old executable before compiling to avoid running stale binary on error
+		if( wxFileExists( exePath ) ){
+			wxRemoveFile( exePath );
+		}
+
+		// Phase 1: Blitz3D compilation (generate C code)
+		// Use -c flag to only generate C code and get the GCC command
+		wxString blitzArgs = " -d -c -o " + exePath + " " + path;
+		wxString blitzCmd = blitzpath + "/bin/blitzcc" + blitzArgs + " 2>&1";
+
+		wxString gccCmd;
+		wxString cFile;
+
+		FILE *fp = popen( blitzCmd.ToUTF8().data(), "r" );
+		if( !fp ){
+			wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
+			return (wxThread::ExitCode)0;
+		}
+
+		char buffer[4096];
+		bool blitzError = false;
+		while( fgets( buffer, sizeof(buffer), fp ) != NULL ){
+			wxString line = wxString::FromUTF8( buffer );
+			line.Trim();
+
+			if( line.size() > 0 ){
+				// Check for special output markers
+				if( line.StartsWith("C_FILE:") ){
+					cFile = line.Mid( 7 );  // Extract C file path
+				} else if( line.StartsWith("GCC_CMD:") ){
+					gccCmd = line.Mid( 8 );  // Extract GCC command
+				} else {
+					// Regular output - send to Blitz3D tab
+					wxCommandEvent event( BUILD_PROGRESS );
+					event.SetString( line );
+					wxPostEvent( dest, event );
+
+					// Check for errors
+					wxString lower = line.Lower();
+					if( lower.Contains("error") || lower.Contains("not found") ){
+						blitzError = true;
+					}
+				}
+			}
+		}
+
+		int status = pclose( fp );
+		int blitzResult = WEXITSTATUS( status );
+
+		// If Blitz3D compilation failed, stop here
+		if( blitzResult != 0 || blitzError || gccCmd.IsEmpty() ){
+			wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
+			return (wxThread::ExitCode)0;
+		}
+
+		// Phase 2: GCC compilation
+		wxPostEvent( dest,wxCommandEvent( BUILD_GCC_PHASE ) );
+
+		fp = popen( (gccCmd + " 2>&1").ToUTF8().data(), "r" );
+		if( !fp ){
+			wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
+			return (wxThread::ExitCode)0;
+		}
+
+		while( fgets( buffer, sizeof(buffer), fp ) != NULL ){
+			wxString line = wxString::FromUTF8( buffer );
+			line.Trim();
+
+			if( line.size() > 0 ){
+				wxCommandEvent event( BUILD_PROGRESS );
+				event.SetString( line );
+				wxPostEvent( dest, event );
+			}
+		}
+
+		status = pclose( fp );
+		int gccResult = WEXITSTATUS( status );
+
+		// If GCC compilation failed, stop here
+		if( gccResult != 0 ){
+			wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
+			return (wxThread::ExitCode)0;
+		}
+
+		// Phase 3: Run the executable
+		if( wxFileExists( exePath ) ){
+			wxString sourceDir = wxFileName( path ).GetPath();
+			wxString runCmd = "cd \"" + sourceDir + "\" && blitzpath=\"" + blitzpath + "\" \"" + exePath + "\" 2>&1";
+
+			wxString dummy;
+			RunCommand( runCmd, dummy );
+		}
+
+		wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
+		return (wxThread::ExitCode)0;
 	}
 #endif
 	args += " "+path;
 
 	wxString bundleId;
+	int compileResult = 0;
 
 #ifdef BB_MSVC
 	// Windows: use wxExecute
@@ -135,10 +236,16 @@ wxThread::ExitCode BlitzCC::Entry(){
 #else
 	// Linux/macOS: use popen() to avoid wxExecute thread issues
 	wxString cmd = blitzpath + "/bin/blitzcc" + args + " 2>&1";
-	RunCommand( cmd, bundleId );
+	compileResult = RunCommand( cmd, bundleId );
 #endif
 
 	std::cout<<bundleId<<std::endl;
+
+	// Only run executable if compilation succeeded
+	if( compileResult != 0 ){
+		wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
+		return (wxThread::ExitCode)0;
+	}
 
 	if( target.platform=="ios-sim" ){
 #ifdef BB_MSVC
@@ -167,21 +274,6 @@ wxThread::ExitCode BlitzCC::Entry(){
 		RunCommand( "ios-deploy --bundle "+out.GetFullPath()+" 2>&1", dummy );
 #endif
 	}
-#ifndef BB_MSVC
-	else if( target.host ){
-		// Non-Windows: run the compiled executable
-		wxFileName tempExe( path );
-		tempExe.ClearExt();
-		tempExe.Normalize( wxPATH_NORM_ABSOLUTE );
-
-		// Change to the source file directory so relative paths work
-		wxString sourceDir = wxFileName( path ).GetPath();
-		wxString runCmd = "cd \"" + sourceDir + "\" && blitzpath=\"" + blitzpath + "\" \"" + tempExe.GetFullPath() + "\" 2>&1";
-
-		wxString dummy;
-		RunCommand( runCmd, dummy );
-	}
-#endif
 
 	wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
 

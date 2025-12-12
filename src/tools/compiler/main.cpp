@@ -633,7 +633,7 @@ int main( int argc,char *argv[] ){
 #endif
 		}else if( usegcc ) {
 #ifdef USE_GCC_BACKEND
-			// Write C code to file and compile with gcc/clang
+			// Write C code to file
 			std::string cFile = out_file + ".c";
 			std::ofstream cOut( cFile );
 			if( !cOut ){
@@ -643,10 +643,20 @@ int main( int argc,char *argv[] ){
 			cOut << c_code;
 			cOut.close();
 
-			Linker_GCC linker( home );
-			ret = linker.createExe( debug,rt,target,cFile,out_file );
-			if( ret != 0 ){
-				std::cerr<<"Error: Compilation failed"<<std::endl;
+			if( compileonly ){
+				// -c flag: only generate C code, don't compile with gcc
+				// Output the C file path and the gcc command for the IDE
+				std::cout<<"C_FILE:"<<cFile<<std::endl;
+				Linker_GCC linker( home );
+				std::string gccCmd = linker.getGccCommand( debug, rt, target, cFile, out_file );
+				std::cout<<"GCC_CMD:"<<gccCmd<<std::endl;
+			}else{
+				// Compile with gcc/clang
+				Linker_GCC linker( home );
+				ret = linker.createExe( debug,rt,target,cFile,out_file );
+				if( ret != 0 ){
+					std::cerr<<"Error: Compilation failed"<<std::endl;
+				}
 			}
 #else
 			std::cerr<<"gcc backend was not compiled in"<<std::endl;

@@ -8,6 +8,7 @@
 
 wxDECLARE_EVENT( BUILD_BEGIN,wxCommandEvent );
 wxDECLARE_EVENT( BUILD_PROGRESS,wxCommandEvent );
+wxDECLARE_EVENT( BUILD_GCC_PHASE,wxCommandEvent );  // Signal start of GCC compilation phase
 wxDECLARE_EVENT( BUILD_END,wxCommandEvent );
 wxDECLARE_EVENT( BUILD_KILL,wxCommandEvent );
 

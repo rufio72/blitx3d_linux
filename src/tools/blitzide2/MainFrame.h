@@ -60,6 +60,7 @@ private:
 	void OnFileViewDirty( wxCommandEvent& event );
 	void OnBuildBegin( wxCommandEvent& event );
 	void OnBuildProgress( wxCommandEvent& event );
+	void OnBuildGccPhase( wxCommandEvent& event );
 	void OnBuildEnd( wxCommandEvent& event );
 	void OnBuildKill( wxCommandEvent& event );
 	void OnLockFile( wxCommandEvent& event );

@@ -175,8 +175,8 @@ int Linker_GCC::linkExecutable(const std::string &objFile, const std::string &ex
     return system(cmd.str().c_str());
 }
 
-int Linker_GCC::createExe(bool debug, const std::string &rt, const Target &target,
-                           const std::string &cFile, const std::string &exeFile) {
+std::string Linker_GCC::getGccCommand(bool debug, const std::string &rt, const Target &target,
+                                       const std::string &cFile, const std::string &exeFile) {
     // For GCC backend, we compile and link in one step
     std::stringstream cmd;
     cmd << getCompiler(target);
@@ -246,8 +246,14 @@ int Linker_GCC::createExe(bool debug, const std::string &rt, const Target &targe
     // C++ standard library
     cmd << " -lstdc++";
 
-    std::cout << "Building: " << cmd.str() << std::endl;
-    int ret = system(cmd.str().c_str());
+    return cmd.str();
+}
+
+int Linker_GCC::createExe(bool debug, const std::string &rt, const Target &target,
+                           const std::string &cFile, const std::string &exeFile) {
+    std::string cmd = getGccCommand(debug, rt, target, cFile, exeFile);
+
+    int ret = system(cmd.c_str());
 
     if (ret != 0) {
         std::cerr << "Failed to build executable" << std::endl;

@@ -49,10 +49,11 @@ wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
 
 	EVT_COMMAND (wxID_ANY, FILE_VIEW_DIRTY_EVENT, MainFrame::OnFileViewDirty)
 
-	EVT_COMMAND (wxID_ANY, BUILD_BEGIN,    MainFrame::OnBuildBegin)
-	EVT_COMMAND (wxID_ANY, BUILD_PROGRESS, MainFrame::OnBuildProgress)
-	EVT_COMMAND (wxID_ANY, BUILD_END,      MainFrame::OnBuildEnd)
-	EVT_COMMAND (wxID_ANY, BUILD_KILL,     MainFrame::OnBuildKill)
+	EVT_COMMAND (wxID_ANY, BUILD_BEGIN,     MainFrame::OnBuildBegin)
+	EVT_COMMAND (wxID_ANY, BUILD_PROGRESS,  MainFrame::OnBuildProgress)
+	EVT_COMMAND (wxID_ANY, BUILD_GCC_PHASE, MainFrame::OnBuildGccPhase)
+	EVT_COMMAND (wxID_ANY, BUILD_END,       MainFrame::OnBuildEnd)
+	EVT_COMMAND (wxID_ANY, BUILD_KILL,      MainFrame::OnBuildKill)
 wxEND_EVENT_TABLE()
 
 MainFrame::MainFrame( const wxString& title )
@@ -493,8 +494,15 @@ void MainFrame::OnBuildProgress( wxCommandEvent& event ){
 	buildDialog->AddMessage( event.GetString() );
 }
 
+void MainFrame::OnBuildGccPhase( wxCommandEvent& event ){
+	buildDialog->StartGccPhase();
+}
+
 void MainFrame::OnBuildEnd( wxCommandEvent& event ){
-	buildDialog->EndModal( 0 );
+	// Check if there were errors during build
+	bool success = !buildDialog->HasErrors();
+	buildDialog->SetBuildFinished( success );
+	// Dialog will close automatically if no errors, or stay open for user to review errors
 	Raise();
 }
 

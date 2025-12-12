@@ -232,6 +232,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t bbCreateMesh(bb_int_t parent);\n";
     header << "extern bb_int_t bbLoadMesh(bb_string_t file, bb_int_t parent);\n";
     header << "extern bb_int_t bbLoadAnimMesh(bb_string_t file, bb_int_t parent);\n";
+    header << "extern bb_int_t bbLoadAnimSeq(bb_int_t entity, bb_string_t file);\n";
     header << "extern bb_int_t bbCopyMesh(bb_int_t mesh, bb_int_t parent);\n";
     header << "extern void bbFreeEntity(bb_int_t entity);\n";
     header << "extern void bbPositionEntity(bb_int_t entity, bb_float_t x, bb_float_t y, bb_float_t z, bb_int_t global);\n";

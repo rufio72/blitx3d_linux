@@ -135,8 +135,40 @@ static inline void debugVertex( Surface *s,int n,int t ){
 	}
 }
 
+// Helper to find file with case-insensitive matching on Linux
+static std::string findFileCI( const std::string &path ){
+	// First try the exact path
+	FILE *f = fopen( path.c_str(), "rb" );
+	if( f ){ fclose(f); return path; }
+
+	// Try with uppercase extension
+	int n = path.rfind( "." );
+	if( n != std::string::npos ){
+		std::string base = path.substr( 0, n+1 );
+		std::string ext = path.substr( n+1 );
+
+		// Try uppercase extension
+		std::string upper_ext;
+		for( char c : ext ) upper_ext += toupper(c);
+		std::string upper_path = base + upper_ext;
+		f = fopen( upper_path.c_str(), "rb" );
+		if( f ){ fclose(f); return upper_path; }
+
+		// Try lowercase extension
+		std::string lower_ext;
+		for( char c : ext ) lower_ext += tolower(c);
+		std::string lower_path = base + lower_ext;
+		f = fopen( lower_path.c_str(), "rb" );
+		if( f ){ fclose(f); return lower_path; }
+	}
+
+	// Return original if nothing found
+	return path;
+}
+
 static Entity *loadEntity( std::string t,int hint ){
 	t=canonicalpath(t);
+	t=findFileCI(t);  // Find actual file with case-insensitive matching
 	int n=t.rfind( "." );if( n==std::string::npos ) return 0;
 	std::string ext=tolower( t.substr( n+1 ) );
 	MeshLoader *l;

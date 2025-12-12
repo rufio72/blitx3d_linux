@@ -16,7 +16,7 @@ wxDEFINE_EVENT( BUILD_GCC_PHASE,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_END,wxCommandEvent );
 wxDEFINE_EVENT( BUILD_KILL,wxCommandEvent );
 
-BlitzCC::BlitzCC( wxEvtHandler *dest,const wxString &blitzpath ):dest(dest),blitzpath(blitzpath),proc(0){
+BlitzCC::BlitzCC( wxEvtHandler *dest,const wxString &blitzpath ):wxThread(wxTHREAD_DETACHED),dest(dest),blitzpath(blitzpath),proc(0){
 }
 
 BlitzCC::~BlitzCC(){
@@ -26,7 +26,19 @@ void BlitzCC::Execute( const wxString &p,const Target &t,const Preferences *pf )
 	path=p;
 	target=t;
 	prefs=pf;
-	Run();
+
+	// Debug: show what we're trying to compile
+	std::cout << "BlitzCC::Execute called" << std::endl;
+	std::cout << "  Path: " << path.ToStdString() << std::endl;
+	std::cout << "  Target: " << target.platform.ToStdString() << std::endl;
+	std::cout << "  Blitzpath: " << blitzpath.ToStdString() << std::endl;
+
+	if( Create() == wxTHREAD_NO_ERROR ){
+		std::cout << "  Thread created, starting..." << std::endl;
+		Run();
+	} else {
+		std::cout << "  ERROR: Thread creation failed!" << std::endl;
+	}
 }
 
 void BlitzCC::Kill(){
@@ -83,12 +95,14 @@ int BlitzCC::RunCommand( const wxString &cmd, wxString &bundleId ){
 #endif
 
 wxThread::ExitCode BlitzCC::Entry(){
+	std::cout << "BlitzCC::Entry() started" << std::endl;
 	wxPostEvent( dest,wxCommandEvent( BUILD_BEGIN ) );
 
 	wxFileName out( path );
 	out.ClearExt();
 	out.SetExt( "app" );
 	out.Normalize( wxPATH_NORM_ABSOLUTE );
+	std::cout << "  target.host = " << (target.host ? "true" : "false") << std::endl;
 
 	wxString args = " -d";  // Always enable debug mode
 	wxString exePath;  // Path to the executable we'll create
@@ -104,10 +118,12 @@ wxThread::ExitCode BlitzCC::Entry(){
 #ifndef BB_MSVC
 	else {
 		// Non-Windows: GCC backend - use two-phase compilation
+		std::cout << "  Using GCC backend (host mode)" << std::endl;
 		wxFileName tempExe( path );
 		tempExe.ClearExt();
 		tempExe.Normalize( wxPATH_NORM_ABSOLUTE );
 		exePath = tempExe.GetFullPath();
+		std::cout << "  Output exe: " << exePath.ToStdString() << std::endl;
 
 		// Delete old executable before compiling to avoid running stale binary on error
 		if( wxFileExists( exePath ) ){
@@ -117,29 +133,39 @@ wxThread::ExitCode BlitzCC::Entry(){
 		// Phase 1: Blitz3D compilation (generate C code)
 		// Use -c flag to only generate C code and get the GCC command
 		wxString blitzArgs = " -d -c -o " + exePath + " " + path;
-		wxString blitzCmd = blitzpath + "/bin/blitzcc" + blitzArgs + " 2>&1";
+		// Set blitzpath environment variable for the child process
+		wxString blitzCmd = "blitzpath=\"" + blitzpath + "\" " + blitzpath + "/bin/blitzcc" + blitzArgs + " 2>&1";
+		std::cout << "  Blitz cmd: " << blitzCmd.ToStdString() << std::endl;
 
 		wxString gccCmd;
 		wxString cFile;
 
+		std::cout << "  Opening popen..." << std::endl;
 		FILE *fp = popen( blitzCmd.ToUTF8().data(), "r" );
 		if( !fp ){
+			std::cout << "  ERROR: popen failed!" << std::endl;
 			wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
 			return (wxThread::ExitCode)0;
 		}
+		std::cout << "  popen OK, reading output..." << std::endl;
 
 		char buffer[4096];
 		bool blitzError = false;
+		int lineCount = 0;
 		while( fgets( buffer, sizeof(buffer), fp ) != NULL ){
 			wxString line = wxString::FromUTF8( buffer );
 			line.Trim();
+			lineCount++;
+			std::cout << "  [" << lineCount << "] " << line.ToStdString() << std::endl;
 
 			if( line.size() > 0 ){
 				// Check for special output markers
 				if( line.StartsWith("C_FILE:") ){
 					cFile = line.Mid( 7 );  // Extract C file path
+					std::cout << "  -> Found C_FILE: " << cFile.ToStdString() << std::endl;
 				} else if( line.StartsWith("GCC_CMD:") ){
 					gccCmd = line.Mid( 8 );  // Extract GCC command
+					std::cout << "  -> Found GCC_CMD: " << gccCmd.ToStdString() << std::endl;
 				} else {
 					// Regular output - send to Blitz3D tab
 					wxCommandEvent event( BUILD_PROGRESS );
@@ -154,12 +180,16 @@ wxThread::ExitCode BlitzCC::Entry(){
 				}
 			}
 		}
+		std::cout << "  Read " << lineCount << " lines from blitzcc" << std::endl;
 
 		int status = pclose( fp );
 		int blitzResult = WEXITSTATUS( status );
+		std::cout << "  blitzcc exit code: " << blitzResult << std::endl;
+		std::cout << "  gccCmd empty: " << (gccCmd.IsEmpty() ? "yes" : "no") << std::endl;
 
 		// If Blitz3D compilation failed, stop here
 		if( blitzResult != 0 || blitzError || gccCmd.IsEmpty() ){
+			std::cout << "  Blitz3D compilation failed or no GCC_CMD found" << std::endl;
 			wxPostEvent( dest,wxCommandEvent( BUILD_END ) );
 			return (wxThread::ExitCode)0;
 		}

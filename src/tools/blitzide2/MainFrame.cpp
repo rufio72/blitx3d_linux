@@ -455,6 +455,10 @@ void MainFrame::OnRun( wxCommandEvent& WXUNUSED(event) ){
 	if( !file ){
 		file=dynamic_cast<FileView*>( nb->GetCurrentPage() );
 	}
+	if( !file ) return;
+
+	// Save file before running
+	if( !file->Save() ) return;
 
 	file->Execute( devices[deviceIdx],&prefs );
 }

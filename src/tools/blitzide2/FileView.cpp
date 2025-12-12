@@ -7,8 +7,12 @@
 #include "BlitzCC.h"
 
 enum {
-  MARGIN_LINE_NUMBERS
+  MARGIN_LINE_NUMBERS,
+  MARGIN_ERROR_MARKERS
 };
+
+// Marker number for error highlighting
+const int ERROR_MARKER = 0;
 
 static wxString keywordsList;
 static bool keywordsLoaded=false;
@@ -32,7 +36,7 @@ void FileView::LoadKeywords(){
   }
 }
 
-FileView::FileView( wxString &path,wxWindow *parent,wxWindowID id ):path(path),cc(0),wxPanel( parent,id ){
+FileView::FileView( wxString &path,wxWindow *parent,wxWindowID id ):path(path),cc(0),checkingExternal(false),wxPanel( parent,id ){
 	dirty=path.length()>0;
 
 	LoadKeywords();
@@ -85,6 +89,10 @@ FileView::FileView( wxString &path,wxWindow *parent,wxWindowID id ):path(path),c
 
 	text->SetMarginWidth( MARGIN_LINE_NUMBERS,25*2 );
 	text->SetMarginType( MARGIN_LINE_NUMBERS,wxSTC_MARGIN_NUMBER );
+
+	// Error marker - light red background for the entire line
+	text->MarkerDefine( ERROR_MARKER, wxSTC_MARK_BACKGROUND );
+	text->MarkerSetBackground( ERROR_MARKER, wxColour( 255, 180, 180 ) );  // Light red
 
 	text->SetLexer( wxSTC_LEX_BLITZBASIC );
 
@@ -165,6 +173,12 @@ void FileView::Open( wxString &path ){
 	}
 
 	text->SetText( source );
+
+	// Store file modification time for external change detection
+	wxFileName fn( path );
+	if( fn.FileExists() ){
+		storedModTime = fn.GetModificationTime();
+	}
 }
 
 bool FileView::Save(){
@@ -200,6 +214,9 @@ bool FileView::Save(){
 	dirty=false;
 	EmitDirtyEvent();
 
+	// Update stored modification time after save
+	UpdateStoredModTime();
+
 	return true;
 }
 
@@ -230,4 +247,59 @@ void FileView::EmitDirtyEvent(){
 	event.SetEventObject( this );
 	event.SetInt( dirty?1:0 );
 	ProcessWindowEvent( event );
+}
+
+void FileView::HighlightErrorLine( int line ){
+	// line is 1-based from compiler, wxSTC uses 0-based
+	if( line > 0 ){
+		text->MarkerAdd( line - 1, ERROR_MARKER );
+	}
+}
+
+void FileView::ClearErrorHighlights(){
+	text->MarkerDeleteAll( ERROR_MARKER );
+}
+
+void FileView::GotoLine( int line ){
+	// line is 1-based, wxSTC uses 0-based
+	if( line > 0 ){
+		text->GotoLine( line - 1 );
+		text->EnsureCaretVisible();
+	}
+}
+
+bool FileView::IsModifiedExternally(){
+	// Skip check if path is empty or we're already showing a prompt
+	if( path.IsEmpty() || checkingExternal ) return false;
+
+	wxFileName fn( path );
+	if( !fn.FileExists() ) return false;
+
+	wxDateTime currentModTime = fn.GetModificationTime();
+
+	// Check if file was modified after we loaded/saved it
+	if( storedModTime.IsValid() && currentModTime.IsValid() ){
+		return currentModTime > storedModTime;
+	}
+	return false;
+}
+
+void FileView::Reload(){
+	checkingExternal = true;
+
+	// Re-open the file
+	Open( path );
+	dirty = false;
+	EmitDirtyEvent();
+
+	checkingExternal = false;
+}
+
+void FileView::UpdateStoredModTime(){
+	if( !path.IsEmpty() ){
+		wxFileName fn( path );
+		if( fn.FileExists() ){
+			storedModTime = fn.GetModificationTime();
+		}
+	}
 }

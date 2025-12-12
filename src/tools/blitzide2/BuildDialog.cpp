@@ -12,13 +12,17 @@ wxBEGIN_EVENT_TABLE(BuildDialog, wxDialog)
 wxEND_EVENT_TABLE()
 
 BuildDialog::BuildDialog ( wxWindow * parent )
-	: wxDialog( parent, wxID_ANY, "Building...", wxDefaultPosition, wxSize(700, 450), wxCAPTION|wxRESIZE_BORDER|wxSTAY_ON_TOP )
+	: wxDialog( NULL, wxID_ANY, "Building...", wxDefaultPosition, wxSize(700, 450), wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER|wxDIALOG_NO_PARENT )
 	, hasErrors(false)
 	, buildFinished(false)
 	, inGccPhase(false)
+	, parentWindow(parent)
 {
-	wxSize pos = (parent->GetSize() - GetSize()) * 0.5;
-	SetPosition( parent->GetPosition() + wxPoint( pos.x, pos.y ) );
+	// Center on parent window
+	if( parent ){
+		wxSize pos = (parent->GetSize() - GetSize()) * 0.5;
+		SetPosition( parent->GetPosition() + wxPoint( pos.x, pos.y ) );
+	}
 
 	wxBoxSizer *mainSizer = new wxBoxSizer( wxVERTICAL );
 
@@ -139,7 +143,9 @@ void BuildDialog::SetBuildFinished( bool success ){
 }
 
 void BuildDialog::OnTerminate( wxCommandEvent & event ){
-	wxPostEvent( GetParent(), wxCommandEvent( BUILD_KILL ) );
+	if( parentWindow ){
+		wxPostEvent( parentWindow, wxCommandEvent( BUILD_KILL ) );
+	}
 }
 
 void BuildDialog::OnClose( wxCommandEvent & event ){

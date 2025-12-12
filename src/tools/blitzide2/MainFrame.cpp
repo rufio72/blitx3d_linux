@@ -370,8 +370,8 @@ void MainFrame::OnExit(wxCommandEvent& event){
 }
 
 void MainFrame::OnAbout(wxCommandEvent& event){
-  wxMessageBox( "...",
-                "About Blitz3D \"NG\"", wxOK | wxICON_INFORMATION );
+  wxMessageBox( "This project was originally developed by the magnificent Mark Sibly and is now maintained by rufio72.\n\nThe original project name has been kept: 'Blitz3D'.",
+                "About Blitz3D", wxOK | wxICON_INFORMATION );
 }
 
 void MainFrame::OnNew( wxCommandEvent& WXUNUSED(event) ){

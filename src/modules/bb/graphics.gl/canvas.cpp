@@ -497,8 +497,41 @@ void GLCanvas::image( BBCanvas *c,int x,int y,bool solid ){
 	GL( glDisable( GL_BLEND ) );
 }
 
+// Helper function to ensure collision pixel data is available
+static unsigned char* ensureCollisionPixels(GLCanvas *canvas) {
+	// First check if pixmap has data
+	if (canvas->pixmap && canvas->pixmap->bits) {
+		return (unsigned char*)canvas->pixmap->bits;
+	}
+
+	// If no pixmap but we have a texture, create pixmap and download data
+	if (canvas->texture && !canvas->pixmap) {
+		int w = canvas->getWidth();
+		int h = canvas->getHeight();
+
+		canvas->pixmap = new BBPixmap();
+		canvas->pixmap->format = PF_RGBA;
+		canvas->pixmap->width = w;
+		canvas->pixmap->height = h;
+		canvas->pixmap->depth = 32;
+		canvas->pixmap->pitch = w * 4;
+		canvas->pixmap->bpp = 4;
+		canvas->pixmap->trans = true;
+		canvas->pixmap->bits = new unsigned char[w * h * 4];
+
+		if (canvas->pixmap->bits) {
+			// Bind the texture and read pixels
+			glBindTexture(GL_TEXTURE_2D, canvas->texture);
+			glGetTexImage(GL_TEXTURE_2D, 0, GL_BGRA, GL_UNSIGNED_BYTE, canvas->pixmap->bits);
+			return (unsigned char*)canvas->pixmap->bits;
+		}
+	}
+
+	return nullptr;
+}
+
 bool GLCanvas::collide( int x,int y,const BBCanvas *src,int src_x,int src_y,bool solid ){
-	const GLCanvas *s = (const GLCanvas*)src;
+	GLCanvas *s = (GLCanvas*)src;
 
 	// Calculate bounding boxes using handle offsets
 	int x1 = x - handle_x;
@@ -512,7 +545,55 @@ bool GLCanvas::collide( int x,int y,const BBCanvas *src,int src_x,int src_y,bool
 	if (y1 + height <= y2) return false;
 	if (y2 + s->height <= y1) return false;
 
-	return true;
+	// If solid mode, bounding box collision is enough
+	if (solid) return true;
+
+	// For pixel-perfect collision, ensure we have pixel data
+	unsigned char *pixels1 = ensureCollisionPixels(const_cast<GLCanvas*>(this));
+	unsigned char *pixels2 = ensureCollisionPixels(s);
+
+	// If no pixel data available, fall back to bounding box collision
+	if (!pixels1 || !pixels2) {
+		return true;
+	}
+
+	// Pixel-perfect collision: check overlapping pixels
+	// Calculate the overlapping region in world coordinates
+	int overlap_left = (x1 > x2) ? x1 : x2;
+	int overlap_top = (y1 > y2) ? y1 : y2;
+	int overlap_right = ((x1 + width) < (x2 + s->width)) ? (x1 + width) : (x2 + s->width);
+	int overlap_bottom = ((y1 + height) < (y2 + s->height)) ? (y1 + height) : (y2 + s->height);
+
+	bool collision = false;
+
+	// Check each pixel in the overlapping region
+	for (int wy = overlap_top; wy < overlap_bottom && !collision; wy++) {
+		for (int wx = overlap_left; wx < overlap_right && !collision; wx++) {
+			// Convert world coordinates to local coordinates for each image
+			int local_x1 = wx - x1;
+			int local_y1 = wy - y1;
+			int local_x2 = wx - x2;
+			int local_y2 = wy - y2;
+
+			// Get alpha values from pixmap (BGRA format, Y may be flipped depending on source)
+			// For textures created from images drawn to canvas, Y is flipped
+			int fy1 = height - 1 - local_y1;
+			int fy2 = s->height - 1 - local_y2;
+
+			unsigned char *p1 = pixels1 + (fy1 * width + local_x1) * 4;
+			unsigned char *p2 = pixels2 + (fy2 * s->width + local_x2) * 4;
+
+			unsigned char alpha1 = p1[3];
+			unsigned char alpha2 = p2[3];
+
+			// Collision if both pixels are non-transparent
+			if (alpha1 > 0 && alpha2 > 0) {
+				collision = true;
+			}
+		}
+	}
+
+	return collision;
 }
 
 bool GLCanvas::rect_collide( int x,int y,int rect_x,int rect_y,int rect_w,int rect_h,bool solid ){
@@ -526,7 +607,46 @@ bool GLCanvas::rect_collide( int x,int y,int rect_x,int rect_y,int rect_w,int re
 	if (y1 + height <= rect_y) return false;
 	if (rect_y + rect_h <= y1) return false;
 
-	return true;
+	// If solid mode, bounding box collision is enough
+	if (solid) return true;
+
+	// For pixel-perfect collision, ensure we have pixel data
+	unsigned char *pixels1 = ensureCollisionPixels(const_cast<GLCanvas*>(this));
+
+	// If no pixel data available, fall back to bounding box collision
+	if (!pixels1) {
+		return true;
+	}
+
+	// Pixel-perfect collision: check overlapping pixels against the rectangle
+	// Calculate the overlapping region in world coordinates
+	int overlap_left = (x1 > rect_x) ? x1 : rect_x;
+	int overlap_top = (y1 > rect_y) ? y1 : rect_y;
+	int overlap_right = ((x1 + width) < (rect_x + rect_w)) ? (x1 + width) : (rect_x + rect_w);
+	int overlap_bottom = ((y1 + height) < (rect_y + rect_h)) ? (y1 + height) : (rect_y + rect_h);
+
+	bool collision = false;
+
+	// Check each pixel in the overlapping region
+	for (int wy = overlap_top; wy < overlap_bottom && !collision; wy++) {
+		for (int wx = overlap_left; wx < overlap_right && !collision; wx++) {
+			// Convert world coordinates to local coordinates for the image
+			int local_x = wx - x1;
+			int local_y = wy - y1;
+
+			// Get alpha value (Y is flipped for texture data)
+			int fy = height - 1 - local_y;
+			unsigned char *p = pixels1 + (fy * width + local_x) * 4;
+			unsigned char alpha = p[3];
+
+			// Collision if pixel is non-transparent (rect is always solid)
+			if (alpha > 0) {
+				collision = true;
+			}
+		}
+	}
+
+	return collision;
 }
 
 bool GLCanvas::lock(){

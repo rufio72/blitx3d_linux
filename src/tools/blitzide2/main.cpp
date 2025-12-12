@@ -1,5 +1,7 @@
 #include <wx/wxprec.h>
 #include <wx/cmdline.h>
+#include <wx/stdpaths.h>
+#include <wx/filename.h>
 #ifndef WX_PRECOMP
 	#include <wx/wx.h>
 #endif
@@ -7,6 +9,19 @@
 #include "dpi.h"
 
 wxString blitzpath;
+
+// Auto-detect blitzpath from executable location
+// Executable is in _release/bin/ide2, so blitzpath is parent of bin/
+static wxString detectBlitzPath() {
+	wxFileName exePath(wxStandardPaths::Get().GetExecutablePath());
+	exePath.MakeAbsolute();
+	// Get directory containing executable (bin/)
+	wxString binDir = exePath.GetPath();
+	// Go up one level to get _release/ using simple string manipulation
+	wxFileName parentDir = wxFileName::DirName(binDir);
+	parentDir.RemoveLastDir();
+	return parentDir.GetPath(wxPATH_GET_VOLUME);
+}
 
 class MyApp : public wxApp{
 private:
@@ -27,8 +42,16 @@ bool MyApp::OnInit(){
 		return false;
 	}
 
+	// Try environment variable first, then auto-detect from executable location
 	if( !wxGetEnv( "blitzpath",&blitzpath ) || blitzpath.length()==0 ){
-		wxMessageBox( "blitzpath not set", "Blitz3D \"NG\"",wxOK|wxICON_ERROR );
+		blitzpath = detectBlitzPath();
+	}
+
+	// Verify blitzpath is valid (check for bin/blitzcc)
+	wxString blitzccPath = blitzpath + "/bin/blitzcc";
+	if( !wxFileExists( blitzccPath ) ){
+		wxMessageBox( "Could not find blitzcc compiler at:\n" + blitzccPath + "\n\nDetected blitzpath: " + blitzpath,
+			"Blitz3D \"NG\"", wxOK|wxICON_ERROR );
 		return false;
 	}
 

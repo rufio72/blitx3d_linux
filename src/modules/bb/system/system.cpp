@@ -28,9 +28,8 @@ BBSystemDriver *bbSystemDriver=0;
 
 void BBCALL bbRuntimeError( BBStr *str ){
 	std::string t=*str;delete str;
-	if( t.size()>255 ) t[255]=0;
 	static char err[256];
-	strcpy( err,t.c_str() );
+	snprintf( err, sizeof(err), "%s", t.c_str() );
 	RTEX( err );
 }
 

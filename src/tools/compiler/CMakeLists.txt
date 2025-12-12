@@ -1,9 +1,10 @@
 set (CMAKE_EXECUTABLE_SUFFIX_ )
 
-# Option to use GCC backend instead of LLVM
-option(USE_GCC_BACKEND "Use GCC/Clang C backend instead of LLVM" OFF)
+# Backend selection: GCC is default, LLVM is optional
+option(USE_GCC_BACKEND "Use GCC/Clang C backend (default)" ON)
+option(USE_LLVM "Use LLVM backend instead of GCC (requires LLVM 19)" OFF)
 
-if(BB64 AND NOT BB_MINGW AND NOT USE_GCC_BACKEND)
+if(BB64 AND NOT BB_MINGW AND USE_LLVM)
   set(REQUIRED_LLVM_VERSION 19)
 
   set(LLVM_KNOWN_PATHS
@@ -24,15 +25,21 @@ if(BB64 AND NOT BB_MINGW AND NOT USE_GCC_BACKEND)
   endif()
   find_package(LLD PATHS ${LLVM_KNOWN_PATHS} NO_DEFAULT_PATH)
 
-  # If LLVM not found, fall back to GCC backend
+  # If LLVM requested but not found, show clear error
   if(NOT LLVM_FOUND OR NOT LLD_FOUND)
-    message(STATUS "LLVM/LLD not found, using GCC backend")
-    set(USE_GCC_BACKEND ON)
+    message(FATAL_ERROR "USE_LLVM=ON but LLVM 19 or LLD not found. Install LLVM 19 or disable USE_LLVM.")
   endif()
+
+  # Disable GCC backend when LLVM is active
+  set(USE_GCC_BACKEND OFF)
 endif()
 
-# Force GCC backend for non-64-bit or MinGW builds
+# Force GCC backend for non-64-bit or MinGW builds (LLVM not supported)
 if(NOT BB64 OR BB_MINGW)
+  if(USE_LLVM)
+    message(WARNING "LLVM not supported on 32-bit or MinGW builds, using GCC backend")
+  endif()
+  set(USE_LLVM OFF)
   set(USE_GCC_BACKEND ON)
 endif()
 

@@ -1,0 +1,113 @@
+================================================================================
+DEBUG CUBEMAP - Riflessioni Acqua cubewater.bb
+Aggiornato: 19 Dicembre 2025 - SESSIONE 3 (FINALE)
+================================================================================
+
+STATUS: BUG APERTO - Il riflesso cubemap mostra la direzione sbagliata
+
+================================================================================
+SINTOMO
+================================================================================
+
+Il riflesso sull'acqua mostra quello che c'è DIETRO la camera invece di quello
+che c'è SOPRA l'acqua. Le lampade e la porta (dietro) sono visibili nel
+riflesso, ma il cubo rosso posizionato sopra la piscina non appare.
+
+================================================================================
+TEST EFFETTUATO
+================================================================================
+
+Creato test_arrow.bb per visualizzare la direzione del vettore R:
+- Freccia verde = direzione calcolata con R = reflect(I, N)
+- Formula: I = normalize(punto - camera), R = I - 2*dot(I,N)*N
+
+RISULTATO TEST: La freccia verde punta CORRETTAMENTE verso l'alto (cubo rosso)
+quando la camera guarda l'acqua dall'alto.
+
+CONCLUSIONE: La formula matematica è corretta. Il problema è ALTROVE.
+
+================================================================================
+POSSIBILI CAUSE DEL BUG
+================================================================================
+
+1. NORMALI DELL'ACQUA IN CUBEWATER.BB
+   - Il file water.3ds potrebbe avere normali invertite
+   - L'animazione delle onde modifica le Y: VertexCoords s,i,x,-y,z
+   - UpdateNormals viene chiamato ma potrebbe non funzionare correttamente
+
+2. COORDINATE NEL SHADER
+   - bbVertex_WorldPosition potrebbe avere valori sbagliati
+   - bbCameraPos potrebbe non arrivare correttamente
+   - Mismatch tra sistema Blitz3D e OpenGL (Z negata in alcuni posti)
+
+3. ORDINE FACCE CUBEMAP
+   - _cube_order[] in canvas.cpp mappa le facce Blitz -> OpenGL
+   - Potrebbe esserci un errore nella mappatura
+   - La faccia UP (4) dovrebbe contenere il cubo rosso
+
+4. CATTURA CUBEMAP
+   - FXCamera cattura le 6 facce con angolazioni specifiche
+   - Face 4 (up): RotateEntity FXCamera, -90, 0, 0
+   - Verificare che il cubo rosso sia effettivamente catturato
+
+================================================================================
+MODIFICHE IMPLEMENTATE (da mantenere)
+================================================================================
+
+1. blitz3d.gl.cpp - Aggiunto uniform bbCameraPos:
+   - struct uniform_locs { ... GLint camera_pos; }
+   - glGetUniformLocation(defaultProgram, "bbCameraPos")
+   - glUniform3f in setViewMatrix() passa camera position
+
+2. default.glsl - Aggiunto supporto camera position:
+   - uniform vec3 bbCameraPos;
+   - SampleCube() usa bbCameraPos per calcolare I
+
+================================================================================
+CODICE ATTUALE SAMPLECUBE (da verificare/correggere)
+================================================================================
+
+```glsl
+vec4 SampleCube( samplerCube tex ){
+  vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
+  vec3 N = normalize(bbVertex_WorldNormal);
+  vec3 R = reflect(I, N);
+  R.z = -R.z;  // Conversione coordinate?
+  return texture(tex, R);
+}
+```
+
+================================================================================
+PROSSIMI PASSI PER RISOLVERE
+================================================================================
+
+1. Verificare le normali dell'acqua in cubewater.bb
+   - Aggiungere debug visivo delle normali (colore = normale)
+   - Controllare se puntano verso l'alto o sono invertite
+
+2. Salvare le 6 facce della cubemap come BMP
+   - Verificare che face 4 (UP) contenga il cubo rosso
+
+3. Aggiungere freccia di debug direttamente in cubewater.bb
+   - Vedere se lì il calcolo R dà risultati diversi
+
+4. Controllare bbVertex_WorldPosition e bbCameraPos
+   - Debug nello shader: mostrare valori come colori
+
+================================================================================
+FILE COINVOLTI
+================================================================================
+
+Shader e rendering:
+- src/modules/bb/blitz3d.gl/default.glsl (SampleCube)
+- src/modules/bb/blitz3d.gl/blitz3d.gl.cpp (uniform bbCameraPos)
+- src/modules/bb/graphics.gl/canvas.cpp (_cube_order[])
+
+Demo:
+- _release/samples/mak/cubewater/cubewater.bb
+- _release/samples/mak/cubewater/level/water.3ds
+
+Test:
+- _release/samples/mak/cubewater/test_arrow.bb (test direzione R)
+
+================================================================================

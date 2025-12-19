@@ -4,7 +4,8 @@ precision highp int;
 uniform mat4 bbProjMatrix;
 uniform mat4 bbViewMatrix;
 uniform mat4 bbWorldMatrix;
-uniform mat3 bbNormalMatrix; // Optimization #4: Precomputed on CPU
+uniform mat3 bbNormalMatrix; // Optimization #4
+uniform vec3 bbCameraPos;    // Camera world position for reflections
 
 uniform sampler2D bbTexture[8];
 uniform samplerCube bbTextureCube[8];
@@ -15,6 +16,8 @@ uniform samplerCube bbTextureCube[8];
 struct BBLightData {
   mat4 TForm;
   vec4 Color;
+  vec4 Position;  // xyz = world position, w = type (1=directional, 2=point, 3=spot)
+  vec4 Params;    // x = range, y = inner_cone, z = outer_cone, w = unused
 } ;
 
 layout(std140) uniform BBLightState {
@@ -53,6 +56,8 @@ layout(std140) uniform BBRenderState {
 #endif
 
 varying vec3 bbVertex_Position;
+varying vec3 bbVertex_WorldPosition;
+varying vec3 bbVertex_WorldNormal;
 varying vec4 bbVertex_Color;
 varying vec3 bbVertex_Normal;
 varying vec2 bbVertex_TexCoord[8];
@@ -108,6 +113,11 @@ void main() {
 
   bbVertex_Position = bbPosition;
 
+  // Calculate world space position and normal for cubemap reflections
+  vec4 worldPos = bbWorldMatrix * vec4(bbPosition, 1.0);
+  bbVertex_WorldPosition = worldPos.xyz;
+  bbVertex_WorldNormal = normalize(mat3(bbWorldMatrix) * bbNormal);
+
   gl_Position = bbModelViewProjectionMatrix * vec4(bbPosition, 1.0);
 
   vec3 EyeNormal = bbNormalMatrix * bbNormal;
@@ -132,25 +142,51 @@ void main() {
     bbMaterialColor = RS.BrushColor;
   }
 
-  if( RS.FullBright==0 ){
-    bbVertex_Normal = normalize( EyeNormal );
+  // Always pass normal for cubemap reflections (even with fullbright)
+  bbVertex_Normal = normalize( EyeNormal );
 
+  if( RS.FullBright==0 ){
     vec4 Diffuse=vec4( 0.0 ),Specular=vec4( 0.0 );
+
+    // Get vertex position in view space for point light calculations
+    vec3 vertexViewPos = (bbModelViewMatrix * vec4(bbPosition, 1.0)).xyz;
 
     for( int i=0;i<LS.LightsUsed;i++ ){
       float nDotVP,nDotHV,pf;
+      float attenuation = 1.0;
+      vec3 LightDir;
 
-      vec3 LightPos=normalize( mat3( bbViewMatrix*LS.Light[i].TForm*rotationMatrix( vec3(1.0,0.0,0.0), 1.5708 ) )*vec3(0.0,1.0,0.0) );
-      vec3 halfVector = normalize( LightPos+vec3( 0.0,0.0,-1.0 ));
+      int lightType = int(LS.Light[i].Position.w);
+      float lightRange = LS.Light[i].Params.x;
 
-      nDotVP = max( 0.0,dot( bbVertex_Normal,LightPos ) );
-      nDotHV = max( 0.0,dot( bbVertex_Normal,vec3( halfVector )));
-      pf = pow( nDotHV,100.0 )*float(nDotVP!=0.0);
+      if( lightType == 1 ){
+        // Directional light
+        LightDir = normalize( mat3( bbViewMatrix*LS.Light[i].TForm*rotationMatrix( vec3(1.0,0.0,0.0), 1.5708 ) )*vec3(0.0,1.0,0.0) );
+      } else {
+        // Point light (type 2) or Spot light (type 3)
+        vec3 lightWorldPos = LS.Light[i].Position.xyz;
+        vec3 lightViewPos = (bbViewMatrix * vec4(lightWorldPos, 1.0)).xyz;
+        vec3 lightToVertex = vertexViewPos - lightViewPos;
+        float distance = length(lightToVertex);
+        LightDir = -normalize(lightToVertex);
+
+        // Attenuation based on range
+        if( lightRange > 0.0 ){
+          attenuation = clamp(1.0 - (distance / lightRange), 0.0, 1.0);
+          attenuation = attenuation * attenuation; // Quadratic falloff
+        }
+      }
+
+      vec3 halfVector = normalize( LightDir + vec3( 0.0, 0.0, -1.0 ));
+
+      nDotVP = max( 0.0, dot( bbVertex_Normal, LightDir ) );
+      nDotHV = max( 0.0, dot( bbVertex_Normal, vec3( halfVector )));
+      pf = pow( nDotHV, 100.0 ) * float(nDotVP != 0.0);
 
       // Limit light contribution to prevent over-saturation
       vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
-      Diffuse  += lightColor * nDotVP;
-      Specular += lightColor * pf;
+      Diffuse  += lightColor * nDotVP * attenuation;
+      Specular += lightColor * pf * attenuation;
     }
 
     bbVertex_Color = RS.Ambient * bbMaterialColor +
@@ -188,8 +224,19 @@ vec4 Sample2D( sampler2D tex,int i ){
 }
 
 vec4 SampleCube( samplerCube tex ){
-  vec3 coord = normalize(vec3(bbVertex_Position.x,-bbVertex_Position.y,bbVertex_Position.z));
-  return texture( tex,coord );
+  // View direction: from camera to fragment (in world space)
+  vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
+
+  // Normal in world space
+  vec3 N = normalize(bbVertex_WorldNormal);
+
+  // Reflection vector
+  vec3 R = reflect(I, N);
+
+  // BUG: Il riflesso mostra direzione sbagliata - vedi DEBUG_CUBEMAP_REPORT.txt
+  R.z = -R.z;
+
+  return texture(tex, R);
 }
 
 vec4 Blend( vec4 t0,vec4 t1,int i ){
@@ -208,7 +255,13 @@ void main() {
   // TODO: ES doesn't allow dynamic indexing of uniforms
   // so this (should) force the various compilers to unroll.
   #define ProcessTexture(i) if( i<RS.TexturesUsed ) bbFragColor=Blend( bbFragColor,RS.Texture[i].CubeMap!=1?Sample2D(bbTexture[i],i):SampleCube(bbTextureCube[i]),i );
-  ProcessTexture(0);
+
+  // For cubemaps, use direct sampling without blend
+  if( 0<RS.TexturesUsed && RS.Texture[0].CubeMap==1 ){
+    bbFragColor = SampleCube(bbTextureCube[0]);
+  } else {
+    ProcessTexture(0);
+  }
   ProcessTexture(1);
   ProcessTexture(2);
   ProcessTexture(3);

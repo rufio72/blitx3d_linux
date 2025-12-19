@@ -133,7 +133,7 @@ public:
 		const Surface::Vertex *v=(const Surface::Vertex*)_v;
 		float coords[3]={ v->coords.x,v->coords.y,v->coords.z };
 		float normal[3]={ v->normal.x,v->normal.y,v->normal.z };
-		setVertex( n,coords,normal,0xffffff,v->tex_coords );
+		setVertex( n,coords,normal,v->color,v->tex_coords );
 	}
 
 	void setVertex( int n,const float coords[3],const float normal[3],const float tex_coords[2][2] ){
@@ -160,9 +160,12 @@ struct LightState{
 	struct LightData{
 		float mat[16];
 		float color[4];
+		float position[4];  // xyz = position, w = type (1=directional, 2=point, 3=spot)
+		float params[4];    // x = range, y = inner_cone, z = outer_cone, w = unused
 	} data[8];
 
 	int lights_used;
+	int padding[3]; // Align to 16 bytes
 };
 
 struct UniformState{
@@ -203,6 +206,7 @@ private:
 		GLint view_matrix = -1;
 		GLint world_matrix = -1;
 		GLint normal_matrix = -1; // Optimization #4
+		GLint camera_pos = -1;    // For cubemap reflections
 	} uniform_locs;
 
 	// Cached view matrix for normal matrix calculation (optimization #4)
@@ -233,30 +237,17 @@ private:
 			memcpy( ls.data[i].mat,lights[i]->matrix,sizeof(ls.data[i].mat) );
 			ls.data[i].color[0]=lights[i]->r;ls.data[i].color[1]=lights[i]->g;ls.data[i].color[2]=lights[i]->b;ls.data[i].color[3]=1.0;
 
-			float z=1.0f,w=0.0f;
-			if( lights[i]->type!=Light::LIGHT_DISTANT ){
-				z=0.0f;
-				w=1.0f;
-			}
+			// Extract light position from matrix (translation component)
+			ls.data[i].position[0]=lights[i]->matrix[12];
+			ls.data[i].position[1]=lights[i]->matrix[13];
+			ls.data[i].position[2]=lights[i]->matrix[14];
+			ls.data[i].position[3]=(float)lights[i]->type; // 1=directional, 2=point, 3=spot
 
-			float pos[]={ 0.0,0.0,z,w };
-			// glLightfv( GL_LIGHT0+i,GL_POSITION,pos );
-
-			if( lights[i]->type!=Light::LIGHT_DISTANT ){
-				float light_range[]={ 0.0f };
-				float range[]={ lights[i]->range };
-				// glLightfv( GL_LIGHT0+i,GL_CONSTANT_ATTENUATION,light_range );
-				// glLightfv( GL_LIGHT0+i,GL_LINEAR_ATTENUATION,range );
-			}
-
-			if( lights[i]->type==Light::LIGHT_SPOT ){
-				float dir[]={ 0.0f,0.0f,-1.0f };
-				float outer[]={ lights[i]->outer_angle/2.0f };
-				float exponent[]={ 10.0f };
-				// glLightfv( GL_LIGHT0+i,GL_SPOT_DIRECTION,dir );
-				// glLightfv( GL_LIGHT0+i,GL_SPOT_CUTOFF,outer );
-				// glLightfv( GL_LIGHT0+i,GL_SPOT_EXPONENT,exponent );
-			}
+			// Light parameters
+			ls.data[i].params[0]=lights[i]->range;
+			ls.data[i].params[1]=lights[i]->inner_angle;
+			ls.data[i].params[2]=lights[i]->outer_angle;
+			ls.data[i].params[3]=0.0f;
 		}
 
 		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData
@@ -415,6 +406,16 @@ public:
 
 		// Optimization #1: Use cached uniform location
 		GL( glUniformMatrix4fv( uniform_locs.view_matrix,1,GL_FALSE,mat ) );
+
+		// Pass camera world position for cubemap reflections
+		// The Matrix contains the camera's world transform, so elements[3][x] is position
+		// Use original coordinates (not negated) to match bbVertex_WorldPosition
+		if( matrix ){
+			GL( glUniform3f( uniform_locs.camera_pos,
+				matrix->elements[3][0],
+				matrix->elements[3][1],
+				matrix->elements[3][2] ) );
+		}
 	}
 
 	void setWorldMatrix( const Matrix *matrix ){
@@ -604,13 +605,17 @@ public:
 				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,flags&BBCanvas::CANVAS_TEX_CLAMPU?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
 				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,flags&BBCanvas::CANVAS_TEX_CLAMPV?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
 
-				if( flags&BBCanvas::CANVAS_TEX_ALPHA ){
+				// Only enable alpha test for masked textures when NOT using alpha blending
+				// For BLEND_ALPHA/BLEND_ADD sprites (like glow), we want smooth blending
+				if( flags&BBCanvas::CANVAS_TEX_ALPHA && blend==BLEND_REPLACE ){
 					us.alpha_test=1;
 				}
 
 				us.texs[us.texs_used].blend=ts.blend;
 				us.texs[us.texs_used].sphere_map=flags&BBCanvas::CANVAS_TEX_SPHERE?1:0;
-				us.texs[us.texs_used].cube_map=flags&BBCanvas::CANVAS_TEX_CUBE?1:0;
+				// Check both flag and target for cubemap
+				int is_cube = (flags&BBCanvas::CANVAS_TEX_CUBE) || (canvas->target == GL_TEXTURE_CUBE_MAP);
+				us.texs[us.texs_used].cube_map=is_cube?1:0;
 				us.texs[us.texs_used].flags=ts.flags;
 
 				us.texs_used++;
@@ -692,6 +697,7 @@ public:
 			uniform_locs.view_matrix = GL( glGetUniformLocation( defaultProgram,"bbViewMatrix" ) );
 			uniform_locs.world_matrix = GL( glGetUniformLocation( defaultProgram,"bbWorldMatrix" ) );
 			uniform_locs.normal_matrix = GL( glGetUniformLocation( defaultProgram,"bbNormalMatrix" ) );
+			uniform_locs.camera_pos = GL( glGetUniformLocation( defaultProgram,"bbCameraPos" ) );
 		}
 
 		GL( glUseProgram( defaultProgram ) );

@@ -1,0 +1,137 @@
+================================================================================
+CUBEMAP REFLECTION - Riferimento Implementazione
+Aggiornato: 22 Dicembre 2025
+================================================================================
+
+================================================================================
+IMPLEMENTAZIONE STANDARD (da fonti online)
+================================================================================
+
+Fragment Shader per riflessioni cubemap (LearnOpenGL):
+
+```glsl
+uniform vec3 cameraPos;
+uniform samplerCube skybox;
+
+in vec3 Position;   // World position del fragment
+in vec3 Normal;     // World normal
+
+void main() {
+    vec3 I = normalize(Position - cameraPos);
+    vec3 R = reflect(I, normalize(Normal));
+    FragColor = texture(skybox, R);
+}
+```
+
+================================================================================
+PROBLEMA SISTEMA COORDINATE (CRITICO)
+================================================================================
+
+Il problema principale è il mismatch tra sistemi di coordinate:
+
+1. OpenGL WORLD SPACE: RIGHT-HANDED
+   - +X = destra
+   - +Y = alto
+   - +Z = VERSO l'osservatore (backward)
+
+2. OpenGL CUBEMAP: LEFT-HANDED (standard RenderMan/Direct3D)
+   - +X = destra
+   - +Y = alto
+   - +Z = LONTANO dall'osservatore (forward)
+
+CONSEGUENZA: Il vettore R calcolato in world space deve essere convertito
+per campionare correttamente la cubemap.
+
+SOLUZIONI TROVATE ONLINE:
+- "Cubemap textures in OpenGL are stored in left hand coordinate system,
+   not right hand like OpenGL camera so X should be flipped"
+- "One fix is to flip the coordinate system in shader by negating the
+   Z component"
+
+================================================================================
+NOSTRA IMPLEMENTAZIONE ATTUALE
+================================================================================
+
+File: src/modules/bb/blitz3d.gl/default.glsl
+
+```glsl
+vec4 SampleCube( samplerCube tex ){
+  vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
+
+  vec3 N = normalize(bbVertex_WorldNormal);
+  N.y = -N.y;  // Workaround per cubewater.bb (specifico!)
+
+  vec3 R = reflect(I, N);
+
+  R.z = -R.z;  // Conversione right-handed -> left-handed
+
+  return texture(tex, R);
+}
+```
+
+================================================================================
+DIFFERENZE CON LO STANDARD
+================================================================================
+
+1. N.y = -N.y
+   - NON è nello standard
+   - Workaround per bug in cubewater.bb (riga 494 usa -Y)
+   - PROBLEMA: Potrebbe rompere altri programmi Blitz3D
+
+2. R.z = -R.z
+   - Corrisponde a una delle soluzioni standard
+   - Necessario per conversione coordinate
+   - Alcune fonti suggeriscono R.x = -R.x invece
+
+================================================================================
+ORDINE FACCE CUBEMAP
+================================================================================
+
+OPENGL (ordine numerico degli enum):
+  0: GL_TEXTURE_CUBE_MAP_POSITIVE_X  (+X, right)
+  1: GL_TEXTURE_CUBE_MAP_NEGATIVE_X  (-X, left)
+  2: GL_TEXTURE_CUBE_MAP_POSITIVE_Y  (+Y, top)
+  3: GL_TEXTURE_CUBE_MAP_NEGATIVE_Y  (-Y, bottom)
+  4: GL_TEXTURE_CUBE_MAP_POSITIVE_Z  (+Z, back in left-handed)
+  5: GL_TEXTURE_CUBE_MAP_NEGATIVE_Z  (-Z, front in left-handed)
+
+BLITZ3D SetCubeFace:
+  0: Sinistra  (-X)
+  1: Avanti    (+Z in Blitz = -Z in OpenGL)
+  2: Destra    (+X)
+  3: Indietro  (-Z in Blitz = +Z in OpenGL)
+  4: Sopra     (+Y)
+  5: Sotto     (-Y)
+
+NOSTRO MAPPING (_cube_order[] in canvas.cpp):
+  Blitz 0 -> GL_TEXTURE_CUBE_MAP_NEGATIVE_X
+  Blitz 1 -> GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
+  Blitz 2 -> GL_TEXTURE_CUBE_MAP_POSITIVE_X
+  Blitz 3 -> GL_TEXTURE_CUBE_MAP_POSITIVE_Z
+  Blitz 4 -> GL_TEXTURE_CUBE_MAP_POSITIVE_Y
+  Blitz 5 -> GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
+
+================================================================================
+RISULTATI TEST
+================================================================================
+
+| N.y flip | R.x flip | R.z flip | Risultato |
+|----------|----------|----------|-----------|
+| NO       | NO       | NO       | Riflesso indietro (bug) |
+| SI       | NO       | NO       | Normali OK, riflesso indietro |
+| SI       | NO       | SI       | "Va molto meglio" (MIGLIORE) |
+| SI       | SI       | NO       | Riflesso torna indietro |
+| SI       | SI       | SI       | Cubo non si riflette |
+| NO       | NO       | SI       | Cubo non si riflette |
+
+================================================================================
+FONTI
+================================================================================
+
+- https://learnopengl.com/Advanced-OpenGL/Cubemaps
+- https://antongerdelan.net/opengl/cubemaps.html
+- https://webglfundamentals.org/webgl/lessons/webgl-environment-maps.html
+- https://community.khronos.org/t/image-orientation-for-cubemaps-actually-a-very-old-topic/105338
+- https://kippykip.com/b3ddocs/commands/3d_commands/SetCubeFace.htm
+
+================================================================================

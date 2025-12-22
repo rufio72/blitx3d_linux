@@ -43,11 +43,10 @@ End Type
 ;----------------------------------------------------------------------------------
 
 Global info1$="Cube mapped water effect"
-Global info2$="Mouse to look around, W/A/S/Z to move"
+Global info2$="Arrows/WASD to move, Q/E to turn, R/F to look up/down"
 
 Include "../start.bb"
 
-HidePointer
 AmbientLight 12,12,12
 player=CreatePivot()
 floorpivot=CreatePivot()
@@ -55,14 +54,20 @@ camera=CreateCamera(player)
 CameraClsMode camera,False,True
 
 MoveEntity camera,0,1.2,0
-PositionEntity player,-52,8,353
+PositionEntity player,0,8,0
 CameraFogMode camera,1
 CameraFogColor camera,100,200,255
 
 FXCamera=CreateCamera()
-CameraClsMode FXCamera,False,True
+CameraClsMode FXCamera,True,True
+CameraClsColor FXCamera,100,200,255  ; same as fog color
 CameraProjMode FXCamera,0
 CameraViewport FXCamera,0,0,WaterMapSize,WaterMapSize
+CameraRange FXCamera,0.1,1000
+CameraZoom FXCamera,1.0  ; FOV 90 degrees for cubemap
+CameraFogMode FXCamera,1
+CameraFogColor FXCamera,100,200,255
+CameraFogRange FXCamera,1,500
 
 ;SET UP FIRE
 Global fire=LoadTexture("level/fire.png",2+48)
@@ -91,6 +96,7 @@ For d.deletelist=Each deletelist
 		PositionEntity firelight(lcount),EntityX(d\ent),EntityY(d\ent),EntityZ(d\ent)
 		newsprite=CopyEntity(firesprite)
 		PositionEntity newsprite,EntityX(d\ent),EntityY(d\ent)+1.5,EntityZ(d\ent)
+		EntityColor newsprite,255,255,255
 	EndIf
 	
 	lcount=lcount+1
@@ -107,9 +113,23 @@ WaterMapTexture=CreateTexture(WaterMapSize,WaterMapSize,128+256+48)
 EntityTexture water,WaterMapTexture
 EntityColor water,100,200,255
 EntityColor water,512,512,512
-EntityAlpha water,0.7
+EntityAlpha water,1.0  ; TEST: opaco per vedere se riflesso appare sulla superficie
 EntityFX water,1
 AddEntity(water)
+
+; RED SQUARE ABOVE POOL for testing reflections
+Global redSquare, redLight
+redSquare = CreateCube()
+ScaleEntity redSquare, 8, 0.3, 8  ; flat and reasonably sized
+PositionEntity redSquare, 0, 25, -145  ; higher and further back
+EntityColor redSquare, 255, 0, 0  ; bright red
+EntityFX redSquare, 1  ; fullbright so it glows
+
+; Red light to illuminate surroundings
+redLight = CreateLight(2)  ; point light
+PositionEntity redLight, 0, 23, -145  ; just below the square
+LightColor redLight, 255, 50, 50  ; red light
+LightRange redLight, 60  ; decent range
 
 Type Vertices
 	Field x#
@@ -158,10 +178,10 @@ EntityRadius floorpivot,4
 
 mainlight=CreateLight()
 RotateEntity mainlight,45,45,45
-LightColor mainlight,128,128,128
+LightColor mainlight,200,200,200
 
-RotateEntity player,0,180,0
-MoveMouse GraphicsWidth()/2,GraphicsHeight()/2
+RotateEntity player,0,0,0
+camyaw = 0
 VWait : Flip
 
 ;MAINLOOP
@@ -178,7 +198,7 @@ While Not KeyHit(1)
 	glow#=Cos(MilliSecs())
 	lum#=(Abs(glow*Sin(glow))*255)*0.8
 	For i=0 To 6
-		LightColor firelight(i),220+lum,160+lum/2,100+lum/3
+		LightColor firelight(i),200+lum,200+lum,200+lum
 		LightRange firelight(i),((lum*1.8)+32)
 	Next
 	UpdateWorld
@@ -287,13 +307,13 @@ End Function
 
 ;--------------------------------------------------------------------------------------------
 Function CreateLayer()
-	l.layer=New layer	
+	l.layer=New layer
 	l\mesh=CreateMesh() : surf=CreateSurface(l\mesh)
 	l\spritebank=CreateBank()
 	NameEntity l\mesh,Handle(l)
 	EntityColor l\mesh,255,255,255
 	EntityFX l\mesh,1+2
-	EntityBlend l\mesh,3
+	EntityBlend l\mesh,1
 	Return l\mesh
 End Function
 ;--------------------------------------------------------------------------------------------
@@ -384,7 +404,7 @@ Function RenderWater()
 		EndIf
 		waterdirection=1
 		
-		PositionEntity FXCamera,EntityX(player),EntityY(water)-2,EntityZ(player)
+		PositionEntity FXCamera,EntityX(player),EntityY(water),EntityZ(player)  ; Follow player XZ position
 
 		
 		
@@ -426,7 +446,7 @@ Function RenderWater()
 		EndIf	
 		waterdirection=-1
 		
-		PositionEntity FXCamera,-EntityX(player),EntityY(player)-2,EntityZ(player)
+		PositionEntity FXCamera,0,EntityY(player)-2,-145  ; Center of pool for underwater
 		
 		
 		If wdb
@@ -548,31 +568,38 @@ End Function
 
 Function freelook()
 
-	mxspd#=MouseXSpeed()*0.25
-	myspd#=MouseYSpeed()*0.25
-	
-	If underwater
-		mxspd=mxspd*0.6
-		myspd=myspd*0.6
-	EndIf
-	
-		
-	MoveMouse GraphicsWidth()/2,GraphicsHeight()/2
+	; Keyboard-only controls
+	turnspd# = 2.0
+	lookspd# = 1.5
 
-	campitch=campitch+myspd
+	If underwater
+		turnspd = turnspd * 0.6
+		lookspd = lookspd * 0.6
+	EndIf
+
+	; Q/E to turn left/right
+	If KeyDown(16) Then camyaw = camyaw + turnspd  ; Q - turn left
+	If KeyDown(18) Then camyaw = camyaw - turnspd  ; E - turn right
+
+	; R/F to look up/down
+	If KeyDown(19) Then campitch = campitch - lookspd  ; R - look up
+	If KeyDown(33) Then campitch = campitch + lookspd  ; F - look down
+
 	If campitch<-85 Then campitch=-85
 	If campitch>85 Then campitch=85
-	RotateEntity player,campitch,EntityYaw(player)-mxspd,0
-	
-	If KeyDown(203) Then mvx=mvx-.3
-	If KeyDown(205) Then mvx=mvx+.3
-	If KeyDown(200) Then mvz=mvz+.3
-	If KeyDown(208) Then mvz=mvz-.3
-	
-	If KeyDown(30) Then mvx=mvx-.3
-	If KeyDown(32) Then mvx=mvx+.3
-	If KeyDown(17) Then mvz=mvz+.3
-	If KeyDown(31) Then mvz=mvz-.3
+	RotateEntity player,campitch,camyaw,0
+
+	; Arrow keys for movement
+	If KeyDown(203) Then mvx=mvx-.3  ; Left arrow - strafe left
+	If KeyDown(205) Then mvx=mvx+.3  ; Right arrow - strafe right
+	If KeyDown(200) Then mvz=mvz+.3  ; Up arrow - forward
+	If KeyDown(208) Then mvz=mvz-.3  ; Down arrow - backward
+
+	; WASD for movement
+	If KeyDown(30) Then mvx=mvx-.3   ; A - strafe left
+	If KeyDown(32) Then mvx=mvx+.3   ; D - strafe right
+	If KeyDown(17) Then mvz=mvz+.3   ; W - forward
+	If KeyDown(31) Then mvz=mvz-.3   ; S - backward
 	
 	
 	PositionEntity floorpivot,EntityX(player),EntityY(player)-8,EntityZ(player)

@@ -1,113 +1,193 @@
 ================================================================================
 DEBUG CUBEMAP - Riflessioni Acqua cubewater.bb
-Aggiornato: 19 Dicembre 2025 - SESSIONE 3 (FINALE)
+Aggiornato: 22 Dicembre 2025 - SESSIONE 4 (FINALE)
 ================================================================================
 
-STATUS: BUG APERTO - Il riflesso cubemap mostra la direzione sbagliata
+STATUS: IN PROGRESSO - Riflesso "va molto meglio" ma c'è ancora un errore residuo
 
 ================================================================================
-SINTOMO
+CONFIGURAZIONE ATTUALE (da testare ulteriormente)
 ================================================================================
 
-Il riflesso sull'acqua mostra quello che c'è DIETRO la camera invece di quello
-che c'è SOPRA l'acqua. Le lampade e la porta (dietro) sono visibili nel
-riflesso, ma il cubo rosso posizionato sopra la piscina non appare.
-
-================================================================================
-TEST EFFETTUATO
-================================================================================
-
-Creato test_arrow.bb per visualizzare la direzione del vettore R:
-- Freccia verde = direzione calcolata con R = reflect(I, N)
-- Formula: I = normalize(punto - camera), R = I - 2*dot(I,N)*N
-
-RISULTATO TEST: La freccia verde punta CORRETTAMENTE verso l'alto (cubo rosso)
-quando la camera guarda l'acqua dall'alto.
-
-CONCLUSIONE: La formula matematica è corretta. Il problema è ALTROVE.
-
-================================================================================
-POSSIBILI CAUSE DEL BUG
-================================================================================
-
-1. NORMALI DELL'ACQUA IN CUBEWATER.BB
-   - Il file water.3ds potrebbe avere normali invertite
-   - L'animazione delle onde modifica le Y: VertexCoords s,i,x,-y,z
-   - UpdateNormals viene chiamato ma potrebbe non funzionare correttamente
-
-2. COORDINATE NEL SHADER
-   - bbVertex_WorldPosition potrebbe avere valori sbagliati
-   - bbCameraPos potrebbe non arrivare correttamente
-   - Mismatch tra sistema Blitz3D e OpenGL (Z negata in alcuni posti)
-
-3. ORDINE FACCE CUBEMAP
-   - _cube_order[] in canvas.cpp mappa le facce Blitz -> OpenGL
-   - Potrebbe esserci un errore nella mappatura
-   - La faccia UP (4) dovrebbe contenere il cubo rosso
-
-4. CATTURA CUBEMAP
-   - FXCamera cattura le 6 facce con angolazioni specifiche
-   - Face 4 (up): RotateEntity FXCamera, -90, 0, 0
-   - Verificare che il cubo rosso sia effettivamente catturato
-
-================================================================================
-MODIFICHE IMPLEMENTATE (da mantenere)
-================================================================================
-
-1. blitz3d.gl.cpp - Aggiunto uniform bbCameraPos:
-   - struct uniform_locs { ... GLint camera_pos; }
-   - glGetUniformLocation(defaultProgram, "bbCameraPos")
-   - glUniform3f in setViewMatrix() passa camera position
-
-2. default.glsl - Aggiunto supporto camera position:
-   - uniform vec3 bbCameraPos;
-   - SampleCube() usa bbCameraPos per calcolare I
-
-================================================================================
-CODICE ATTUALE SAMPLECUBE (da verificare/correggere)
-================================================================================
+File: src/modules/bb/blitz3d.gl/default.glsl
 
 ```glsl
 vec4 SampleCube( samplerCube tex ){
+  // View direction: from camera to fragment (in world space)
   vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
+
+  // Normal in world space - inverti Y per compensare cubewater.bb che usa -Y
   vec3 N = normalize(bbVertex_WorldNormal);
+  N.y = -N.y;
+
+  // Reflection vector
   vec3 R = reflect(I, N);
-  R.z = -R.z;  // Conversione coordinate?
+
+  // Conversione sistema coordinate (right-handed -> left-handed cubemap)
+  R.z = -R.z;
+
   return texture(tex, R);
 }
 ```
 
 ================================================================================
-PROSSIMI PASSI PER RISOLVERE
+PROBLEMI TROVATI E RISOLTI
 ================================================================================
 
-1. Verificare le normali dell'acqua in cubewater.bb
-   - Aggiungere debug visivo delle normali (colore = normale)
-   - Controllare se puntano verso l'alto o sono invertite
+1. NORMALI DELL'ACQUA INVERTITE
+   - CAUSA: In cubewater.bb, riga 494: VertexCoords s,i,x,-y,z
+     Il segno meno davanti a Y inverte le coordinate delle onde
+   - UpdateNormals ricalcola le normali basandosi su coordinate invertite
+   - RISULTATO: Le normali puntavano verso il BASSO invece che verso l'ALTO
+   - SOLUZIONE: N.y = -N.y nello shader
+   - VERIFICA: Debug visivo mostrava acqua VERDE BRILLANTE (normali corrette)
 
-2. Salvare le 6 facce della cubemap come BMP
-   - Verificare che face 4 (UP) contenga il cubo rosso
+2. SISTEMA COORDINATE CUBEMAP
+   - OpenGL world space: RIGHT-HANDED (+Z verso osservatore)
+   - OpenGL cubemap: LEFT-HANDED (+Z lontano dall'osservatore, come Direct3D)
+   - SOLUZIONE: R.z = -R.z per convertire il vettore riflesso
 
-3. Aggiungere freccia di debug direttamente in cubewater.bb
-   - Vedere se lì il calcolo R dà risultati diversi
+3. SHADER NON RICOMPILATO
+   - default.glsl viene convertito in default.glsl.h tramite bin2h
+   - bin2h viene eseguito durante cmake configure, NON durante ninja build
+   - IMPORTANTE: Per ricompilare lo shader seguire la procedura sotto
 
-4. Controllare bbVertex_WorldPosition e bbCameraPos
-   - Debug nello shader: mostrare valori come colori
+================================================================================
+TEST EFFETTUATI (22 Dicembre 2025)
+================================================================================
+
+| Test | N.y = -N.y | R.x | R.z | Risultato |
+|------|------------|-----|-----|-----------|
+| 1    | NO         | NO  | NO  | Riflesso indietro (bug originale) |
+| 2    | SI         | NO  | NO  | Normali corrette ma riflesso indietro |
+| 3    | SI         | NO  | SI  | "Va molto meglio" ma errore residuo |
+| 4    | SI         | SI  | NO  | Riflesso torna indietro |
+| 5    | SI         | SI  | SI  | "Sembra meglio ma cubo non si riflette" |
+| 6    | NO         | NO  | SI  | Cubo non si riflette |
+
+MIGLIORE COMBINAZIONE: N.y = -N.y + R.z = -R.z (Test 3)
+
+================================================================================
+ORDINE FACCE CUBEMAP
+================================================================================
+
+Blitz3D SetCubeFace (da documentazione ufficiale):
+  0: Sinistra  (-X)  -> yaw = 90
+  1: Avanti    (+Z)  -> yaw = 0 (default)
+  2: Destra    (+X)  -> yaw = -90
+  3: Indietro  (-Z)  -> yaw = 180
+  4: Sopra     (+Y)  -> pitch = -90
+  5: Sotto     (-Y)  -> pitch = -90, roll = 180
+
+Mapping in canvas.cpp (_cube_order[]):
+  0: GL_TEXTURE_CUBE_MAP_NEGATIVE_X  (left)
+  1: GL_TEXTURE_CUBE_MAP_NEGATIVE_Z  (forward: Blitz +Z = OpenGL -Z)
+  2: GL_TEXTURE_CUBE_MAP_POSITIVE_X  (right)
+  3: GL_TEXTURE_CUBE_MAP_POSITIVE_Z  (backward: Blitz -Z = OpenGL +Z)
+  4: GL_TEXTURE_CUBE_MAP_POSITIVE_Y  (up)
+  5: GL_TEXTURE_CUBE_MAP_NEGATIVE_Y  (down)
+
+Rotazioni FXCamera in cubewater.bb (verificate corrette):
+  Face 0: RotateEntity FXCamera, 0, 90, 0    (left)
+  Face 1: RotateEntity FXCamera, 0, 0, 0     (forward)
+  Face 2: RotateEntity FXCamera, 0, -90, 0   (right)
+  Face 3: RotateEntity FXCamera, 0, 180, 0   (backward)
+  Face 4: RotateEntity FXCamera, -90, 0, 0   (up)
+
+================================================================================
+POSIZIONE ELEMENTI NELLA SCENA
+================================================================================
+
+FXCamera (durante cattura cubemap):
+  - Position: (0, EntityY(water)-2, -145) = circa (0, -4, -145)
+  - Range: 0.1 - 1000
+
+Cubo rosso (redSquare):
+  - Position: (0, 25, -145)
+  - Scale: (8, 0.3, 8)
+  - NON viene nascosto durante HideEntities() -> dovrebbe essere visibile
+
+Acqua (water):
+  - Position: (0, -2, 0) dopo MoveEntity water,0,-2,0
+  - Texture: cubemap 256x256 con flag 128+256+48
+
+================================================================================
+COMANDI PER RICOMPILARE
+================================================================================
+
+# Dopo ogni modifica a default.glsl:
+cd /home/rufio72/b3d
+rm src/modules/bb/blitz3d.gl/default.glsl.h
+cmake -G Ninja -B _release
+ninja -C _release
+
+# Poi ricompilare cubewater:
+cd _release/samples/mak/cubewater
+blitzpath=/home/rufio72/b3d/_release /home/rufio72/b3d/_release/bin/blitzcc -o cubewater cubewater.bb
+DISPLAY=:0 timeout 120 ./cubewater
+
+================================================================================
+FONTI E RIFERIMENTI
+================================================================================
+
+OpenGL Cubemap Implementation:
+- https://learnopengl.com/Advanced-OpenGL/Cubemaps
+- https://antongerdelan.net/opengl/cubemaps.html
+- https://webglfundamentals.org/webgl/lessons/webgl-environment-maps.html
+
+Sistema Coordinate Cubemap:
+- https://community.khronos.org/t/image-orientation-for-cubemaps-actually-a-very-old-topic/105338
+- https://github.com/pex-gl/pex-materials/issues/3
+
+Blitz3D Documentation:
+- https://kippykip.com/b3ddocs/commands/3d_commands/SetCubeFace.htm
+
+Informazioni chiave dalle fonti:
+- "Cubemap textures in OpenGL are stored in left hand coordinate system"
+- "X should be flipped" oppure "Z should be flipped" per conversione
+- "The OpenGL cube map definition is based on the RenderMan standard"
+- OpenGL world space è right-handed, cubemap è left-handed
+
+================================================================================
+PROSSIMI PASSI
+================================================================================
+
+1. Descrivere l'errore residuo visivamente
+2. Verificare che il cubo rosso sia effettivamente catturato nella faccia UP
+   - Salvare le 6 facce della cubemap come immagini BMP
+3. Provare altre combinazioni se necessario
+4. Considerare se il problema è specifico di cubewater.bb o generale
 
 ================================================================================
 FILE COINVOLTI
 ================================================================================
 
-Shader e rendering:
-- src/modules/bb/blitz3d.gl/default.glsl (SampleCube)
+Shader:
+- src/modules/bb/blitz3d.gl/default.glsl (SampleCube - MODIFICATO)
+- src/modules/bb/blitz3d.gl/default.glsl.h (generato da bin2h)
 - src/modules/bb/blitz3d.gl/blitz3d.gl.cpp (uniform bbCameraPos)
+
+Mapping facce cubemap:
 - src/modules/bb/graphics.gl/canvas.cpp (_cube_order[])
 
 Demo:
 - _release/samples/mak/cubewater/cubewater.bb
-- _release/samples/mak/cubewater/level/water.3ds
 
-Test:
-- _release/samples/mak/cubewater/test_arrow.bb (test direzione R)
+Documentazione:
+- CUBEMAP_REFERENCE.txt (confronto implementazione standard vs attuale)
+
+================================================================================
+NOTE IMPORTANTI
+================================================================================
+
+1. Il workaround N.y = -N.y è SPECIFICO per cubewater.bb che inverte Y.
+   Altri programmi Blitz3D potrebbero non avere questo problema.
+   IDEALE: correggere cubewater.bb invece dello shader.
+
+2. La conversione R.z = -R.z è necessaria per il sistema di coordinate.
+   Questo dovrebbe essere corretto per tutti i programmi.
+
+3. Le fonti online suggeriscono sia flip X che flip Z come soluzioni.
+   Nel nostro caso R.z = -R.z funziona meglio di R.x = -R.x.
 
 ================================================================================

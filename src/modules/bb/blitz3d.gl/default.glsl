@@ -227,13 +227,14 @@ vec4 SampleCube( samplerCube tex ){
   // View direction: from camera to fragment (in world space)
   vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
 
-  // Normal in world space
+  // Normal in world space - inverti Y per compensare cubewater.bb che usa -Y
   vec3 N = normalize(bbVertex_WorldNormal);
+  N.y = -N.y;
 
   // Reflection vector
   vec3 R = reflect(I, N);
 
-  // BUG: Il riflesso mostra direzione sbagliata - vedi DEBUG_CUBEMAP_REPORT.txt
+  // Conversione sistema coordinate (right-handed -> left-handed cubemap)
   R.z = -R.z;
 
   return texture(tex, R);

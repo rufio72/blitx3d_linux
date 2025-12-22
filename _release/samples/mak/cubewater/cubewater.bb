@@ -489,8 +489,8 @@ Function RenderWater()
 
 	s=GetSurface(water,1)
 	For i=0 To CountVertices(s)-1
-		Freq#=MilliSecs()/4
-		Vertex(i)\y#=Sin(freq+Vertex(i)\x#*500+Vertex(i)\z#*300)*1.2
+		Freq#=MilliSecs()/8
+		Vertex(i)\y#=Sin(freq+Vertex(i)\x#*200+Vertex(i)\z#*150)*0.5
 		VertexCoords s,i,Vertex(i)\x#,-Vertex(i)\y#,Vertex(i)\z#
 	Next
 

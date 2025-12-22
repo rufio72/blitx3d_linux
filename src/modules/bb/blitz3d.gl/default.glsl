@@ -226,6 +226,7 @@ vec4 Sample2D( sampler2D tex,int i ){
 vec4 SampleCube( samplerCube tex ){
   // View direction: from camera to fragment (in world space)
   vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
+  I.x = -I.x;  // Flip horizontal direction before reflection calculation
 
   // Normal in world space - inverti Y per compensare cubewater.bb che usa -Y
   vec3 N = normalize(bbVertex_WorldNormal);

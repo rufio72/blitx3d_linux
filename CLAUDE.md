@@ -104,6 +104,48 @@ Platform-specific variants use dot notation (e.g., `filesystem.posix`, `filesyst
 - `opengl/`: OpenGL renderer (primary graphics backend)
 - `test/`: Test runtime
 
+### GLSL Shaders (IMPORTANTE)
+
+I file `.glsl` vengono convertiti in `.glsl.h` tramite `bin2h` durante il configure di cmake. I file `.glsl.h` sono in `.gitignore` (generati).
+
+**File shader principali:**
+- `src/modules/bb/blitz3d.gl/default.glsl` - Shader 3D (cubemap, lighting, etc.)
+- `src/modules/bb/graphics.gl/default.glsl` - Shader 2D
+
+**PROCEDURA per modificare uno shader:**
+
+```bash
+# 1. Modifica il file .glsl
+# 2. Elimina il .glsl.h generato
+rm src/modules/bb/blitz3d.gl/default.glsl.h
+
+# 3. Rigenera con cmake
+cmake -G Ninja -B _release
+
+# 4. Ricompila
+ninja -C _release
+
+# 5. VERIFICA che il fix sia nel binario compilato!
+strings _release/bin/x86_64-linux-gnu/runtime.opengl.so | grep "tuo_codice"
+```
+
+**Se bin2h non funziona**, usa xxd manualmente:
+```bash
+cd src/modules/bb/blitz3d.gl
+xxd -i default.glsl | sed 's/unsigned char default_glsl\[\]/const unsigned char DEFAULT_GLSL[]/g; s/unsigned int default_glsl_len/const size_t DEFAULT_GLSL_SIZE/g' > default.glsl.h
+ninja -C /home/rufio72/b3d/_release
+```
+
+**SEMPRE verificare** che lo shader sia stato compilato correttamente prima di testare:
+```bash
+strings _release/bin/x86_64-linux-gnu/runtime.opengl.so | grep "pattern_da_cercare"
+```
+
+**Cubemap reflection (SampleCube in default.glsl):**
+- `I.x = -I.x` - Fix flip orizzontale
+- `N.y = -N.y` - Compensa normali invertite di cubewater.bb
+- `R.z = -R.z` - Conversione coordinate right-handed → left-handed
+
 ### Platform Configuration
 The root `CMakeLists.txt` detects and sets:
 - `BB_PLATFORM`: macos, linux, win32, win64, ios, android, emscripten, nx
@@ -112,6 +154,16 @@ The root `CMakeLists.txt` detects and sets:
 - `BB_TRIPLE`: Target triple (e.g., `x86_64-linux-gnu`)
 
 ## Testing
+
+**IMPORTANTE**: Quando si eseguono demo o test grafici con timeout, usare SEMPRE un timeout di almeno 2 minuti (120 secondi). Mai usare timeout inferiori perché l'utente ha bisogno di tempo per osservare e interagire con il programma.
+
+```bash
+# Corretto:
+DISPLAY=:0 timeout 120 ./programma
+
+# Sbagliato (troppo breve):
+DISPLAY=:0 timeout 15 ./programma
+```
 
 Test files are in `test/` directory as `.bb` Blitz3D source files:
 - `test/all.bb`: Main test suite

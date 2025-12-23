@@ -329,6 +329,7 @@ void ProgNode::translate3( Codegen_C *g, const std::vector<UserFunc> &userfuncs 
 	for( int k=0; k<sem_env->decls->size(); ++k ){
 		Decl *d = sem_env->decls->decls[k];
 		if( d->kind != DECL_GLOBAL ) continue;
+		if( d->type->vectorType() ) continue;  // Skip vectors - handled by VectorDeclNode
 
 		std::string ctype;
 		std::string initVal = "0";

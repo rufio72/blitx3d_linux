@@ -156,17 +156,23 @@ void Node::createVars3( Environ *e, Codegen_C *g ){
 		g->emitLine( ctype + " " + varName + " = " + init + ";" );
 	}
 
-	// Declare and initialize local vectors
+	// Declare and initialize vectors
 	for( int k=0; k<e->decls->size(); ++k ){
 		Decl *d = e->decls->decls[k];
 		if( d->kind == DECL_PARAM ) continue;
 		VectorType *v = d->type->vectorType();
 		if( !v ) continue;
 
-		std::string varName = g->toCSafeName( "_l" + d->name );
 		std::string vecLabel = g->toCSafeName( v->label );
-		// Allocate the vector using the runtime function
-		g->emitLine( "void *" + varName + " = _bbVecAlloc((BBVecType*)&" + vecLabel + ");" );
+		if( d->kind == DECL_GLOBAL ){
+			// For globals, assign to the existing global variable
+			std::string varName = g->toCSafeName( "_v" + d->name );
+			g->emitLine( varName + " = _bbVecAlloc((BBVecType*)&" + vecLabel + ");" );
+		} else {
+			// For locals, declare a new local variable
+			std::string varName = g->toCSafeName( "_l" + d->name );
+			g->emitLine( "void *" + varName + " = _bbVecAlloc((BBVecType*)&" + vecLabel + ");" );
+		}
 	}
 }
 #endif

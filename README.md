@@ -7,6 +7,46 @@ Over time I'd like to introduce an alternative C-like syntax (for those who, lik
 Yes, I know — reviving a compiler from 2000 with goto and gosub might seem a bit old-fashioned. But I think now that AI is learning to write code, this compiler could actually become a better solution than all those engines where you have to learn complex environments, study strategies and whatnot.
 Anyway, even if nobody else ends up caring about this, I can tell you that working on this project just makes me feel good.
 
+## Stato attuale
+
+23-12-2026
+All the examples work. There might be something I haven't noticed, but overall they work.
+There will probably be some bugs in texture handling, or something I haven't noticed, that slipped past me, but overall it seems like the first part of the work is done.
+Then I'll try to get the tank game working. I consider that a test for the compiler's reliability.
+When I manage to get that part working, I'll start considering the compiler ready.
+Then I'll move on to creating the distributable version for Linux.
+
+
+
+
+## Documentation
+      
+The original Blitz3D help is available in the [\_release/help](_release/help)
+ directory in HTML form.
+Documentation is generated from Markdown files using the built-in `docgen`
+tool.
+
+
+## New Features
+### Object-Oriented Programming (OOP)
+
+Blitz3D-NG introduces full OOP support with the following features:
+
+**Classes**: Define custom types with `Class...End Class`
+**Methods**: Member functions with `Method...End Method`
+**Constructors**: Automatic initialization with `Method New()`
+**Inheritance**: Extend classes with the `Extends` keyword
+**Self/Super**: Access current instance and parent class methods
+**Static Methods**: Class-level functions with `Static Method`
+**Access Modifiers**: `Private`, `Protected`, and `Public` visibility control
+
+See the full [OOP Documentation](docs/OOP.md) for details and examples.
+## Roadmap
+
+
+
+
+
 ## License
 
 ```

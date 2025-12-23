@@ -9,7 +9,7 @@ Anyway, even if nobody else ends up caring about this, I can tell you that worki
 
 ## Current status
 
-23-12-2026
+23-12-2025
 All the examples work. There might be something I haven't noticed, but overall they work.
 There will probably be some bugs in texture handling, or something I haven't noticed, that slipped past me, but overall it seems like the first part of the work is done.
 Then I'll try to get the tank game working. I consider that a test for the compiler's reliability.

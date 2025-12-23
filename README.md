@@ -1,4 +1,4 @@
-#BLitz3d
+## BLitz3d
 
 This compiler is a fork of the Blitz3D NG project, which itself was a fork of the original Blitz3D by the late Mark Sibly.
 My goal is to modernize Blitz3D and make it compile on Linux, Windows, Mac and Android. Android compilation is really important to me. The other platforms I see more as a dress rehearsal.
@@ -7,7 +7,7 @@ Over time I'd like to introduce an alternative C-like syntax (for those who, lik
 Yes, I know — reviving a compiler from 2000 with goto and gosub might seem a bit old-fashioned. But I think now that AI is learning to write code, this compiler could actually become a better solution than all those engines where you have to learn complex environments, study strategies and whatnot.
 Anyway, even if nobody else ends up caring about this, I can tell you that working on this project just makes me feel good.
 
-## Stato attuale
+## Current status
 
 23-12-2026
 All the examples work. There might be something I haven't noticed, but overall they work.
@@ -15,9 +15,6 @@ There will probably be some bugs in texture handling, or something I haven't not
 Then I'll try to get the tank game working. I consider that a test for the compiler's reliability.
 When I manage to get that part working, I'll start considering the compiler ready.
 Then I'll move on to creating the distributable version for Linux.
-
-
-
 
 ## Documentation
       
@@ -30,7 +27,7 @@ tool.
 ## New Features
 ### Object-Oriented Programming (OOP)
 
-Blitz3D-NG introduces full OOP support with the following features:
+This version of Blitz3D introduces full OOP support with the following features:
 
 **Classes**: Define custom types with `Class...End Class`
 **Methods**: Member functions with `Method...End Method`

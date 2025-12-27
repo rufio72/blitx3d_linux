@@ -188,6 +188,11 @@ macro(bb_end_runtime )
   target_link_libraries(${name}.shared ${START_GROUP} bbruntime_dll ${name}.static)
   set_target_properties(${name}.shared PROPERTIES OUTPUT_NAME "runtime.${id}")
 
+  # Export bb* symbols using version script (Linux/Unix only)
+  if(BB_LINUX OR BB_NDK)
+    target_link_options(${name}.shared PRIVATE "-Wl,--version-script=${PROJECT_SOURCE_DIR}/src/runtime/exports.map")
+  endif()
+
   if(BB_WINDOWS)
     target_output_to_bin(${name}.shared)
 

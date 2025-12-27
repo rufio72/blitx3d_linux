@@ -65,9 +65,10 @@ else()
   endif()
 endif()
 
-# set symbol visibility to hidden to make dead code elimination more effective
+# set symbol visibility options for dead code elimination
+# Note: -fvisibility=hidden removed to allow GCC backend to access runtime symbols
 if (NOT MSVC)
-  add_compile_options(-fvisibility=hidden -fdata-sections -ffunction-sections)
+  add_compile_options(-fdata-sections -ffunction-sections)
 endif()
 
 if(NOT BB_HOST_ARCH STREQUAL BB_ARCH AND NOT BB_PLATFORM MATCHES mingw AND NOT BB_PLATFORM STREQUAL android AND NOT BB_PLATFORM STREQUAL win32 AND NOT BB_PLATFORM STREQUAL emscripten)

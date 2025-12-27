@@ -35,7 +35,7 @@ void HtmlHelp::OnNavigating( wxWebViewEvent& event ){
     ProcessWindowEvent( event );
   } else {
     wxFileName filename( dirPath );
-    if ( !dirPath.EndsWith(".html") && filename.IsFileReadable() ){
+    if ( !dirPath.EndsWith(".html") && !dirPath.EndsWith(".htm") && filename.IsFileReadable() ){
       wxCommandEvent event( OPEN_FILE_EVENT,GetId() );
       event.SetEventObject( this );
       event.SetString( dirPath );

@@ -117,20 +117,6 @@ EntityAlpha water,1.0  ; TEST: opaco per vedere se riflesso appare sulla superfi
 EntityFX water,1
 AddEntity(water)
 
-; RED SQUARE ABOVE POOL for testing reflections
-Global redSquare, redLight
-redSquare = CreateCube()
-ScaleEntity redSquare, 8, 0.3, 8  ; flat and reasonably sized
-PositionEntity redSquare, 0, 25, -145  ; higher and further back
-EntityColor redSquare, 255, 0, 0  ; bright red
-EntityFX redSquare, 1  ; fullbright so it glows
-
-; Red light to illuminate surroundings
-redLight = CreateLight(2)  ; point light
-PositionEntity redLight, 0, 23, -145  ; just below the square
-LightColor redLight, 255, 50, 50  ; red light
-LightRange redLight, 60  ; decent range
-
 Type Vertices
 	Field x#
 	Field y#
@@ -648,3 +634,4 @@ Function RecurseSeek(ent)
 	Next
 	tab=tab-4
 End Function
+

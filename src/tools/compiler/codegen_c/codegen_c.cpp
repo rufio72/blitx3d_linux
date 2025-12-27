@@ -480,6 +480,28 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "/* Buffer functions */\n";
     header << "extern void bbSaveBuffer(bb_int_t buffer, bb_string_t filename);\n";
     header << "\n";
+    header << "/* Bank functions */\n";
+    header << "extern bb_int_t bbCreateBank(bb_int_t size);\n";
+    header << "extern void bbFreeBank(bb_int_t bank);\n";
+    header << "extern bb_int_t bbBankSize(bb_int_t bank);\n";
+    header << "extern void bbResizeBank(bb_int_t bank, bb_int_t size);\n";
+    header << "extern void bbCopyBank(bb_int_t src, bb_int_t srcOffset, bb_int_t dest, bb_int_t destOffset, bb_int_t count);\n";
+    header << "extern bb_int_t bbPeekByte(bb_int_t bank, bb_int_t offset);\n";
+    header << "extern bb_int_t bbPeekShort(bb_int_t bank, bb_int_t offset);\n";
+    header << "extern bb_int_t bbPeekInt(bb_int_t bank, bb_int_t offset);\n";
+    header << "extern bb_float_t bbPeekFloat(bb_int_t bank, bb_int_t offset);\n";
+    header << "extern void bbPokeByte(bb_int_t bank, bb_int_t offset, bb_int_t value);\n";
+    header << "extern void bbPokeShort(bb_int_t bank, bb_int_t offset, bb_int_t value);\n";
+    header << "extern void bbPokeInt(bb_int_t bank, bb_int_t offset, bb_int_t value);\n";
+    header << "extern void bbPokeFloat(bb_int_t bank, bb_int_t offset, bb_float_t value);\n";
+    header << "\n";
+    header << "/* Texture cubemap functions */\n";
+    header << "extern void bbSetCubeFace(bb_int_t texture, bb_int_t face);\n";
+    header << "extern void bbSetCubeMode(bb_int_t texture, bb_int_t mode);\n";
+    header << "\n";
+    header << "/* Sync functions */\n";
+    header << "extern void bbVWait(bb_int_t frames);\n";
+    header << "\n";
 }
 
 Codegen_C::~Codegen_C() {

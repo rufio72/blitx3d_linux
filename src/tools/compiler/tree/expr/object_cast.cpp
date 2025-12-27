@@ -27,3 +27,13 @@ llvm::Value *ObjectCastNode::translate2( Codegen_LLVM *g ){
 	return g->builder->CreateBitOrPointerCast( t,llvm::PointerType::get( sem_type->structType()->structtype,0 ) );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string ObjectCastNode::translate3( Codegen_C *g ){
+	std::string handle = expr->translate3( g );
+	std::string typePtr = "_t" + g->toCSafeName( sem_type->structType()->ident );
+	return "_bbObjFromHandle(" + handle + ", (BBObjType*)&" + typePtr + ")";
+}
+#endif

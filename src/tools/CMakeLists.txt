@@ -5,7 +5,6 @@ IF(BB_DESKTOP AND NOT BB_CROSSCOMPILE)
   add_subdirectory(blitzide2)
   add_subdirectory(bblaunch2)
   add_subdirectory(docgen)
-  add_subdirectory(test_aui)
 
   IF(BB_WINDOWS)
     add_subdirectory(bblaunch)

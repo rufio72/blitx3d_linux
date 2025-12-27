@@ -22,3 +22,12 @@ llvm::Value *ObjectHandleNode::translate2( Codegen_LLVM *g ){
 	return g->CallIntrinsic( "_bbObjToHandle",ty,1,t );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+std::string ObjectHandleNode::translate3( Codegen_C *g ){
+	std::string obj = expr->translate3( g );
+	return "_bbObjToHandle((bb_obj_t)" + obj + ")";
+}
+#endif

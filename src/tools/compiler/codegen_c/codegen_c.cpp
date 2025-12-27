@@ -81,6 +81,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t _bbObjCompare(bb_obj_t a, bb_obj_t b);\n";
     header << "extern bb_obj_t _bbObjLoad(bb_obj_t *p);\n";
     header << "extern bb_int_t _bbObjHandle(bb_obj_t obj);\n";
+    header << "extern bb_int_t _bbObjToHandle(bb_obj_t obj);\n";
     header << "extern bb_obj_t _bbObjFromHandle(bb_int_t handle, BBObjType *type);\n";
     header << "\n";
     header << "/* Vector functions */\n";

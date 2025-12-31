@@ -77,8 +77,14 @@ static int sendNetMsg( unsigned char type,std::string from,std::string to,std::s
 	memset( msg,0,msg_size );
 
 	msg->type=type;
-	if( from.length()>0 ) strncpy( msg->from.id,from.c_str(),16 );
-	if( to.length()>0 ) strncpy( msg->to.id,to.c_str(),16 );
+	if( from.length()>0 ){
+		strncpy( msg->from.id,from.c_str(),15 );
+		msg->from.id[15]='\0';
+	}
+	if( to.length()>0 ){
+		strncpy( msg->to.id,to.c_str(),15 );
+		msg->to.id[15]='\0';
+	}
 	msg->length=data.length();
 	// strncpy( (char*)(msg+sizeof(BBNetMsg)-sizeof(msg->data)),data.c_str(),data.length() );
 

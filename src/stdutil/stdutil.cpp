@@ -350,7 +350,8 @@ std::string filenamepath( const std::string &t ){
 	return res;
 #else
 	char buff[PATH_MAX+1];
-	strcpy( buff,t.c_str() );
+	strncpy( buff,t.c_str(),PATH_MAX );
+	buff[PATH_MAX]='\0';
 	return std::string( dirname( buff ) );
 #endif
 }
@@ -371,7 +372,8 @@ std::string filenamefile( const std::string &t ){
 	return t.substr( p );
 #else
 	char buff[PATH_MAX+1];
-	strcpy( buff,t.c_str() );
+	strncpy( buff,t.c_str(),PATH_MAX );
+	buff[PATH_MAX]='\0';
 	return std::string( basename( buff ) );
 #endif
 }

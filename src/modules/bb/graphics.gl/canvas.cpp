@@ -1,6 +1,7 @@
 #include "../stdutil/stdutil.h"
 #include <bb/graphics/font.h>
 #include "canvas.h"
+#include "graphics_util.h"
 #include <utf8.h>
 
 #include <cmath>

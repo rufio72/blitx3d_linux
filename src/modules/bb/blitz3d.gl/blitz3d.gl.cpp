@@ -1,6 +1,7 @@
 
 #include "../stdutil/stdutil.h"
 #include <bb/graphics.gl/graphics.gl.h>
+#include <bb/graphics.gl/graphics_util.h>
 #include <bb/system/system.h>
 #include "blitz3d.gl.h"
 #include "default.glsl.h"
@@ -223,6 +224,9 @@ private:
 		GLuint bound_cube[MAX_TEXTURES] = {0};
 	} tex_cache;
 
+	// Texture parameter cache (optimization #6 - avoid redundant glTexParameteri)
+	GLTextureParamCache tex_param_cache[MAX_TEXTURES];
+
 	void setLights(){
 		LightState ls={ 0 };
 
@@ -267,6 +271,11 @@ private:
 public:
 	GLScene():wireframe(false){
 		memset( &us,0,sizeof(UniformState) );
+
+		// Initialize texture parameter caches
+		for (int i = 0; i < MAX_TEXTURES; i++) {
+			bbGLInitTexParamCache(&tex_param_cache[i]);
+		}
 
 		const float MIDLEVEL[]={ 0.5f,0.5f,0.5f,1.0f };
 		setAmbient( MIDLEVEL );
@@ -600,10 +609,12 @@ public:
 				bool no_filter=flags&BBCanvas::CANVAS_TEX_NOFILTERING;
 				bool mipmap=flags&BBCanvas::CANVAS_TEX_MIPMAP;
 
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_MAG_FILTER,no_filter?GL_NEAREST:GL_LINEAR ) );
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_MIN_FILTER,mipmap?GL_LINEAR_MIPMAP_LINEAR:(no_filter?GL_NEAREST:GL_LINEAR) ) );
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,flags&BBCanvas::CANVAS_TEX_CLAMPU?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,flags&BBCanvas::CANVAS_TEX_CLAMPV?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
+				// Optimization #6: Use cached texture parameters
+				bbGLSetTextureParams(&tex_param_cache[i], canvas->texture, canvas->target,
+					mipmap ? GL_LINEAR_MIPMAP_LINEAR : (no_filter ? GL_NEAREST : GL_LINEAR),
+					no_filter ? GL_NEAREST : GL_LINEAR,
+					flags & BBCanvas::CANVAS_TEX_CLAMPU ? GL_CLAMP_TO_EDGE : GL_REPEAT,
+					flags & BBCanvas::CANVAS_TEX_CLAMPV ? GL_CLAMP_TO_EDGE : GL_REPEAT);
 
 				// Only enable alpha test for masked textures when NOT using alpha blending
 				// For BLEND_ALPHA/BLEND_ADD sprites (like glow), we want smooth blending

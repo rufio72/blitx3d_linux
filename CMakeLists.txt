@@ -69,6 +69,8 @@ endif()
 # Note: -fvisibility=hidden removed to allow GCC backend to access runtime symbols
 if (NOT MSVC)
   add_compile_options(-fdata-sections -ffunction-sections)
+  # Security warnings for unsafe string operations
+  add_compile_options(-Wformat -Wformat-security -Wstringop-overflow)
 endif()
 
 if(NOT BB_HOST_ARCH STREQUAL BB_ARCH AND NOT BB_PLATFORM MATCHES mingw AND NOT BB_PLATFORM STREQUAL android AND NOT BB_PLATFORM STREQUAL win32 AND NOT BB_PLATFORM STREQUAL emscripten)

@@ -2,7 +2,7 @@ bin2h(SOURCE_FILE default.glsl HEADER_FILE default.glsl.h VARIABLE_NAME DEFAULT_
 
 bb_start_module(graphics.gl)
 set(DEPENDS_ON bb.graphics)
-set(SOURCES graphics.gl.cpp graphics.gl.h canvas.cpp canvas.h default.glsl.h)
+set(SOURCES graphics.gl.cpp graphics.gl.h graphics_util.h canvas.cpp canvas.h default.glsl.h)
 
 IF(BB_WINDOWS)
   set(SYSTEM_LIBS opengl32)

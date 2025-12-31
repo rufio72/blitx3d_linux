@@ -252,8 +252,8 @@ static const char *linkUserLibs(){
 
 	do{
 		if( err=loadUserLib( fd.cFileName ) ){
-			static char buf[64];
-			sprintf( buf,"Error in userlib '%s' - %s",fd.cFileName,err );
+			static char buf[256];
+			snprintf( buf,sizeof(buf),"Error in userlib '%s' - %s",fd.cFileName,err );
 			err=buf;break;
 		}
 
@@ -290,7 +290,7 @@ const char *openLibs( const Target &t,const std::string &rt ){
 		runtimeHMOD=OPENLIB( (home+LIBPATH).c_str() );
 		if( !runtimeHMOD ){
 			std::string msg("Unable to open " RUNTIMENAME "."+rt+".");
-			strcpy( err,msg.c_str() );
+			snprintf( err,sizeof(err),"%s",msg.c_str() );
 			return err;
 		}
 
@@ -298,7 +298,7 @@ const char *openLibs( const Target &t,const std::string &rt ){
 		GetRuntime gr=(GetRuntime)LIBSYM( runtimeHMOD,"runtimeGetRuntime" );
 		if( !gr ){
 			std::string msg("Error in " RUNTIMENAME "."+rt+"." LIBSUFFIX);
-			strcpy( err,msg.c_str() );
+			snprintf( err,sizeof(err),"%s",msg.c_str() );
 			return err;
 		}
 		runtimeLib=gr();

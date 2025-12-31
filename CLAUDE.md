@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Blitz3D "NG" (Next Generation) is a modernization of the classic Blitz3D game development language, adding cross-platform support (macOS, Linux, Windows) and 64-bit compilation via LLVM. The 32-bit Windows build retains the original Blitz code generation.
+This is a modernization of the classic Blitz3D game development language, adding cross-platform support (macOS, Linux, Windows) and 64-bit compilation via LLVM. The 32-bit Windows build retains the original Blitz code generation.
 
 ## Build Commands
 

@@ -224,21 +224,48 @@ vec4 Sample2D( sampler2D tex,int i ){
 }
 
 vec4 SampleCube( samplerCube tex ){
-  // View direction: from camera to fragment (in world space)
+  // View direction: from camera to fragment (both in Blitz world space)
   vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
-  I.x = -I.x;  // Flip horizontal direction before reflection calculation
 
-  // Normal in world space - inverti Y per compensare cubewater.bb che usa -Y
+  // Normal in world space, forced to face the viewer (FlipMesh can invert it)
   vec3 N = normalize(bbVertex_WorldNormal);
-  N.y = -N.y;
+  if( dot(N, I) > 0.0 ) N = -N;
 
   // Reflection vector
   vec3 R = reflect(I, N);
 
-  // Conversione sistema coordinate (right-handed -> left-handed cubemap)
-  R.z = -R.z;
+  // Cube faces are stored via SetCubeFace/CopyRect with the up/down views in the
+  // -Y/+Y faces and images copied 1:1 from the framebuffer; with that layout the
+  // Blitz-space lookup direction only needs Y negated (verified with markers).
+  R.y = -R.y;
 
-  return texture(tex, R);
+  vec4 refl = texture(tex, R);
+
+  // Fresnel (Schlick-like): full reflection at grazing angles, darker water color
+  // looking straight down. Local wave slope changes the angle, so ripples shade.
+  float cosTheta = clamp(dot(-I, N), 0.0, 1.0);
+  float fresnel = 0.15 + 0.85 * pow(1.0 - cosTheta, 3.0);
+  vec3 deep = RS.FogColor.rgb * 0.25;
+  vec3 col = mix(deep, refl.rgb, fresnel);
+
+  // Specular glints: Blinn-Phong sparkle from point/spot lights on wave crests.
+  for( int i=0;i<LS.LightsUsed;i++ ){
+    if( int(LS.Light[i].Position.w)==1 ) continue; // skip directional
+    vec3 Lv = LS.Light[i].Position.xyz - bbVertex_WorldPosition;
+    float dist = length(Lv);
+    vec3 L = Lv / dist;
+    float att = 1.0;
+    float range = LS.Light[i].Params.x;
+    if( range > 0.0 ){
+      att = clamp(1.0 - dist/range, 0.0, 1.0);
+      att = att * att;
+    }
+    vec3 H = normalize(L - I);
+    float spec = pow(max(dot(N, H), 0.0), 200.0);
+    col += clamp(LS.Light[i].Color.rgb, 0.0, 1.0) * spec * att * 2.0;
+  }
+
+  return vec4(col, refl.a);
 }
 
 vec4 Blend( vec4 t0,vec4 t1,int i ){

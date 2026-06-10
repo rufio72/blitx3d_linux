@@ -474,9 +474,11 @@ Function RenderWater()
 
 
 	s=GetSurface(water,1)
+	Freq#=MilliSecs()/8
 	For i=0 To CountVertices(s)-1
-		Freq#=MilliSecs()/8
-		Vertex(i)\y#=Sin(freq+Vertex(i)\x#*200+Vertex(i)\z#*150)*0.5
+		; due onde incrociate per un'acqua piu' increspata e meno regolare
+		Vertex(i)\y#=Sin(freq+Vertex(i)\x#*320+Vertex(i)\z#*240)*0.4
+		Vertex(i)\y#=Vertex(i)\y#+Sin(freq*1.7+Vertex(i)\x#*150-Vertex(i)\z#*210)*0.3
 		VertexCoords s,i,Vertex(i)\x#,-Vertex(i)\y#,Vertex(i)\z#
 	Next
 
@@ -634,4 +636,8 @@ Function RecurseSeek(ent)
 	Next
 	tab=tab-4
 End Function
+
+
+
+
 

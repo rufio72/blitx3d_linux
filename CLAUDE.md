@@ -142,9 +142,15 @@ strings _release/bin/x86_64-linux-gnu/runtime.opengl.so | grep "pattern_da_cerca
 ```
 
 **Cubemap reflection (SampleCube in default.glsl):**
-- `I.x = -I.x` - Fix flip orizzontale
-- `N.y = -N.y` - Compensa normali invertite di cubewater.bb
-- `R.z = -R.z` - Conversione coordinate right-handed → left-handed
+- `R.y = -R.y` è l'UNICA conversione necessaria: le viste up/down sono salvate
+  nelle facce -Y/+Y (vedi `_cube_order` in graphics.gl/canvas.cpp) e le immagini
+  sono copiate 1:1 dal framebuffer. Verificato empiricamente con marker colorati.
+- NON aggiungere flip su I.x/N.y/R.z: erano workaround tarati quando CopyRect
+  scriveva tutte le viste sulla faccia 0 (bug corretto in GLCanvas::blit, che ora
+  seleziona l'attachment della faccia scelta con SetCubeFace).
+- `bbCameraPos` viene ricavata invertendo la view matrix in
+  blitz3d.gl.cpp:setViewMatrix (la matrice passata è la view, non la world della
+  camera: elements[3] NON è la posizione).
 
 ### Platform Configuration
 The root `CMakeLists.txt` detects and sets:

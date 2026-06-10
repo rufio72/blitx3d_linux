@@ -189,7 +189,7 @@ wxThread::ExitCode BlitzCC::Entry(){
 					// Check for errors and parse line number
 					// Format: "filepath":line:col:line:col:message
 					wxString lower = line.Lower();
-					if( lower.Contains("error") || lower.Contains("not found") ){
+					if( !lower.StartsWith("warning") && (lower.Contains("error") || lower.Contains("not found")) ){
 						blitzError = true;
 
 						// Try to parse error line number

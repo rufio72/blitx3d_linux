@@ -463,6 +463,17 @@ void GLCanvas::blit( int x,int y,BBCanvas *s,int src_x,int src_y,int src_w,int s
 	GL( glBindFramebuffer( GL_READ_FRAMEBUFFER,rfb ) );
 	GL( glBindFramebuffer( GL_DRAW_FRAMEBUFFER,dfb ) );
 
+	// Select the right color attachment on both FBOs: for cube map canvases
+	// setCubeFace() stores the face in 'mode', but a new FBO's draw/read buffer
+	// state defaults to attachment 0, so without this every face lands on face 0.
+	if( rfb && src->mode>=GL_COLOR_ATTACHMENT0 ){
+		GL( glReadBuffer( src->mode ) );
+	}
+	if( dfb && mode>=GL_COLOR_ATTACHMENT0 ){
+		const GLenum bufs[1]={ (GLenum)mode };
+		GL( glDrawBuffers( 1,bufs ) );
+	}
+
 	GL( glBlitFramebuffer( srcX0,srcY0,srcX1,srcY1,dstX0,dstY0,dstX1,dstY1,GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,GL_NEAREST ) );
 	// Phase 1 Optimization: Only generate mipmap if texture has mipmapping enabled
 	if( flags & CANVAS_TEX_MIPMAP ){
@@ -962,7 +973,8 @@ unsigned int GLCanvas::textureId(){
 unsigned int GLCanvas::framebufferId(){
 	if( framebuffer || mode==GL_FRONT || mode==GL_BACK ) return framebuffer;
 
-	mode=GL_COLOR_ATTACHMENT0;
+	// Don't clobber a face already selected via setCubeFace()
+	if( !mode ) mode=GL_COLOR_ATTACHMENT0;
 
 	GL( glGenRenderbuffers( 1,&depthbuffer ) );
 	GL( glBindRenderbuffer( GL_RENDERBUFFER,depthbuffer ) );

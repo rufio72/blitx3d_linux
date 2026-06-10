@@ -224,9 +224,6 @@ private:
 		GLuint bound_cube[MAX_TEXTURES] = {0};
 	} tex_cache;
 
-	// Texture parameter cache (optimization #6 - avoid redundant glTexParameteri)
-	GLTextureParamCache tex_param_cache[MAX_TEXTURES];
-
 	void setLights(){
 		LightState ls={ 0 };
 
@@ -271,11 +268,6 @@ private:
 public:
 	GLScene():wireframe(false){
 		memset( &us,0,sizeof(UniformState) );
-
-		// Initialize texture parameter caches
-		for (int i = 0; i < MAX_TEXTURES; i++) {
-			bbGLInitTexParamCache(&tex_param_cache[i]);
-		}
 
 		const float MIDLEVEL[]={ 0.5f,0.5f,0.5f,1.0f };
 		setAmbient( MIDLEVEL );
@@ -416,14 +408,17 @@ public:
 		// Optimization #1: Use cached uniform location
 		GL( glUniformMatrix4fv( uniform_locs.view_matrix,1,GL_FALSE,mat ) );
 
-		// Pass camera world position for cubemap reflections
-		// The Matrix contains the camera's world transform, so elements[3][x] is position
-		// Use original coordinates (not negated) to match bbVertex_WorldPosition
+		// Pass camera world position for cubemap reflections.
+		// 'matrix' is the VIEW matrix (inverse of the camera transform), so its
+		// translation row is -pos*R; recover the world position as -t*R^T.
+		// This is in Blitz world space, matching bbVertex_WorldPosition (which is
+		// computed from the un-negated world matrix).
 		if( matrix ){
-			GL( glUniform3f( uniform_locs.camera_pos,
-				matrix->elements[3][0],
-				matrix->elements[3][1],
-				matrix->elements[3][2] ) );
+			const Matrix *m=matrix;
+			float cx=-( m->elements[3][0]*m->elements[0][0] + m->elements[3][1]*m->elements[0][1] + m->elements[3][2]*m->elements[0][2] );
+			float cy=-( m->elements[3][0]*m->elements[1][0] + m->elements[3][1]*m->elements[1][1] + m->elements[3][2]*m->elements[1][2] );
+			float cz=-( m->elements[3][0]*m->elements[2][0] + m->elements[3][1]*m->elements[2][1] + m->elements[3][2]*m->elements[2][2] );
+			GL( glUniform3f( uniform_locs.camera_pos,cx,cy,cz ) );
 		}
 	}
 
@@ -609,12 +604,13 @@ public:
 				bool no_filter=flags&BBCanvas::CANVAS_TEX_NOFILTERING;
 				bool mipmap=flags&BBCanvas::CANVAS_TEX_MIPMAP;
 
-				// Optimization #6: Use cached texture parameters
-				bbGLSetTextureParams(&tex_param_cache[i], canvas->texture, canvas->target,
-					mipmap ? GL_LINEAR_MIPMAP_LINEAR : (no_filter ? GL_NEAREST : GL_LINEAR),
-					no_filter ? GL_NEAREST : GL_LINEAR,
-					flags & BBCanvas::CANVAS_TEX_CLAMPU ? GL_CLAMP_TO_EDGE : GL_REPEAT,
-					flags & BBCanvas::CANVAS_TEX_CLAMPV ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+				// NOTE: no caching here — texture ids are reused by GL after delete and the
+				// same slot serves both the 2D and cube units, so a per-slot cache can skip
+				// required glTexParameteri calls (mipmap-less textures then sample as black).
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_MAG_FILTER,no_filter?GL_NEAREST:GL_LINEAR ) );
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_MIN_FILTER,mipmap?GL_LINEAR_MIPMAP_LINEAR:(no_filter?GL_NEAREST:GL_LINEAR) ) );
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,flags&BBCanvas::CANVAS_TEX_CLAMPU?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
+				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,flags&BBCanvas::CANVAS_TEX_CLAMPV?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
 
 				// Only enable alpha test for masked textures when NOT using alpha blending
 				// For BLEND_ALPHA/BLEND_ADD sprites (like glow), we want smooth blending

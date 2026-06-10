@@ -80,8 +80,8 @@ void BuildDialog::AddBlitzMessage( const wxString &m ){
 
 	// Check for error patterns in the message
 	wxString lower = m.Lower();
-	if( lower.Contains("error") || lower.Contains("not found") ||
-		lower.Contains("failed") ){
+	if( !lower.StartsWith("warning") && (lower.Contains("error") || lower.Contains("not found") ||
+		lower.Contains("failed")) ){
 		hasErrors = true;
 		// Highlight error lines in red
 		long start = blitzOutput->GetLastPosition() - m.Length() - 1;

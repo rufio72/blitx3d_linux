@@ -152,6 +152,51 @@ Class Player
 End Class
 ```
 
+### This (alias)
+
+`This` is an alias of `Self`: the two keywords are interchangeable.
+
+```blitz
+Method AddScore(points%)
+    This\score% = This\score% + points%
+End Method
+```
+
+### Dot syntax after Self / This / Super
+
+After `Self`, `This` and `Super` you can use a dot (`.`) instead of the
+backslash (`\`) for field access and method calls. Both forms are equivalent
+and can be mixed freely:
+
+```blitz
+Method Describe$()
+    Self.score% = 0              ; same as Self\score%
+    This.AddScore(10)            ; same as This\AddScore(10)
+    Return Super.Describe$()     ; same as Super\Describe$()
+End Method
+```
+
+Note: the dot form is only available after `Self`/`This`/`Super`. On ordinary
+variables (`p.field`) the dot still means a *type tag* (`Local p.Player`),
+as in classic Blitz3D, so object access through a variable keeps using the
+backslash: `p\score%`.
+
+### Fields always require Self
+
+Inside a method, a bare identifier never refers to a field. Classic Blitz3D
+auto-declares unknown identifiers as local variables, so this compiles but
+does NOT touch the field:
+
+```blitz
+Method Increment()
+    value% = value% + 1      ; WRONG: creates a local, field unchanged
+End Method
+
+Method IncrementOK()
+    Self\value% = Self\value% + 1   ; correct (or Self.value%)
+End Method
+```
+
 ---
 
 ## Inheritance

@@ -47,9 +47,10 @@ private:
 	void parseChar( int c );
 	std::string parseTypeTag();
 
+	std::string parseSigilTag();
 	VarNode *parseVar();
-	VarNode *parseVar( const std::string &ident,const std::string &tag );
-	ExprNode *parseVarOrMethodCall( const std::string &ident,const std::string &tag );
+	VarNode *parseVar( const std::string &ident,const std::string &tag,bool allowDot=false );
+	ExprNode *parseVarOrMethodCall( const std::string &ident,const std::string &tag,bool allowDot=false );
 	CallNode *parseCall( const std::string &ident,const std::string &tag );
 	IfNode *parseIf();
 

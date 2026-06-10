@@ -216,14 +216,23 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			}
 			break;
 		case SELF:
-			// Self is treated as a variable named "self"
+			// Self is treated as a variable named "self"; both Self\x and Self.x work
 			{
 				toker->next();
-				std::string tag=parseTypeTag();
-				a_ptr<VarNode> var( parseVar( "self",tag ) );
-				if( toker->curr()!='=' ) exp( "variable assignment" );
-				toker->next();ExprNode *expr=parseExpr( false );
-				result=d_new AssNode( var.release(),expr );
+				ExprNode *expr_or_var=parseVarOrMethodCall( "self","",true );
+				if( dynamic_cast<MethodCallNode*>(expr_or_var) ){
+					// Method call as statement: Self\Method() / Self.Method()
+					result=d_new ExprStmtNode( expr_or_var );
+				}else{
+					VarExprNode *var_expr=dynamic_cast<VarExprNode*>(expr_or_var);
+					if( !var_expr ) ex( "Unexpected expression" );
+					if( toker->curr()!='=' ) exp( "variable assignment" );
+					toker->next();ExprNode *expr=parseExpr( false );
+					VarNode *var=var_expr->var;
+					var_expr->var=0; // prevent double delete
+					delete var_expr;
+					result=d_new AssNode( var,expr );
+				}
 			}
 			break;
 		case SUPER:
@@ -233,7 +242,7 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				if( currentClassName.empty() ){
 					ex( "Super can only be used inside a method" );
 				}
-				if( toker->curr()!='\\' ){
+				if( toker->curr()!='\\' && toker->curr()!='.' ){
 					exp( "'\\'" );
 				}
 				toker->next();
@@ -536,13 +545,24 @@ std::string Parser::parseTypeTag(){
 	return "";
 }
 
+// Like parseTypeTag but without the '.ident' form: used in dot-style member
+// access (Self.field), where a '.' is an access separator, not a type tag.
+std::string Parser::parseSigilTag(){
+	switch( toker->curr() ){
+	case '%':toker->next();return "%";
+	case '#':toker->next();return "#";
+	case '$':toker->next();return "$";
+	}
+	return "";
+}
+
 VarNode *Parser::parseVar(){
 	std::string ident=parseIdent();
 	std::string tag=parseTypeTag();
 	return parseVar( ident,tag );
 }
 
-VarNode *Parser::parseVar( const std::string &ident,const std::string &tag ){
+VarNode *Parser::parseVar( const std::string &ident,const std::string &tag,bool allowDot ){
 	a_ptr<VarNode> var;
 	if( toker->curr()=='(' ){
 		toker->next();
@@ -553,10 +573,12 @@ VarNode *Parser::parseVar( const std::string &ident,const std::string &tag ){
 	}else var=d_new IdentVarNode( ident,tag );
 
 	for(;;){
-		if( toker->curr()=='\\' ){
+		if( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
+			bool dot=( toker->curr()=='.' );
 			toker->next();
 			std::string ident=parseIdent();
-			std::string tag=parseTypeTag();
+			// in dot-mode a '.' is a member access, never a type tag
+			std::string tag=dot ? parseSigilTag() : parseTypeTag();
 			ExprNode *expr=d_new VarExprNode( var.release() );
 			var=d_new FieldVarNode( expr,ident,tag );
 		}else if( toker->curr()=='[' ){
@@ -575,7 +597,7 @@ VarNode *Parser::parseVar( const std::string &ident,const std::string &tag ){
 
 // Parse a variable access or method call (obj\Method())
 // Returns either VarExprNode or MethodCallNode
-ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::string &tag ){
+ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::string &tag,bool allowDot ){
 	a_ptr<VarNode> var;
 	if( toker->curr()=='(' ){
 		toker->next();
@@ -586,10 +608,12 @@ ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::stri
 	}else var=d_new IdentVarNode( ident,tag );
 
 	for(;;){
-		if( toker->curr()=='\\' ){
+		if( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
+			bool dot=( toker->curr()=='.' );
 			toker->next();
 			std::string field_ident=parseIdent();
-			std::string field_tag=parseTypeTag();
+			// in dot-mode a '.' is a member access, never a type tag
+			std::string field_tag=dot ? parseSigilTag() : parseTypeTag();
 
 			// Check if this is a method call: obj\Method(...)
 			if( toker->curr()=='(' ){
@@ -606,10 +630,11 @@ ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::stri
 				ExprNode *method_call=d_new MethodCallNode( obj_expr,field_ident,field_tag,exprs.release() );
 
 				// Check for chained method calls or field access
-				while( toker->curr()=='\\' ){
+				while( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
+					bool next_dot=( toker->curr()=='.' );
 					toker->next();
 					std::string next_ident=parseIdent();
-					std::string next_tag=parseTypeTag();
+					std::string next_tag=next_dot ? parseSigilTag() : parseTypeTag();
 					if( toker->curr()=='(' ){
 						// Chained method call
 						toker->next();
@@ -1087,9 +1112,9 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		toker->next();break;
 	case SELF:
 		// Self is treated as a variable named "self"
-		toker->next();tag=parseTypeTag();
-		// Use parseVarOrMethodCall to support self\Method() syntax
-		result=parseVarOrMethodCall( "self",tag );
+		toker->next();
+		// Use parseVarOrMethodCall to support self\Method() / self.Method() syntax
+		result=parseVarOrMethodCall( "self","",true );
 		break;
 	case SUPER:
 		// Super\Method() calls the parent class's method
@@ -1098,7 +1123,7 @@ ExprNode *Parser::parsePrimary( bool opt ){
 			if( currentClassName.empty() ){
 				ex( "Super can only be used inside a method" );
 			}
-			if( toker->curr()!='\\' ){
+			if( toker->curr()!='\\' && toker->curr()!='.' ){
 				exp( "'\\'" );
 			}
 			toker->next();

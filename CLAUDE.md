@@ -83,8 +83,11 @@ The compiler supports Object-Oriented Programming with these key files:
 - `Class`/`End Class` - Define classes with fields and methods
 - `Method`/`End Method` - Define instance methods (receive implicit `self` parameter)
 - `Static Method` - Define class methods (no `self` parameter)
-- `Self` - Reference to current object instance
+- `Self` - Reference to current object instance (`This` is an alias)
 - `Super\Method()` - Call parent class method
+- Dot syntax after `Self`/`This`/`Super`: `Self.field` and `Self.Method()` are
+  equivalent to the backslash forms (only there: on ordinary variables `.` is
+  still the classic type tag)
 - `Extends` - Single inheritance
 - Methods compiled as global functions: `ClassName_MethodName(self, args...)`
 

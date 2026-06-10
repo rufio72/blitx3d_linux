@@ -117,6 +117,18 @@ EntityAlpha water,1.0  ; TEST: opaco per vedere se riflesso appare sulla superfi
 EntityFX water,1
 AddEntity(water)
 
+; LAMPADA A BORDO PISCINA - luce bassa sull'acqua per i riflessi speculari
+Global poollamp, poollampmesh
+poollampmesh = CreateSphere(8)
+ScaleEntity poollampmesh,0.8,0.8,0.8
+PositionEntity poollampmesh,0,2,-182
+EntityColor poollampmesh,255,220,150
+EntityFX poollampmesh,1
+poollamp = CreateLight(2)
+PositionEntity poollamp,0,2,-182
+LightColor poollamp,255,220,150
+LightRange poollamp,70
+
 Type Vertices
 	Field x#
 	Field y#

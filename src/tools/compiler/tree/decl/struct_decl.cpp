@@ -139,7 +139,7 @@ void StructDeclNode::translate2( Codegen_LLVM *g ){
 #ifdef USE_GCC_BACKEND
 #include "../../codegen_c/codegen_c.h"
 
-void StructDeclNode::translate3( Codegen_C *g ){
+void bbTranslateObjTypeInit( Codegen_C *g,const std::string &ident,StructType *sem_type ){
 	// Generate BBObjType initializer that matches runtime's blitz.h
 	// BBObjType = { bb_int_t type, BBObj used, BBObj free, bb_int_t fieldCnt, BBType* fieldTypes[N] }
 	// BBObj = { fields, next, prev, type, ref_cnt }
@@ -182,6 +182,10 @@ void StructDeclNode::translate3( Codegen_C *g ){
 		g->globals << "    " << typeName << ".fieldTypes[" << k << "] = " << fieldTypeRefs[k] << ";\n";
 	}
 	g->globals << "}\n";
+}
+
+void StructDeclNode::translate3( Codegen_C *g ){
+	bbTranslateObjTypeInit( g,ident,sem_type );
 }
 #endif
 

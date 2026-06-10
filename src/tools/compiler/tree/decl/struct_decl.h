@@ -23,4 +23,10 @@ struct StructDeclNode : public DeclNode{
 	json toJSON( Environ *e );
 };
 
+#ifdef USE_GCC_BACKEND
+// Emit the BBObjType constructor-initializer for a struct/class type.
+// Shared by StructDeclNode and ClassDeclNode.
+void bbTranslateObjTypeInit( Codegen_C *g,const std::string &ident,StructType *sem_type );
+#endif
+
 #endif

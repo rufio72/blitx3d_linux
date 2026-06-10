@@ -1,4 +1,5 @@
 #include "class_decl.h"
+#include "struct_decl.h"
 
 /////////////////////
 // Class Declaration //
@@ -172,6 +173,17 @@ void ClassDeclNode::translate2( Codegen_LLVM *g ){
 
 	// Translate methods
 	methods->translate2( g );
+}
+#endif
+
+#ifdef USE_GCC_BACKEND
+void ClassDeclNode::translate3( Codegen_C *g ){
+	// Object-type table initializer (full field list: inherited + own)
+	bbTranslateObjTypeInit( g,ident,sem_type );
+
+	// Emit method bodies (methods are compiled as global functions
+	// ClassName_MethodName(self,...))
+	methods->translate3( g );
 }
 #endif
 

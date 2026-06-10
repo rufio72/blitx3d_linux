@@ -155,6 +155,9 @@ public:
             generateModulePages(mod);
         }
 
+        // Generate language guides (e.g. OOP)
+        generateOOPGuide();
+
         // Generate index
         generateIndex(modules);
 
@@ -242,6 +245,19 @@ private:
         writeFile(modDir + "/index.html", wrapInLayout(mod.name, content, "../../"));
     }
 
+    void generateOOPGuide() {
+        std::string md = readFile(srcPath + "/docs/OOP.md");
+        if (md.empty()) {
+            std::cout << "  Skipped OOP guide (docs/OOP.md not found)" << std::endl;
+            return;
+        }
+        std::string content = "<div class=\"full-page\">\n" + parser.parse(md) + "</div>\n";
+        fs::create_directories(outPath + "/language");
+        writeFile(outPath + "/language/oop.html",
+                  wrapInLayout("Object-Oriented Programming", content, "../"));
+        std::cout << "  Generated: " << outPath << "/language/oop.html" << std::endl;
+    }
+
     void generateIndex(const std::vector<Module>& modules) {
         std::string content = R"(
 <div class="full-page">
@@ -251,6 +267,7 @@ private:
   <ul class="main-menu">
     <li><a href="../samples">Samples</a> - a collection of samples to whet your appetite!</li>
     <li><a href="./reference/index.html">Command Reference</a> - for the low down on the Blitz3D command set.</li>
+    <li><a href="./language/oop.html">OOP Guide</a> - object-oriented programming: Class, Method, Self, Super, inheritance.</li>
     <li><a href="https://github.com/nickmckay/blitz3d-ng" target="_blank">GitHub</a> - source code and issue tracker</li>
   </ul>
 

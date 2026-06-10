@@ -261,8 +261,11 @@ std::string SuperMethodCallNode::translate3( Codegen_C *g ){
 
 	std::string result = funcName + "(";
 
-	// First argument is self
-	result += "self";
+	// First argument is self — use the same name mangling as DeclVarNode
+	if( self_decl->kind == DECL_GLOBAL ) result += g->toCSafeName( "_v" + self_decl->name );
+	else if( self_decl->kind == DECL_LOCAL ) result += g->toCSafeName( "_l" + self_decl->name );
+	else if( self_decl->kind == DECL_PARAM ) result += g->toCSafeName( "_p" + self_decl->name );
+	else result += g->toCSafeName( self_decl->name );
 
 	// Then the rest of the arguments
 	for( int i = 0; i < exprs->size(); i++ ){

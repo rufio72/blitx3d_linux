@@ -229,12 +229,10 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 		args.push_back("--eh-frame-hdr");
 
 		args.push_back( sysroot+"/usr/lib/"+ndktriple+"/"+ndkapi+"/crtbegin_so.o");
-		args.push_back("-L");args.push_back( ndkroot+"/lib64/clang/11.0.5/lib/linux/"+ndkarch);
-		args.push_back("-L");args.push_back( ndkroot+"/lib/gcc/"+ndktriple+"/4.9.x");
-		args.push_back("-L");args.push_back( ndkroot+"/"+ndktriple+"/lib64");
-		args.push_back("-L");args.push_back( ndkroot+"/"+ndktriple+"/lib");
+		// Use clang 17 paths (NDK r26+)
+		args.push_back("-L");args.push_back( ndkroot+"/lib/clang/17/lib/linux/"+ndkarch);
 		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"/"+ndkapi);
-		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple+"");
+		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib/"+ndktriple);
 		args.push_back("-L");args.push_back( ndkroot+"/sysroot/usr/lib");
 	}else if( nx ){
 		args.push_back( "-maarch64elf" );
@@ -273,9 +271,27 @@ void Linker_LLD::createExe( bool debug,const std::string &rt,const Target &targe
 			platform_version_min=platform_version_max=target.version;
 		}
 
-		// TODO: use xcrun --show-sdk-path
+		// Use xcrun to get SDK path dynamically
+		std::string xcrun_sdk = (sdkname == "MacOSX") ? "macosx" :
+		                        (sdkname == "iPhoneOS") ? "iphoneos" : "iphonesimulator";
+		std::string xcrun_cmd = "xcrun --sdk " + xcrun_sdk + " --show-sdk-path";
+		std::string sdk_path;
+		if( FILE *fp = popen( xcrun_cmd.c_str(), "r" ) ){
+			char path[512];
+			if( fgets( path, sizeof(path), fp ) ){
+				// Remove trailing newline
+				size_t len = strlen(path);
+				if( len > 0 && path[len-1] == '\n' ) path[len-1] = '\0';
+				sdk_path = path;
+			}
+			pclose(fp);
+		}
+		if( sdk_path.empty() ){
+			// Fallback to default path if xcrun fails
+			sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/"+sdkname+".platform/Developer/SDKs/"+sdkname+".sdk";
+		}
 		args.push_back("-syslibroot");
-		args.push_back( "/Applications/Xcode.app/Contents/Developer/Platforms/"+sdkname+".platform/Developer/SDKs/"+sdkname+".sdk" );
+		args.push_back( sdk_path );
 
 		libs.push_back( "objc" );
 		libs.push_back( "c" );

@@ -5,7 +5,10 @@
 #include <map>
 #include <vector>
 #include <sstream>
+#include <set>
 #include "../target.h"
+
+struct FuncType;
 
 // Forward declarations for Blitz types
 struct Type;
@@ -22,6 +25,8 @@ public:
 
     // Output streams
     std::stringstream header;      // Forward declarations, structs
+    std::stringstream runtimeDecls; // Auto-generated extern decls for runtime funcs
+    std::set<std::string> declaredRuntimeSyms;
     std::stringstream globals;     // Global variables
     std::stringstream functions;   // Function definitions
     std::stringstream mainCode;    // Main program code
@@ -60,6 +65,9 @@ public:
     void emitLine(const std::string &code);
     void emitLabel(const std::string &label);
     void emitGlobal(const std::string &code);
+
+    // Declare an extern prototype for a runtime function (deduplicated)
+    void declareRuntimeFunc(const std::string &symbol, FuncType *funcType);
 
     // Type conversion
     std::string toCType(Type *type);

@@ -1,4 +1,5 @@
 #include "codegen_c.h"
+#include <cmath>
 #include "../tree/type.h"
 #include <iostream>
 #include <fstream>
@@ -538,6 +539,42 @@ void Codegen_C::emitGlobal(const std::string &code) {
     globals << code << "\n";
 }
 
+static std::string extractExternSymbol(const std::string &line) {
+    // matches: extern <ret type tokens> <name>(
+    size_t par = line.find('(');
+    if (par == std::string::npos || line.compare(0, 7, "extern ") != 0) return "";
+    size_t end = par;
+    while (end > 0 && isspace((unsigned char)line[end-1])) end--;
+    size_t start = end;
+    while (start > 0 && (isalnum((unsigned char)line[start-1]) || line[start-1]=='_')) start--;
+    return line.substr(start, end-start);
+}
+
+void Codegen_C::declareRuntimeFunc(const std::string &symbol, FuncType *f) {
+    if (declaredRuntimeSyms.empty()) {
+        // First call: collect symbols already declared in the hardcoded header
+        std::string h = header.str(), line;
+        std::stringstream hs(h);
+        while (std::getline(hs, line)) {
+            std::string sym = extractExternSymbol(line);
+            if (!sym.empty()) declaredRuntimeSyms.insert(sym);
+        }
+    }
+    if (!declaredRuntimeSyms.insert(symbol).second) return;
+
+    std::string decl = "extern " + toCType(f->returnType) + " " + symbol + "(";
+    if (!f->params || f->params->size() == 0) {
+        decl += "void";
+    } else {
+        for (int k = 0; k < f->params->size(); ++k) {
+            if (k) decl += ", ";
+            decl += toCType(f->params->decls[k]->type);
+        }
+    }
+    decl += ");\n";
+    runtimeDecls << decl;
+}
+
 std::string Codegen_C::toCType(Type *type) {
     if( type == Type::int_type ) return "bb_int_t";
     if( type == Type::float_type ) return "bb_float_t";
@@ -566,6 +603,9 @@ std::string Codegen_C::constantInt(int i) {
 }
 
 std::string Codegen_C::constantFloat(double f) {
+    // Non-finite values would print as 'inf'/'nan', which is not valid C
+    if (std::isinf(f)) return f > 0 ? "__builtin_inff()" : "(-__builtin_inff())";
+    if (std::isnan(f)) return "__builtin_nanf(\"\")";
     std::stringstream ss;
     ss.precision(17);
     ss << std::fixed << f;
@@ -665,6 +705,8 @@ std::string Codegen_C::generateOutput() {
     std::stringstream output;
 
     output << header.str();
+    output << "\n/* Runtime declarations (auto-generated from module decls) */\n";
+    output << runtimeDecls.str();
     output << "\n/* Global variables */\n";
     output << globals.str();
     output << "\n/* Data section */\n";

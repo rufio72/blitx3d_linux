@@ -161,6 +161,10 @@ std::string CallNode::translate3( Codegen_C *g ){
 	if( funcName.empty() ){
 		// User-defined function - use same naming as FuncDeclNode
 		funcName = g->toCSafeName( "f" + ident );
+	}else{
+		// Runtime function: make sure an extern prototype is emitted, or C
+		// falls back to an implicit int declaration (string returns crash)
+		g->declareRuntimeFunc( funcName,f );
 	}
 
 	std::string result = funcName + "(";

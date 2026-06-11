@@ -29,3 +29,14 @@ void InsertNode::translate2( Codegen_LLVM *g ){
 	g->CallIntrinsic( s,Type::void_type->llvmType( g->context.get() ),2,t1,t2 );
 }
 #endif
+
+#ifdef USE_GCC_BACKEND
+#include "../../codegen_c/codegen_c.h"
+
+void InsertNode::translate3( Codegen_C *g ){
+	std::string t1=expr1->translate3( g );
+	std::string t2=expr2->translate3( g );
+	std::string s=before ? "_bbObjInsBefore" : "_bbObjInsAfter";
+	g->emitLine( s + "((bb_obj_t)" + t1 + ",(bb_obj_t)" + t2 + ");" );
+}
+#endif

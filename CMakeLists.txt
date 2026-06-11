@@ -204,13 +204,18 @@ IF(BB_ENV MATCHES debug OR BB_ENV MATCHES test)
   # TODO: work to remove the need for this...
   add_definitions(-D_DEBUG)
 ELSE()
-  set(CMAKE_BUILD_TYPE MinSizeRel)
-  # TODO: perhaps enable this as a build option for those interested in speed
-  # over disk space.
-  # set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set(CMAKE_BUILD_TYPE Release)
   set(BB_RELEASE true)
   if(NOT BB_MINGW)
+    # LTO scoped to tools/IDE only (see src/tools/CMakeLists.txt).
+    # Setting CMAKE_INTERPROCEDURAL_OPTIMIZATION globally triggers a GCC LTO
+    # miscompilation of _bbStrConcat (double-free in benchmark.bb).
+    # Confirmed via ASan: bug disappears when LTO is off on runtime/modules.
     set(ENABLE_LTO true)
+  endif()
+  # Strip release binaries on GNU toolchains.
+  if(BB_GNU AND NOT BB_MINGW)
+    add_link_options(-Wl,-s)
   endif()
 ENDIF()
 

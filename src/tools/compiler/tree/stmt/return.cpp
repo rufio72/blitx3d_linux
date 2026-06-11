@@ -83,7 +83,18 @@ void ReturnNode::translate2( Codegen_LLVM *g ){
 void ReturnNode::translate3( Codegen_C *g ){
 	if( expr ){
 		std::string val = expr->translate3( g );
-		g->emitLine( "return " + val + ";" );
+		if( g->cleanupLines.empty() ){
+			g->emitLine( "return " + val + ";" );
+		}else{
+			// evaluate first (the expression may read the locals we are
+			// about to release), then run the release epilogue
+			std::string tmp = g->newTemp();
+			g->emitLine( "{" );
+			g->emitLine( g->currentRetType + " " + tmp + " = " + val + ";" );
+			for( size_t i=0; i<g->cleanupLines.size(); ++i ) g->emitLine( g->cleanupLines[i] );
+			g->emitLine( "return " + tmp + ";" );
+			g->emitLine( "}" );
+		}
 	} else {
 		// Gosub return - use computed goto with labels as values extension
 		g->emitLine( "goto *_bbPopGosub();" );

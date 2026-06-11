@@ -175,6 +175,32 @@ void Node::createVars3( Environ *e, Codegen_C *g ){
 		}
 	}
 }
+
+// C-backend counterpart of deleteVars: release statements emitted on every
+// exit path (string locals/params, object locals, Blitz-array locals)
+std::vector<std::string> Node::deleteVars3( Environ *e, Codegen_C *g ){
+	std::vector<std::string> lines;
+	for( int k=0; k<e->decls->size(); ++k ){
+		Decl *d = e->decls->decls[k];
+		Type *type = d->type;
+		if( type == Type::string_type ){
+			if( d->kind == DECL_LOCAL ){
+				lines.push_back( "_bbStrRelease(" + g->toCSafeName( "_l" + d->name ) + ");" );
+			}else if( d->kind == DECL_PARAM ){
+				lines.push_back( "_bbStrRelease(" + g->toCSafeName( "_p" + d->name ) + ");" );
+			}
+		}else if( type->structType() ){
+			if( d->kind == DECL_LOCAL ){
+				lines.push_back( "_bbObjRelease(" + g->toCSafeName( "_l" + d->name ) + ");" );
+			}
+		}else if( VectorType *v = type->vectorType() ){
+			if( d->kind == DECL_LOCAL ){
+				lines.push_back( "_bbVecFree(" + g->toCSafeName( "_l" + d->name ) + ", (BBVecType*)&" + g->toCSafeName( v->label ) + ");" );
+			}
+		}
+	}
+	return lines;
+}
 #endif
 
 ////////////////////////

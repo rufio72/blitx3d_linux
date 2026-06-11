@@ -52,6 +52,11 @@ public:
     // Break label stack for Exit statements
     std::vector<std::string> breakLabelStack;
 
+    // Release statements (strings/objects/blitz-arrays) emitted on every
+    // exit path of the current function; filled by FuncDeclNode::translate3
+    std::vector<std::string> cleanupLines;
+    std::string currentRetType;
+
     // Data values
     std::vector<std::string> dataValues;
 

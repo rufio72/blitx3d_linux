@@ -147,8 +147,21 @@ void FuncDeclNode::translate3( Codegen_C *g ){
 	// Create local variables
 	createVars3( sem_env, g );
 
+	// Release statements for every exit path (Return emits them too)
+	g->cleanupLines = deleteVars3( sem_env, g );
+	g->currentRetType = retType;
+
 	// Translate statements
 	stmts->translate3( g );
+
+	// Implicit return: release vars and return the default value
+	for( size_t i=0; i<g->cleanupLines.size(); ++i ) g->emitLine( g->cleanupLines[i] );
+	if( sem_type->returnType == Type::string_type ) g->emitLine( "return _bbStrConst(\"\");" );
+	else if( sem_type->returnType == Type::float_type ) g->emitLine( "return 0.0;" );
+	else g->emitLine( "return 0;" );
+
+	g->cleanupLines.clear();
+	g->currentRetType.clear();
 
 	g->endFunction();
 }

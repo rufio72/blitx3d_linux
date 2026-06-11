@@ -67,6 +67,7 @@ struct Node{
 #endif
 #ifdef USE_GCC_BACKEND
 	static void createVars3( Environ *e, Codegen_C *g );
+	static std::vector<std::string> deleteVars3( Environ *e, Codegen_C *g );
 #endif
 };
 

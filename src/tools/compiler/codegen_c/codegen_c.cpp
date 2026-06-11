@@ -68,6 +68,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "/* Object runtime functions */\n";
     header << "extern bb_obj_t _bbObjNew(BBObjType *type);\n";
     header << "extern void _bbObjDelete(bb_obj_t obj);\n";
+    header << "extern void _bbObjRelease(bb_obj_t obj);\n";
     header << "extern void _bbObjDeleteEach(BBObjType *type);\n";
     header << "extern bb_int_t _bbObjEachFirst(bb_obj_t *var, BBObjType *type);\n";
     header << "extern bb_int_t _bbObjEachNext(bb_obj_t *var);\n";

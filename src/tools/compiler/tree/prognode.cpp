@@ -414,6 +414,12 @@ void ProgNode::translate3( Codegen_C *g, const std::vector<UserFunc> &userfuncs 
 	// Translate statements
 	stmts->translate3( g );
 
+	// Release main-level locals (keeps runtime leak stats clean)
+	{
+		std::vector<std::string> cleanup = deleteVars3( sem_env, g );
+		for( size_t i=0; i<cleanup.size(); ++i ) g->emitLine( cleanup[i] );
+	}
+
 	g->endMain();
 }
 #endif

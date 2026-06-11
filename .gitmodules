@@ -49,3 +49,7 @@
 [submodule "deps/llvm"]
 	path = deps/llvm
 	url = https://github.com/blitz3d-ng/build-llvm
+[submodule "deps/assimp/tree"]
+	path = deps/assimp/tree
+	url = https://github.com/assimp/assimp.git
+	shallow = true

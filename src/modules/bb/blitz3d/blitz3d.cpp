@@ -11,6 +11,7 @@
 #include "loader_x2.h"
 #include "loader_3ds.h"
 #include "loader_b3d.h"
+#include "loader_assimp.h"
 #include "std.h"
 #include "graphics.h"
 
@@ -44,6 +45,7 @@ extern float stats3d[10];
 static Loader_X2 loader_x;
 static Loader_3DS loader_3ds;
 static Loader_B3D loader_b3d;
+static Loader_Assimp loader_assimp;
 
 static std::map<std::string,Transform> loader_mat_map;
 
@@ -177,6 +179,7 @@ static Entity *loadEntity( std::string t,int hint ){
 	if( ext=="3ds" ) l=&loader_3ds;
 	else if( ext=="b3d" ) l=&loader_b3d;
 	else if( ext=="x" ) l=&loader_x;
+	else if( ext=="gltf" || ext=="glb" || ext=="obj" || ext=="dae" || ext=="fbx" ) l=&loader_assimp;
 	else return 0;
 
 	const Transform &conv=loader_mat_map[ext];

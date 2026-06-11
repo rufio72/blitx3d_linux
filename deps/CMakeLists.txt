@@ -36,6 +36,7 @@ add_subdirectory(glew)
 add_subdirectory(sdl)
 add_subdirectory(libpng)
 add_subdirectory(freeimage)
+add_subdirectory(assimp)
 add_subdirectory(dxsdk)
 
 # audio

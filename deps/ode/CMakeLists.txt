@@ -2,10 +2,13 @@ if(NOT BB_DESKTOP AND NOT BB_NX)
   return()
 endif()
 
-# patch to make it more friendly
+# patch to make it more friendly (guard keeps the replace idempotent
+# across reconfigures, otherwise each configure prepends another "# ")
 file(READ tree/CMakeLists.txt FILE_CONTENTS)
-string(REPLACE "add_custom_target(uninstall" "# add_custom_target(uninstall" FILE_CONTENTS "${FILE_CONTENTS}")
-file_write_changes(tree/CMakeLists.txt "${FILE_CONTENTS}")
+if(NOT FILE_CONTENTS MATCHES "# add_custom_target\\(uninstall")
+  string(REPLACE "add_custom_target(uninstall" "# add_custom_target(uninstall" FILE_CONTENTS "${FILE_CONTENTS}")
+  file_write_changes(tree/CMakeLists.txt "${FILE_CONTENTS}")
+endif()
 
 # for mingw
 file(READ tree/ode/src/threading_pool_win.cpp FILE_CONTENTS)

@@ -48,7 +48,7 @@ private:
 
 	void collide( Object *src );
 	void render( Camera *c,Mirror *m );
-	void render( Model *m,const RenderContext &rc );
+	void render( Model *m,const RenderContext &rc,bool sort_opaque=false );
 	void flushTransparent();
 
 };

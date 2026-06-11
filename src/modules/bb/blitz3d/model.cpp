@@ -28,6 +28,9 @@ public:
 	int getQueueType()const{
 		return q_type;
 	}
+	const Brush &getBrush()const{
+		return brush;
+	}
 	void render(){
 		bbScene->setRenderState( brush.getRenderState() );
 		bbScene->render( mesh,fv,vc,ft,tc );
@@ -126,4 +129,13 @@ void Model::renderQueue( int type ){
 		q->render();
 		delete q;
 	}
+}
+
+void Model::sortQueue( int type ){
+	std::vector<MeshQueue*> &que=queues[type];
+	if( que.size()<2 ) return;
+	// adjacent equal states let the scene skip the whole UBO/texture setup
+	std::stable_sort( que.begin(),que.end(),[]( const MeshQueue *a,const MeshQueue *b ){
+		return a->getBrush()<b->getBrush();
+	} );
 }

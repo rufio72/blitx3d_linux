@@ -643,7 +643,7 @@ void World::render( Camera *cam,Mirror *mirror ){
 	for( unsigned int k=0;k<unord_mods.size();++k ){
 		Model *mod=unord_mods[k];
 		if( !mod->doAutoFade( cam_tform.v ) ) continue;
-		render( mod,rc );
+		render( mod,rc,true );
 	}
 	bbScene->setZMode( BBScene::ZMODE_CMPONLY );
 	flushTransparent();
@@ -657,7 +657,7 @@ void World::render( Camera *cam,Mirror *mirror ){
 	}
 }
 
-void World::render( Model *mod,const RenderContext &rc ){
+void World::render( Model *mod,const RenderContext &rc,bool sort_opaque ){
 
 	bool trans=mod->render( rc );
 
@@ -667,6 +667,8 @@ void World::render( Model *mod,const RenderContext &rc ){
 		}else{
 			bbScene->setWorldMatrix( 0 );
 		}
+		// safe only when depth testing is on (ZMODE_NORMAL phase)
+		if( sort_opaque ) mod->sortQueue( Model::QUEUE_OPAQUE );
 		mod->renderQueue( Model::QUEUE_OPAQUE );
 	}
 

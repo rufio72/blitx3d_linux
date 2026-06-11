@@ -181,11 +181,18 @@ struct LightState{
 		float color[4];
 		float position[4];  // xyz = position, w = type (1=directional, 2=point, 3=spot)
 		float params[4];    // x = range, y = inner_cone, z = outer_cone, w = unused
+		float direction[4]; // xyz = world-space direction (directional lights), w = unused
 	} data[8];
 
 	int lights_used;
 	int padding[3]; // Align to 16 bytes
 };
+
+// std140 layout guards: these must match BBLightState/BBRenderState in
+// default.glsl exactly - adding or reordering a field without updating the
+// shader (and vice versa) silently corrupts every uniform that follows
+static_assert( sizeof(LightState::LightData)==128,"LightData layout must match BBLightData (std140)" );
+static_assert( sizeof(LightState)==8*128+16,"LightState layout must match BBLightState (std140)" );
 
 struct UniformState{
 	float ambient[4];
@@ -206,6 +213,9 @@ struct UniformState{
 	int fog_mode;
 	int alpha_test;
 };
+
+static_assert( sizeof(UniformState::GLTexState)==80,"GLTexState layout must match BBTextureState (std140)" );
+static_assert( sizeof(UniformState)==48+8*80+32,"UniformState layout must match BBRenderState (std140)" );
 
 class GLScene : public BBScene{
 private:
@@ -242,6 +252,17 @@ private:
 		GLuint bound_cube[MAX_TEXTURES] = {0};
 	} tex_cache;
 
+	// Redundant-state elimination: shadow copies of GL state and of the
+	// last uploaded UBO contents; reset in begin() because 2D code and
+	// end() touch the same GL state between renders
+	int cur_blend=-1;
+	int cur_cullface=-1;
+	int cur_polymode=-1;
+	UniformState last_us={ 0 };
+	bool last_us_valid=false;
+	LightState last_ls={ 0 };
+	bool last_ls_valid=false;
+
 	void setLights(){
 		LightState ls={ 0 };
 
@@ -267,7 +288,24 @@ private:
 			ls.data[i].params[1]=lights[i]->inner_angle;
 			ls.data[i].params[2]=lights[i]->outer_angle;
 			ls.data[i].params[3]=0.0f;
+
+			// Optimization #8: world-space direction on the CPU. Equivalent
+			// to the old per-vertex mat3(TForm*rotX(90))*vec3(0,1,0), which
+			// reduces to minus the third column of the light matrix.
+			const float *m=lights[i]->matrix;
+			float dx=-m[8],dy=-m[9],dz=-m[10];
+			float len=sqrtf( dx*dx+dy*dy+dz*dz );
+			if( len>0 ){ dx/=len;dy/=len;dz/=len; }
+			ls.data[i].direction[0]=dx;
+			ls.data[i].direction[1]=dy;
+			ls.data[i].direction[2]=dz;
+			ls.data[i].direction[3]=0.0f;
 		}
+
+		// skip the upload entirely if nothing changed since last frame
+		if( last_ls_valid && !memcmp( &ls,&last_ls,sizeof(ls) ) ) return;
+		last_ls=ls;
+		last_ls_valid=true;
 
 		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData
 		if( light_ubo==0 ){
@@ -526,10 +564,11 @@ public:
 			us.fog_mode = 0;
 		}
 
-		if( rs.fx&FX_DOUBLESIDED ){
-			GL( glDisable( GL_CULL_FACE ) );
-		}else{
-			GL( glEnable( GL_CULL_FACE ) );
+		int want_cull=rs.fx&FX_DOUBLESIDED ? 0 : 1;
+		if( want_cull!=cur_cullface ){
+			if( want_cull ){ GL( glEnable( GL_CULL_FACE ) ); }
+			else{ GL( glDisable( GL_CULL_FACE ) ); }
+			cur_cullface=want_cull;
 		}
 
 		int blend=rs.blend;
@@ -538,10 +577,10 @@ public:
 
 		// TODO: sort this out for ES
 #ifndef GLES
-		if( rs.fx&FX_WIREFRAME||wireframe ){
-			GL( glPolygonMode(GL_FRONT_AND_BACK,GL_LINE) );
-		}else{
-			GL( glPolygonMode(GL_FRONT_AND_BACK,GL_FILL) );
+		int want_poly=( rs.fx&FX_WIREFRAME||wireframe ) ? 1 : 0;
+		if( want_poly!=cur_polymode ){
+			GL( glPolygonMode( GL_FRONT_AND_BACK,want_poly?GL_LINE:GL_FILL ) );
+			cur_polymode=want_poly;
 		}
 #endif
 
@@ -622,13 +661,20 @@ public:
 				bool no_filter=flags&BBCanvas::CANVAS_TEX_NOFILTERING;
 				bool mipmap=flags&BBCanvas::CANVAS_TEX_MIPMAP;
 
-				// NOTE: no caching here — texture ids are reused by GL after delete and the
-				// same slot serves both the 2D and cube units, so a per-slot cache can skip
-				// required glTexParameteri calls (mipmap-less textures then sample as black).
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_MAG_FILTER,no_filter?GL_NEAREST:GL_LINEAR ) );
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_MIN_FILTER,mipmap?GL_LINEAR_MIPMAP_LINEAR:(no_filter?GL_NEAREST:GL_LINEAR) ) );
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,flags&BBCanvas::CANVAS_TEX_CLAMPU?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
-				GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,flags&BBCanvas::CANVAS_TEX_CLAMPV?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
+				// Sampling params are a function of the canvas flags only.
+				// The cache lives in the canvas (NOT per texture-slot: ids
+				// are reused by GL after delete, but this cache dies with
+				// the canvas that owns the texture, so it cannot go stale).
+				int want_params=(no_filter?1:0)|(mipmap?2:0)
+					|(flags&BBCanvas::CANVAS_TEX_CLAMPU?4:0)
+					|(flags&BBCanvas::CANVAS_TEX_CLAMPV?8:0);
+				if( canvas->cached_tex_params!=want_params ){
+					GL( glTexParameteri( canvas->target,GL_TEXTURE_MAG_FILTER,no_filter?GL_NEAREST:GL_LINEAR ) );
+					GL( glTexParameteri( canvas->target,GL_TEXTURE_MIN_FILTER,mipmap?GL_LINEAR_MIPMAP_LINEAR:(no_filter?GL_NEAREST:GL_LINEAR) ) );
+					GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_S,flags&BBCanvas::CANVAS_TEX_CLAMPU?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
+					GL( glTexParameteri( canvas->target,GL_TEXTURE_WRAP_T,flags&BBCanvas::CANVAS_TEX_CLAMPV?GL_CLAMP_TO_EDGE:GL_REPEAT ) );
+					canvas->cached_tex_params=want_params;
+				}
 
 				// Only enable alpha test for masked textures when NOT using alpha blending
 				// For BLEND_ALPHA/BLEND_ADD sprites (like glow), we want smooth blending
@@ -647,36 +693,45 @@ public:
 			}
 		}
 
-		switch( blend ){
-		default:case BLEND_REPLACE:
-			GL( glDisable( GL_BLEND ) );
-			break;
-		case BLEND_ALPHA:
-			GL( glEnable( GL_BLEND ) );
-			GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA ) );
-			break;
-		case BLEND_MULTIPLY:
-			GL( glEnable( GL_BLEND ) );
-			GL( glBlendFunc( GL_DST_COLOR,GL_ZERO ) );
-			break;
-		case BLEND_ADD:
-			GL( glEnable( GL_BLEND ) );
-			GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE ) );
-			break;
+		if( blend!=cur_blend ){
+			switch( blend ){
+			default:case BLEND_REPLACE:
+				GL( glDisable( GL_BLEND ) );
+				break;
+			case BLEND_ALPHA:
+				GL( glEnable( GL_BLEND ) );
+				GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA ) );
+				break;
+			case BLEND_MULTIPLY:
+				GL( glEnable( GL_BLEND ) );
+				GL( glBlendFunc( GL_DST_COLOR,GL_ZERO ) );
+				break;
+			case BLEND_ADD:
+				GL( glEnable( GL_BLEND ) );
+				GL( glBlendFunc( GL_SRC_ALPHA,GL_ONE ) );
+				break;
+			}
+			cur_blend=blend;
 		}
 
-		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData
-		if( render_ubo==0 ){
-			GL( glGenBuffers( 1,&render_ubo ) );
-			GL( glBindBuffer( GL_UNIFORM_BUFFER,render_ubo ) );
-			GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(us),nullptr,GL_DYNAMIC_DRAW ) );
-			GL( glBindBufferRange( GL_UNIFORM_BUFFER,2,render_ubo,0,sizeof(us) ) );
-		}else{
-			GL( glBindBuffer( GL_UNIFORM_BUFFER,render_ubo ) );
-		}
+		// Optimization #2: Use member UBO, allocate once, update with glBufferSubData.
+		// Skip the upload (and the binds) entirely when the state is identical to
+		// the last one uploaded - consecutive surfaces usually share their brush.
+		if( !last_us_valid || memcmp( &us,&last_us,sizeof(us) ) ){
+			if( render_ubo==0 ){
+				GL( glGenBuffers( 1,&render_ubo ) );
+				GL( glBindBuffer( GL_UNIFORM_BUFFER,render_ubo ) );
+				GL( glBufferData( GL_UNIFORM_BUFFER,sizeof(us),nullptr,GL_DYNAMIC_DRAW ) );
+				GL( glBindBufferRange( GL_UNIFORM_BUFFER,2,render_ubo,0,sizeof(us) ) );
+			}else{
+				GL( glBindBuffer( GL_UNIFORM_BUFFER,render_ubo ) );
+			}
 
-		GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(us),&us ) );
-		GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
+			GL( glBufferSubData( GL_UNIFORM_BUFFER,0,sizeof(us),&us ) );
+			GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
+			last_us=us;
+			last_us_valid=true;
+		}
 
 		// restore
 		us.fog_mode=fog_mode;
@@ -732,8 +787,18 @@ public:
 
 		GL( glDepthFunc( GL_LEQUAL ) );
 
+		// 2D rendering and end() touch the same GL state between renders:
+		// drop the shadow copies so the first draw re-applies everything
+		cur_blend=-1;
+		cur_cullface=1; // glEnable above
+		cur_polymode=-1;
+		last_us_valid=false;
+
 		lights.clear();
-		for( unsigned long i=0;i<l.size();i++ ) lights.push_back( dynamic_cast<GLLight*>(l[i]) );
+		for( unsigned long i=0;i<l.size();i++ ){
+			GLLight *gl=dynamic_cast<GLLight*>(l[i]);
+			if( gl ) lights.push_back( gl );
+		}
 
 		setLights();
 

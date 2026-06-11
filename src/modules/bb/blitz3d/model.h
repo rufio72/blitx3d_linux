@@ -42,6 +42,9 @@ public:
 	virtual void setRenderBrush( const Brush &b ){}
 	virtual bool render( const RenderContext &rc ){ return false; }
 	virtual void renderQueue( int type );
+	// group queued draws by render state; only call when depth testing is
+	// active (with ZMODE_DISABLE the draw order is semantic)
+	void sortQueue( int type );
 
 	virtual Sprite *getSprite(){ return 0; }
 	virtual Terrain *getTerrain(){ return 0; }

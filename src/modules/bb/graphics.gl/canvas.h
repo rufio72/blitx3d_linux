@@ -40,6 +40,10 @@ public:
 	unsigned int texture,depthbuffer;
 	int twidth,theight;
 
+	// last glTexParameteri state applied to this canvas' texture
+	// (packed flags, see GLScene::setRenderState); -1 = not yet applied
+	int cached_tex_params=-1;
+
 	void uploadData();
 	void downloadData();
 	void setPixmap( BBPixmap *pm );

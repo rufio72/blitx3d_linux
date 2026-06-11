@@ -18,6 +18,7 @@ struct BBLightData {
   vec4 Color;
   vec4 Position;  // xyz = world position, w = type (1=directional, 2=point, 3=spot)
   vec4 Params;    // x = range, y = inner_cone, z = outer_cone, w = unused
+  vec4 Direction; // xyz = world-space direction, precomputed on the CPU
 } ;
 
 layout(std140) uniform BBLightState {
@@ -62,18 +63,6 @@ varying vec4 bbVertex_Color;
 varying vec3 bbVertex_Normal;
 varying vec2 bbVertex_TexCoord[8];
 varying float bbVertex_FogFactor;
-
-mat4 rotationMatrix(vec3 axis, float angle){
-  axis = normalize(axis);
-  float s = sin(angle);
-  float c = cos(angle);
-  float oc = 1.0 - c;
-
-  return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
-              oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
-              oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
-              0.0,                                0.0,                                0.0,                                1.0);
-}
 
 float fogFactorLinear(
   const float dist,
@@ -160,8 +149,9 @@ void main() {
       float lightRange = LS.Light[i].Params.x;
 
       if( lightType == 1 ){
-        // Directional light
-        LightDir = normalize( mat3( bbViewMatrix*LS.Light[i].TForm*rotationMatrix( vec3(1.0,0.0,0.0), 1.5708 ) )*vec3(0.0,1.0,0.0) );
+        // Directional light: world direction precomputed on the CPU
+        // (equivalent to the old mat3(TForm*rotX(90))*vec3(0,1,0))
+        LightDir = normalize( mat3( bbViewMatrix ) * LS.Light[i].Direction.xyz );
       } else {
         // Point light (type 2) or Spot light (type 3)
         vec3 lightWorldPos = LS.Light[i].Position.xyz;

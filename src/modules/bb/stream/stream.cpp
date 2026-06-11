@@ -60,13 +60,13 @@ bb_float_t BBCALL bbReadFloat( BBStream *s ){
 
 BBStr * BBCALL bbReadString( BBStream *s ){
 	if( bb_env.debug ) debugStream( s );
-	int len;
+	int len=0;
 	BBStr *str=d_new BBStr();
-	if( s->read( (char*)&len,4 ) ){
-		char *buff=d_new char[len];
-		if( s->read( buff,len ) ){
-			*str=std::string( buff,len );
-		}
+	if( s->read( (char*)&len,4 )==4 && len>0 ){
+		char *buff;
+		try{ buff=d_new char[len]; }catch( const std::bad_alloc& ){ return str; }
+		int n=s->read( buff,len );
+		if( n>0 ) *str=std::string( buff,n );
 		delete[] buff;
 	}
 	return str;
@@ -122,8 +122,8 @@ void BBCALL bbWriteLine( BBStream *s,BBStr *t ){
 void BBCALL bbCopyStream( BBStream *s,BBStream *d,bb_int_t buff_size ){
 	if( bb_env.debug ){
 		debugStream( s );debugStream( d );
-		if( buff_size<1 || buff_size>1024*1024 ) RTEX( "Illegal buffer size" );
 	}
+	if( buff_size<1 || buff_size>1024*1024 ) RTEX( "Illegal buffer size" );
 	char *buff=d_new char[buff_size];
 	while( s->eof()==0 && d->eof()==0 ){
 		int n=s->read( buff,buff_size );

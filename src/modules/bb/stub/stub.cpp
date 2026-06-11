@@ -2,6 +2,8 @@
 #include <bb/runtime/runtime.h>
 #include "stub.h"
 
+#include <exception>
+
 bool bbruntime_run( void (*pc)(),bool dbg ){
 	bb_env.debug=dbg;
 
@@ -16,6 +18,12 @@ bool bbruntime_run( void (*pc)(),bool dbg ){
 			_bbDebugError( x.err.c_str() );
 			err=true;
 		}
+	}catch( std::exception &x ){
+		_bbDebugError( x.what() );
+		err=true;
+	}catch( ... ){
+		_bbDebugError( "Unhandled exception" );
+		err=true;
 	}
 	bbruntime_destroy();
 	return !err;

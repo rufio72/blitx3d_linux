@@ -329,7 +329,7 @@ std::string fullfilename( const std::string &t ){
 	GetFullPathName( t.c_str(),MAX_PATH,buff,&p );
 #else
 	char buff[PATH_MAX+1];
-	realpath( t.c_str(),buff );
+	if( !realpath( t.c_str(),buff ) ) return t;
 #endif
 	return std::string( buff );
 }
@@ -487,9 +487,11 @@ std::string bbResolvePath( const std::string &path ){
 		fs::path dir= result.empty() ? fs::path(".") : result;
 		std::string want=tolower( comp.string() );
 		bool found=false;
-		for( const auto &entry:fs::directory_iterator( dir,ec ) ){
-			if( tolower( entry.path().filename().string() )==want ){
-				result/=entry.path().filename();
+		// increment via error_code: range-for would throw on unreadable entries
+		fs::directory_iterator it( dir,fs::directory_options::skip_permission_denied,ec ),end;
+		for( ;!ec && it!=end;it.increment( ec ) ){
+			if( tolower( it->path().filename().string() )==want ){
+				result/=it->path().filename();
 				found=true;break;
 			}
 		}

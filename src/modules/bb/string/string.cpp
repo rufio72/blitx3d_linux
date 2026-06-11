@@ -26,6 +26,7 @@ BBStr * BBCALL bbLeft( BBStr *s,bb_int_t n ){
 
 BBStr * BBCALL bbRight( BBStr *s,bb_int_t n ){
 	CHKPOS( n );
+	if( !s->size() || !n ){ *s="";return s; }
 	const char *begin=s->data();
 	const char *end=begin+s->size()-1;
 	while( --n>0&&end>begin ){
@@ -37,10 +38,12 @@ BBStr * BBCALL bbRight( BBStr *s,bb_int_t n ){
 }
 
 BBStr * BBCALL bbReplace( BBStr *s,BBStr *from,BBStr *to ){
-	int n=0,from_sz=from->size(),to_sz=to->size();
-	while( n<s->size() && (n=s->find( *from,n ))!=std::string::npos ){
-		s->replace( n,from_sz,*to );
-		n+=to_sz;
+	size_t n=0,from_sz=from->size(),to_sz=to->size();
+	if( from_sz ){
+		while( n<s->size() && (n=s->find( *from,n ))!=std::string::npos ){
+			s->replace( n,from_sz,*to );
+			n+=to_sz;
+		}
 	}
 	delete from;delete to;return s;
 }
@@ -74,7 +77,7 @@ BBStr * BBCALL bbMid( BBStr *s,bb_int_t o,bb_int_t n ){
 	utf8_int32_t chr;
 	const char *l=s->c_str(),*r=s->c_str()+s->size();
 	const char *p=l;while( --o>0&&p<r ) p=utf8codepoint( p,&chr );
-	const char *e=p;while( n-->0&&p<r ) e=utf8codepoint( e,&chr );
+	const char *e=p;while( n-->0&&e<r ) e=utf8codepoint( e,&chr );
 	*s=s->substr( p-l,e-p );return s;
 }
 
@@ -88,10 +91,14 @@ BBStr * BBCALL bbLower( BBStr *s ){
 	return s;
 }
 
+static inline bool bbIsGraph( unsigned char c ){
+	return c>=0x80 || isgraph( c );
+}
+
 BBStr * BBCALL bbTrim( BBStr *s ){
 	int n=0,p=s->size();
-	while( n<s->size() && !isgraph( (*s)[n] ) ) ++n;
-	while( p>n && !isgraph( (*s)[p-1] ) ) --p;
+	while( n<s->size() && !bbIsGraph( (*s)[n] ) ) ++n;
+	while( p>n && !bbIsGraph( (*s)[p-1] ) ) --p;
 	*s=s->substr( n,p-n );return s;
 }
 
@@ -103,7 +110,8 @@ BBStr * BBCALL bbLSet( BBStr *s,bb_int_t n ){
 		const char *p=l;while( n-->0&&p<r ) p=utf8codepoint( p,&chr );
 		*s=s->substr( 0,p-l );
 	}else{
-		while( utf8len( s->c_str() )<n ) *s+=' ';
+		size_t len=utf8len( s->c_str() );
+		if( len<(size_t)n ) s->append( n-len,' ' );
 	}
 	return s;
 }
@@ -116,7 +124,8 @@ BBStr * BBCALL bbRSet( BBStr *s,bb_int_t n ){
 		const char *p=r;while( --n>0&&p>l ) p=utf8rcodepoint( p,&chr );
 		*s=s->substr( p-l );
 	}else{
-		while( utf8len( s->c_str() )<n ) *s=' '+*s;
+		size_t len=utf8len( s->c_str() );
+		if( len<(size_t)n ) s->insert( (size_t)0,n-len,' ' );
 	}
 	return s;
 }
@@ -124,6 +133,7 @@ BBStr * BBCALL bbRSet( BBStr *s,bb_int_t n ){
 BBStr * BBCALL bbChr( bb_int_t n ){
 	utf8_int8_t b[4];
 	const char *e=utf8catcodepoint( b,n,4 );
+	if( !e ) return d_new BBStr();
 	return d_new BBStr( b,e-b );
 }
 

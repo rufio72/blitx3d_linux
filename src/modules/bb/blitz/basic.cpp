@@ -531,10 +531,12 @@ static void *gosub_stack[512] = { 0 };
 static int gosub_idx=0;
 
 void BBCALL _bbPushGosub( void *addr ){
+	if( gosub_idx>=512 ) RTEX( "Gosub stack overflow" );
 	gosub_stack[gosub_idx++]=addr;
 }
 
 void *BBCALL _bbPopGosub(){
+	if( gosub_idx<=0 ) RTEX( "Return without Gosub" );
 	return gosub_stack[--gosub_idx];
 }
 

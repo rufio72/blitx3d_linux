@@ -67,6 +67,10 @@ public:
 	unsigned int vertex_array=0;
 	unsigned int vertex_buffer=0,index_buffer=0;
 
+	// deferred upload: unlock() only marks the CPU copy dirty, upload()
+	// runs at draw time so N writers per frame cost a single transfer
+	bool gpu_dirty=false,ever_uploaded=false;
+
 	GLMesh( int mv,int mt,int f ):max_verts(mv),max_tris(mt),flags(f){
 		GL( glGenVertexArrays( 1,&vertex_array ) );
 		GL( glGenBuffers( 1,&vertex_buffer ) );
@@ -109,11 +113,22 @@ public:
 	}
 
 	void unlock(){
-		// Optimization #3: Upload both vertex and index buffers once in unlock()
+		// upload is deferred to draw time: sprites and skinned meshes
+		// lock/unlock the shared mesh once per object per frame, and an
+		// immediate glBufferData here meant one full-buffer transfer each
+		gpu_dirty=true;
+	}
+
+	void upload(){
+		if( !gpu_dirty || !verts ) return;
+		// re-uploaded buffers are dynamic by nature (sprites, skinning)
+		GLenum usage=ever_uploaded ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
 		GL( glBindBuffer( GL_ARRAY_BUFFER,vertex_buffer ) );
-		GL( glBufferData( GL_ARRAY_BUFFER,max_verts*sizeof(GLVertex),verts,GL_STATIC_DRAW ) );
+		GL( glBufferData( GL_ARRAY_BUFFER,max_verts*sizeof(GLVertex),verts,usage ) );
 		GL( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,index_buffer ) );
-		GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,max_tris*3*sizeof(unsigned int),tris,GL_STATIC_DRAW ) );
+		GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,max_tris*3*sizeof(unsigned int),tris,usage ) );
+		gpu_dirty=false;
+		ever_uploaded=true;
 	}
 
 	void offsetIndices( int offset ){
@@ -745,6 +760,8 @@ public:
 		mesh->offsetArrays( first_vert );
 		GL( glDrawElements( GL_TRIANGLES,tri_cnt*3,GL_UNSIGNED_INT,0 ) );
 #else
+		// flush pending CPU-side edits once per frame instead of per unlock
+		mesh->upload();
 		// Optimization #3: Use offset in draw call instead of re-uploading buffers
 		GL( glDrawElementsBaseVertex( GL_TRIANGLES,tri_cnt*3,GL_UNSIGNED_INT,
 			(void*)(first_tri*3*sizeof(unsigned int)),first_vert ) );

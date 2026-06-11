@@ -45,6 +45,11 @@ void trackmem( bool enable );
 void checkmem( std::ostream &out );
 
 //some stuff that should be in std libs
+// Resolve a Windows-style path on case-sensitive filesystems: converts
+// backslashes and falls back to a case-insensitive per-component lookup.
+// Returns the path unchanged on Windows or when the file exists as-is.
+std::string bbResolvePath( const std::string &path );
+
 int atoi( const std::string &s );
 long atol( const std::string &s );
 double atof( const std::string &s );

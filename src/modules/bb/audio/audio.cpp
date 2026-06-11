@@ -22,6 +22,7 @@ static BBChannel *playMusic( BBStr *f,bool use_3d ){
 }
 
 BBSound * BBCALL bbLoadSound( BBStr *f ){
+	*f=bbResolvePath( *f );
 	return loadSound( f,false );
 }
 
@@ -62,6 +63,7 @@ BBChannel * BBCALL bbPlaySound( BBSound *sound ){
 }
 
 BBChannel * BBCALL bbPlayMusic( BBStr *f ){
+	*f=bbResolvePath( *f );
 	return playMusic( f,false );
 }
 
@@ -112,6 +114,7 @@ bb_float_t BBCALL bbChannelPosition( BBChannel *channel ){
 }
 
 BBSound * BBCALL bbLoad3DSound( BBStr *f ){
+	*f=bbResolvePath( *f );
 	return loadSound( f,true );
 }
 

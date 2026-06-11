@@ -77,14 +77,17 @@ static BBFile *open( BBStr *f,std::ios_base::openmode n ){
 }
 
 BBFile* BBCALL bbReadFile( BBStr *f ){
+	*f=bbResolvePath( *f );
 	return open( f,std::ios_base::in );
 }
 
 BBFile* BBCALL bbWriteFile( BBStr *f ){
+	*f=bbResolvePath( *f );
 	return open( f,std::ios_base::out|std::ios_base::trunc );
 }
 
 BBFile* BBCALL bbOpenFile( BBStr *f ){
+	*f=bbResolvePath( *f );
 	return open( f,std::ios_base::in|std::ios_base::out );
 }
 
@@ -103,6 +106,7 @@ bb_int_t BBCALL bbSeekFile( BBFile *f,bb_int_t pos ){
 }
 
 BBDir* BBCALL bbReadDir( BBStr *d ){
+	*d=bbResolvePath( *d );
 	std::string t=*d;delete d;
 	return gx_filesys->openDir( t,0 );
 }
@@ -122,6 +126,7 @@ BBStr* BBCALL bbCurrentDir(){
 }
 
 void BBCALL bbChangeDir( BBStr *d ){
+	*d=bbResolvePath( *d );
 	debugFileSys();
 	gx_filesys->setCurrentDir( *d );
 	delete d;
@@ -140,6 +145,7 @@ void BBCALL bbDeleteDir( BBStr *d ){
 }
 
 bb_int_t BBCALL bbFileType( BBStr *f ){
+	*f=bbResolvePath( *f );
 	std::string t=*f;delete f;
 	debugFileSys();
 	int n=gx_filesys->getFileType( t );
@@ -147,12 +153,14 @@ bb_int_t BBCALL bbFileType( BBStr *f ){
 }
 
 bb_int_t BBCALL bbFileSize( BBStr *f ){
+	*f=bbResolvePath( *f );
 	std::string t=*f;delete f;
 	debugFileSys();
 	return gx_filesys->getFileSize( t );
 }
 
 void BBCALL bbCopyFile( BBStr *f,BBStr *to ){
+	*f=bbResolvePath( *f );
 	std::string src=*f,dest=*to;
 	delete f;delete to;
 	debugFileSys();
@@ -160,6 +168,7 @@ void BBCALL bbCopyFile( BBStr *f,BBStr *to ){
 }
 
 void BBCALL bbDeleteFile( BBStr *f ){
+	*f=bbResolvePath( *f );
 	debugFileSys();
 	gx_filesys->deleteFile( *f );
 	delete f;

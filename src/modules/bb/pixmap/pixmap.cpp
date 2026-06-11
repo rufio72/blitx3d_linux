@@ -9,7 +9,7 @@ BBPixmap::BBPixmap():width(0),height(0),depth(0),pitch(0),bits(0){
 }
 
 BBPixmap::~BBPixmap(){
-  delete bits;
+  delete[] bits;
 }
 
 int BBPixmap::getWidth(){

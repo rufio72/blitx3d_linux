@@ -1,4 +1,5 @@
 
+#include "../../../stdutil/stdutil.h"
 #include "std.h"
 
 #ifdef PRO
@@ -383,6 +384,7 @@ BBLIB bb_float_t BBCALL bbStats3D( bb_int_t n ){
 //Note: modify canvas->backup() to NOT release backup image!
 //
 BBLIB Texture * BBCALL bbLoadTexture( BBStr *file,bb_int_t flags ){
+	*file=bbResolvePath( *file );
 	debug3d();
 	Texture *t=d_new Texture( canonicalpath(*file),flags );delete file;
 	if( !t->getCanvas(0) ){ delete t;return 0; }
@@ -391,6 +393,7 @@ BBLIB Texture * BBCALL bbLoadTexture( BBStr *file,bb_int_t flags ){
 }
 
 BBLIB Texture * BBCALL bbLoadAnimTexture( BBStr *file,bb_int_t flags,bb_int_t w,bb_int_t h,bb_int_t first,bb_int_t cnt ){
+	*file=bbResolvePath( *file );
 	debug3d();
 	Texture *t=d_new Texture( *file,flags,w,h,first,cnt );
 	delete file;
@@ -514,6 +517,7 @@ BBLIB Brush * BBCALL bbCreateBrush( bb_float_t r,bb_float_t g,bb_float_t b ){
 }
 
 BBLIB Brush * BBCALL bbLoadBrush( BBStr *file,bb_int_t flags,bb_float_t u_scale,bb_float_t v_scale ){
+	*file=bbResolvePath( *file );
 	debug3d();
 	Texture t( *file,flags );delete file;
 	if( !t.getCanvas(0) ) return 0;
@@ -615,6 +619,7 @@ BBLIB Entity * BBCALL bbCreateMesh( Entity *p ){
 }
 
 BBLIB Entity * BBCALL bbLoadMesh( BBStr *f,Entity *p ){
+	*f=bbResolvePath( *f );
 	debugParent(p);
 	Entity *e=loadEntity( f->c_str(),MeshLoader::HINT_COLLAPSE );
 	delete f;
@@ -626,6 +631,7 @@ BBLIB Entity * BBCALL bbLoadMesh( BBStr *f,Entity *p ){
 }
 
 BBLIB Entity * BBCALL bbLoadAnimMesh( BBStr *f,Entity *p ){
+	*f=bbResolvePath( *f );
 	debugParent(p);
 	Entity *e=loadEntity( f->c_str(),0 );
 	delete f;
@@ -1189,6 +1195,7 @@ BBLIB Entity * BBCALL bbCreateSprite( Entity *p ){
 }
 
 BBLIB Entity * BBCALL bbLoadSprite( BBStr *file,bb_int_t flags,Entity *p ){
+	*file=bbResolvePath( *file );
 	debugParent(p);
 	Texture t( *file,flags );
 	delete file;if( !t.getCanvas(0) ) return 0;
@@ -1248,6 +1255,7 @@ BBLIB Entity * BBCALL bbCreatePlane( bb_int_t segs,Entity *p ){
 // MD2 COMMANDS //
 //////////////////
 BBLIB Entity * BBCALL bbLoadMD2( BBStr *file,Entity *p ){
+	*file=bbResolvePath( *file );
 	debugParent(p);
 	MD2Model *t=d_new MD2Model( canonicalpath(*file) );delete file;
 	if( !t->getValid() ){ delete t;return 0; }
@@ -1278,6 +1286,7 @@ BBLIB bb_int_t BBCALL bbMD2Animating( MD2Model *m ){
 // BSP Commands //
 //////////////////
 BBLIB Entity * BBCALL bbLoadBSP( BBStr *file,bb_float_t gam,Entity *p ){
+	*file=bbResolvePath( *file );
 	debugParent(p);
 	CachedTexture::setPath( filenamepath( *file ) );
 	Q3BSPModel *t=d_new Q3BSPModel( *file,gam );delete file;
@@ -1329,6 +1338,7 @@ BBLIB Entity * BBCALL bbCreateTerrain( bb_int_t n,Entity *p ){
 }
 
 BBLIB Entity * BBCALL bbLoadTerrain( BBStr *file,Entity *p ){
+	*file=bbResolvePath( *file );
 	debugParent(p);
 	BBPixmap *m=bbLoadPixmap( *file );
 	if( !m ) RTEX( "Unable to load heightmap image" );
@@ -1496,6 +1506,7 @@ BBLIB Entity * BBCALL bbFindChild( Entity *e,BBStr *t ){
 // ANIMATION COMMANDS //
 ////////////////////////
 BBLIB bb_int_t BBCALL bbLoadAnimSeq( Object *o,BBStr *f ){
+	*f=bbResolvePath( *f );
 	debugObject( o );
 	if( Animator *anim=o->getAnimator() ){
 		Entity *t=loadEntity( f->c_str(),MeshLoader::HINT_ANIMONLY );

@@ -658,6 +658,7 @@ static bool saveCanvas( BBCanvas *c,const std::string &f ){
 }
 
 bb_int_t BBCALL bbLoadBuffer( BBCanvas *c,BBStr *str ){
+	*str=bbResolvePath( *str );
 	debugCanvas( c );
 	std::string s=*str;delete str;
 	BBCanvas *t=gx_graphics->loadCanvas( s,0 );
@@ -749,6 +750,7 @@ void BBCALL bbText( bb_int_t x,bb_int_t y,BBStr *str,bb_int_t centre_x,bb_int_t 
 }
 
 BBFont * BBCALL bbLoadFont( BBStr *name,bb_int_t height,bb_int_t bold,bb_int_t italic,bb_int_t underline ){
+	*name=bbResolvePath( *name );
 	int flags=
 		(bold ? BBFont::FONT_BOLD : 0 ) |
 		(italic ? BBFont::FONT_ITALIC : 0 ) |
@@ -792,6 +794,7 @@ bb_int_t BBCALL bbStringHeight( BBStr *str ){
 }
 
 BBImage * BBCALL bbLoadImage( BBStr *s ){
+	*s=bbResolvePath( *s );
 	std::string t=*s;delete s;
 	BBCanvas *c=gx_graphics->loadCanvas( t,0 );
 	if( !c ) return 0;
@@ -805,6 +808,7 @@ BBImage * BBCALL bbLoadImage( BBStr *s ){
 }
 
 BBImage * BBCALL bbLoadAnimImage( BBStr *s,bb_int_t w,bb_int_t h,bb_int_t first,bb_int_t cnt ){
+	*s=bbResolvePath( *s );
 
 	std::string t=*s;delete s;
 

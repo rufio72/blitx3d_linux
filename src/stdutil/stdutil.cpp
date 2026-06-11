@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <filesystem>
 
 #ifndef WIN32
 #include <libgen.h>
@@ -466,3 +467,34 @@ HBITMAP ScaleBitmap( HBITMAP bmp,int width,int height ){
 // 	::SelectObject( dest.m_hDC, old_dest );
 // 	return result;
 // }
+
+std::string bbResolvePath( const std::string &path ){
+#if defined(WIN32) || defined(_WIN32)
+	return path;
+#else
+	std::string p=path;
+	for( size_t i=0;i<p.size();++i ) if( p[i]=='\\' ) p[i]='/';
+
+	namespace fs=std::filesystem;
+	std::error_code ec;
+	if( p.empty() || fs::exists( fs::path(p),ec ) ) return p;
+
+	fs::path in( p );
+	fs::path result= in.is_absolute() ? fs::path("/") : fs::path();
+	for( const auto &comp:in.relative_path() ){
+		fs::path cand= result.empty() ? comp : result/comp;
+		if( fs::exists( cand,ec ) ){ result=cand; continue; }
+		fs::path dir= result.empty() ? fs::path(".") : result;
+		std::string want=tolower( comp.string() );
+		bool found=false;
+		for( const auto &entry:fs::directory_iterator( dir,ec ) ){
+			if( tolower( entry.path().filename().string() )==want ){
+				result/=entry.path().filename();
+				found=true;break;
+			}
+		}
+		if( !found ) result/=comp;
+	}
+	return result.string();
+#endif
+}

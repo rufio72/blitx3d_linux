@@ -17,7 +17,8 @@ size_t OGGAudioStream::oread( void *ptr, size_t size, size_t nmemb, void *dataso
 int OGGAudioStream::oseek( void *datasource, ogg_int64_t offset, int whence ){
 	OGGAudioStream *stream=(OGGAudioStream*)datasource;
 	std::ios_base::seekdir way=whence==SEEK_SET?(std::ios_base::beg):(whence==SEEK_CUR?(std::ios_base::cur):std::ios_base::end);
-	return stream->in.seekg( offset,way ).gcount();
+	stream->in.clear();
+	return stream->in.seekg( offset,way ).fail() ? -1 : 0;
 }
 
 int OGGAudioStream::oclose( void *datasource ){
@@ -29,8 +30,12 @@ long OGGAudioStream::otell( void *datasource ){
 	return stream->in.tellg();
 }
 
-OGGAudioStream::OGGAudioStream( int buf_size ):AudioStream(buf_size){
+OGGAudioStream::OGGAudioStream( int buf_size ):AudioStream(buf_size),opened(false){
 	bits=BITS;
+}
+
+OGGAudioStream::~OGGAudioStream(){
+	if( opened ) ov_clear( &vfile );
 }
 
 bool OGGAudioStream::readHeader(){
@@ -43,9 +48,12 @@ bool OGGAudioStream::readHeader(){
 		return false;
 	}
 
-	samples=ov_pcm_total( &vfile,0 );
+	opened=true;
+
 	channels=ov_info( &vfile,-1 )->channels;
 	frequency=ov_info( &vfile,-1 )->rate;
+	// total samples across all channels, same convention as mp3
+	samples=ov_pcm_total( &vfile,0 )*channels;
 
 	return true;
 }

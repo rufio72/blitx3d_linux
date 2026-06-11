@@ -27,11 +27,15 @@ int MP3AudioStream::seek_cb( uint64_t position,void *user_data ){
 }
 
 
-MP3AudioStream::MP3AudioStream( int buf_size ):AudioStream( buf_size ){
+MP3AudioStream::MP3AudioStream( int buf_size ):AudioStream( buf_size ),opened(false){
 	if( !mp3d_init ){
 		mp3dec_init( &mp3d );
 		mp3d_init=true;
 	}
+}
+
+MP3AudioStream::~MP3AudioStream(){
+	if( opened ) mp3dec_ex_close( &dec );
 }
 
 bool MP3AudioStream::readHeader(){
@@ -45,6 +49,8 @@ bool MP3AudioStream::readHeader(){
 	if( mp3dec_ex_open_cb(&dec, &io, MP3D_SEEK_TO_SAMPLE) ){
 		return false;
 	}
+
+	opened=true;
 
 	if( dec.samples==0 ){
 		return false;

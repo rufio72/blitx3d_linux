@@ -15,7 +15,10 @@
 
 #include <thread>
 #include <mutex>
+#include <atomic>
+#include <chrono>
 #include <string.h>
+#include <math.h>
 
 #define NUM_BUFFERS 6
 #define BUFFER_SIZE 4096
@@ -31,20 +34,23 @@ public:
 	ALenum format;
 
 	std::thread playbackThread;
-	std::mutex playbackMutex;
-	bool playbackRunning;
+	std::atomic<bool> playbackRunning;
+	std::atomic<bool> paused;
+	std::atomic<bool> looping;
 
-	OpenALChannel():stream(0),source(0),frequency(0),playbackRunning(false){}
+	OpenALChannel():stream(0),source(0),frequency(0),playbackRunning(false),paused(false),looping(false){}
 
 	~OpenALChannel(){
 		playbackRunning=false;
-		playbackThread.join(); // TODO: this may not be the best idea...
+		if( playbackThread.joinable() ) playbackThread.join();
+		delete stream;
 	}
 
 	bool setStream( AudioStream *s ){
 		stream=s->getRef();
 
 		unsigned int bits=stream->getBits(),channels=stream->getChannels();
+		frequency=stream->getFrequency();
 
 		format=0;
 		if( bits==8 ){
@@ -59,7 +65,7 @@ public:
 				format=AL_FORMAT_STEREO16;
 		}
 		if( format==0 ){
-			RTEX( "unsupport format" );
+			LOGD( "unsupported format: %u bits, %u channels",bits,channels );
 			return false;
 		}
 
@@ -72,6 +78,10 @@ public:
 	bool queue( ALuint buffer ){
 		unsigned char *buf;
 		size_t size=stream->decode( &buf );
+		if( size==0 && looping ){
+			stream->reset();
+			size=stream->decode( &buf );
+		}
 		if( size==0 ) return false;
 
 		alBufferData( buffer,format,buf,size,stream->getFrequency() );
@@ -80,7 +90,7 @@ public:
 	}
 
 	bool streaming(){
-		return playbackRunning && !stream->eof();
+		return playbackRunning && ( looping || !stream->eof() );
 	}
 
 	void play(){
@@ -91,49 +101,58 @@ public:
 	}
 
 	static void playback( OpenALChannel *channel ){
-		int ret;
-
-		for( int i=0;i<NUM_BUFFERS;i++ ){
-			if( !channel->queue( channel->buffers[i] ) ) break;
-		}
-
-		if( alGetError()!=AL_NO_ERROR ){
-			goto end;
-		}
-
-		alSourcePlay( channel->source );
-		if( alGetError()!=AL_NO_ERROR ){
-			channel->playbackRunning=false;
-			goto end;
-		}
-
-		while( channel->streaming() ){
-			ALuint buffer;
+		{
 			ALint val;
 
-			alGetSourcei( channel->source,AL_BUFFERS_PROCESSED,&val );
-			if( val<=0 ) continue;
+			for( int i=0;i<NUM_BUFFERS;i++ ){
+				if( !channel->queue( channel->buffers[i] ) ) break;
+			}
 
-			while( val-- ){
-				alSourceUnqueueBuffers(channel->source, 1, &buffer);
-				if( channel->queue( buffer )==false ){
-					goto end;
-				}else if( alGetError()!=AL_NO_ERROR ){
-					LOGD( "%s","error buffering..." );
-					goto end;
+			if( alGetError()!=AL_NO_ERROR ){
+				goto end;
+			}
+
+			alSourcePlay( channel->source );
+			if( alGetError()!=AL_NO_ERROR ){
+				goto end;
+			}
+
+			while( channel->streaming() ){
+				if( channel->paused ){
+					std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+					continue;
+				}
+
+				ALuint buffer;
+				alGetSourcei( channel->source,AL_BUFFERS_PROCESSED,&val );
+				if( val<=0 ){
+					std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+					continue;
+				}
+
+				while( val-- ){
+					alSourceUnqueueBuffers(channel->source, 1, &buffer);
+					if( channel->queue( buffer )==false ){
+						goto drain;
+					}else if( alGetError()!=AL_NO_ERROR ){
+						LOGD( "%s","error buffering..." );
+						goto end;
+					}
+				}
+
+				alGetSourcei( channel->source,AL_SOURCE_STATE,&val );
+				if( val!=AL_PLAYING && !channel->paused ){
+					alSourcePlay(channel->source);
 				}
 			}
 
-			alGetSourcei( channel->source,AL_SOURCE_STATE,&val );
-			if( val!=AL_PLAYING ){
-				alSourcePlay(channel->source);
+drain:
+			while( channel->playbackRunning ){
+				alGetSourcei( channel->source,AL_SOURCE_STATE,&val );
+				if( val!=AL_PLAYING && val!=AL_PAUSED ) break;
+				std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
 			}
 		}
-
-		ALint val;
-		do{
-			alGetSourcei( channel->source,AL_SOURCE_STATE,&val );
-		}while( val==AL_PLAYING );
 
 end:
 		channel->playbackRunning=false;
@@ -143,14 +162,30 @@ end:
 	}
 
 	void stop(){
+		if( !playbackRunning ) return;
+		playbackRunning=false;
+		alSourceStop( source );
 	}
-	void setPaused( bool paused ){
+	void setPaused( bool p ){
+		if( !playbackRunning ) return;
+		paused=p;
+		if( p ) alSourcePause( source );
+		else alSourcePlay( source );
 	}
 	void setPitch( int pitch ){
+		if( !playbackRunning || !frequency ) return;
+		alSourcef( source,AL_PITCH,pitch/(float)frequency );
 	}
 	void setVolume( float volume ){
+		if( !playbackRunning ) return;
+		alSourcef( source,AL_GAIN,volume );
 	}
 	void setPan( float pan ){
+		if( !playbackRunning ) return;
+		if( pan<-1 ) pan=-1;
+		if( pan>1 ) pan=1;
+		alSourcei( source,AL_SOURCE_RELATIVE,AL_TRUE );
+		alSource3f( source,AL_POSITION,pan,0,-sqrtf( 1-pan*pan ) );
 	}
 	void set3d( const float pos[3],const float vel[3] ){
 		float p[3]={ pos[0],pos[1],-pos[2] };
@@ -168,7 +203,7 @@ end:
 		// alSourcef( source,AL_MAX_GAIN,100.0f );
 	}
 	bool isPlaying(){
-		return playbackRunning;
+		return playbackRunning && !paused;
 	}
 	float getDuration(){
 		return (stream->getSamples() / (float)stream->getChannels()) / (float)stream->getFrequency();
@@ -183,10 +218,17 @@ public:
 	AudioStream *stream;
 	ALenum format;
 
-	OpenALSound():format(0){
+	bool loop;
+	int pitch;
+	float volume,pan;
+
+	OpenALSound():stream(0),format(0),loop(false),pitch(0),volume(1),pan(0){
 	}
 
 	~OpenALSound(){
+		// channels still playing hold Refs: the stream deletes itself
+		// when the last one goes away
+		if( stream ) stream->release();
 	}
 
 	bool setStream( AudioStream *s ){
@@ -194,13 +236,23 @@ public:
 		return true;
 	}
 
+	void applyDefaults( OpenALChannel *channel ){
+		channel->looping=loop;
+		if( volume!=1 ) channel->setVolume( volume );
+		if( pan ) channel->setPan( pan );
+		if( pitch ) channel->setPitch( pitch );
+	}
+
 	BBChannel *play(){
 		OpenALChannel *channel=new OpenALChannel();
 		if( !channel->setStream( stream ) ){
+			delete channel;
 			return 0;
 		}
 		alDistanceModel( AL_NONE );
+		channel->looping=loop;
 		channel->play();
+		applyDefaults( channel );
 		channel_set.insert( channel );
 		return channel;
 	}
@@ -208,24 +260,31 @@ public:
 	BBChannel *play3d( const float pos[3],const float vel[3] ){
 		OpenALChannel *channel=new OpenALChannel();
 		if( !channel->setStream( stream ) ){
+			delete channel;
 			return 0;
 		}
 		channel->set3d( pos,vel );
+		channel->looping=loop;
 		channel->play();
+		applyDefaults( channel );
 		channel_set.insert( channel );
 		return channel;
 	}
 
-	void setLoop( bool loop ){
+	void setLoop( bool t ){
+		loop=t;
 	}
 
 	void setPitch( int hertz ){
+		pitch=hertz;
 	}
 
-	void setVolume( float volume ){
+	void setVolume( float t ){
+		volume=t;
 	}
 
-	void setPan( float pan ){
+	void setPan( float t ){
+		pan=t;
 	}
 };
 
@@ -239,6 +298,7 @@ protected:
 
 		// TODO: come up with something a little more clever
 		const char *ext = strrchr( filename.c_str(),'.' );
+		if( !ext ) ext=".wav";
 		const char *exts[]={ ext,strcasecmp( ext + 1,"wav" )==0?".ogg":".wav",0 };
 		int tries=0;
 		while( exts[tries] ){
@@ -302,8 +362,7 @@ public:
 
 		OpenALSound *sound=new OpenALSound();
 		if( !sound->setStream( stream ) ){
-			delete sound;
-			delete stream;
+			delete sound; // releases the stream if it was stored
 			return 0;
 		}
 
@@ -315,6 +374,7 @@ public:
 	}
 	//master pause
 	void setVolume( float volume ){
+		alListenerf( AL_GAIN,volume );
 	}
 	//master volume
 
@@ -326,9 +386,12 @@ public:
 		float p[3]={ pos[0],pos[1],-pos[2] };
 		float v[3]={ vel[0],vel[1],-vel[2] };
 
+		// AL_ORIENTATION wants 6 floats: "at" followed by "up"
+		float orient[6]={ forward[0],forward[1],-forward[2],up[0],up[1],-up[2] };
+
 		alListenerfv( AL_POSITION,p );
 		alListenerfv( AL_VELOCITY,v );
-		alListenerfv( AL_ORIENTATION,up );
+		alListenerfv( AL_ORIENTATION,orient );
 	}
 
 	BBChannel *playCDTrack( int track,int mode ){
@@ -343,10 +406,12 @@ public:
 
 		OpenALChannel *channel=new OpenALChannel();
 		if( !channel->setStream( stream ) ){
-			delete stream;
-			delete channel;
+			delete channel; // drops its Ref, if any
+			stream->release();
 			return 0;
 		}
+		// channel's Ref keeps the stream alive; deleted with the channel
+		stream->release();
 
 		channel->play();
 		channel_set.insert( channel );
@@ -360,6 +425,7 @@ BBMODULE_CREATE( audio_openal ){
 	driver=d_new OpenALAudioDriver();
 	if( !driver->init() ){
 		delete driver;
+		driver=0;
 		return true;
 	}
 	gx_audio=driver;

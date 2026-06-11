@@ -63,9 +63,16 @@ bool WAVAudioStream::readHeader(){
 	read( buf,4 );
 
 	if( strncmp( "LIST",(char*)buf,4 )==0 ){
-		read( buf,4 ); // size
-		int size=*(int*)buf;
-		read( buf,size ); // eat it up
+		read( buf,4 );
+		int size  = buf[3]<<24;
+		size |= buf[2]<<16;
+		size |= buf[1]<<8;
+		size |= buf[0];
+		if( size<0 ){
+			LOGD( "bad LIST chunk size %i",size );
+			return false;
+		}
+		in.seekg( size,std::ios_base::cur ); // skip it
 
 		read( buf,4 ); // cont...
 	}
@@ -77,6 +84,11 @@ bool WAVAudioStream::readHeader(){
 
 	// data size
 	read( buf,4 );
+	int dataSize  = buf[3]<<24;
+	dataSize |= buf[2]<<16;
+	dataSize |= buf[1]<<8;
+	dataSize |= buf[0];
+	if( dataSize>0 && bits ) samples=dataSize/(bits/8);
 
 	return true;
 }

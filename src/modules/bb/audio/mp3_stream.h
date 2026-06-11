@@ -7,6 +7,7 @@
 class MP3AudioStream : public AudioStream{
 public:
 	MP3AudioStream( int buf_size );
+	~MP3AudioStream();
 	bool readHeader();
 
 	void seek( long pos );
@@ -16,6 +17,7 @@ public:
 protected:
 	mp3dec_io_t io;
 	mp3dec_ex_t dec;
+	bool opened;
 
 	static size_t read_cb( void *buf,size_t size,void *user_data );
 	static int seek_cb( uint64_t position,void *user_data );

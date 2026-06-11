@@ -19,15 +19,23 @@ protected:
 #endif
 	std::string path;
 
+	// Refs outstanding; once release() marks the stream orphaned the
+	// last Ref to go away deletes it
+	int refs;
+	bool orphaned;
+
 public:
 	struct Ref{
 		AudioStream *stream;
 		long pos;
+		// private decode buffer: stream->buf is shared between all Refs
+		unsigned char *refbuf;
 
 		Ref( AudioStream *s );
 		~Ref();
 
 		size_t decode( unsigned char **buf );
+		void reset();
 
 		unsigned int getChannels();
 		unsigned int getBits();
@@ -38,6 +46,9 @@ public:
 	};
 
 	Ref *getRef();
+
+	// give up ownership: stream deletes itself when the last Ref dies
+	void release();
 
 public:
 

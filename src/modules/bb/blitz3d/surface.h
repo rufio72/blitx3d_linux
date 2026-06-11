@@ -17,13 +17,16 @@ public:
 		unsigned char bone_bones[MAX_SURFACE_BONES];
 		float bone_weights[MAX_SURFACE_BONES];
 
-		Vertex():color(~0){
+		Vertex(){
+			// zero everything (padding included) so memcmp-based ordering
+			// below is deterministic
+			memset( this,0,sizeof(*this) );
+			color=~0;
 			bone_bones[0]=255;
-			memset(tex_coords,0,sizeof(tex_coords));
 		}
 
 		bool operator<( const Vertex &t )const{
-			return memcmp( this,&t,sizeof(*this) )==-1;
+			return memcmp( this,&t,sizeof(*this) )<0;
 		}
 	};
 

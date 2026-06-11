@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <unistd.h>
 
+#include <filesystem>
+
 class PosixDir : public BBDir{
 public:
 	PosixDir( DIR *dp ):dp(dp){
@@ -37,15 +39,21 @@ PosixFileSystem::~PosixFileSystem(){
 }
 
 bool PosixFileSystem::createDir( const std::string &dir ){
-	RTEX( "PosixFileSystem::createDir not implemented" );
+	std::string t=canonicalpath( dir );
+	return mkdir( t.c_str(),0777 )==0;
 }
 
 bool PosixFileSystem::deleteDir( const std::string &dir ){
-	RTEX( "PosixFileSystem::deleteDir not implemented" );
+	std::string t=canonicalpath( dir );
+	return rmdir( t.c_str() )==0;
 }
 
 bool PosixFileSystem::createFile( const std::string &file ){
-	RTEX( "PosixFileSystem::createFile not implemented" );
+	std::string t=canonicalpath( file );
+	FILE *f=fopen( t.c_str(),"wb" );
+	if( !f ) return false;
+	fclose( f );
+	return true;
 }
 
 bool PosixFileSystem::deleteFile( const std::string &file ){
@@ -54,11 +62,14 @@ bool PosixFileSystem::deleteFile( const std::string &file ){
 }
 
 bool PosixFileSystem::copyFile( const std::string &src,const std::string &dest ){
-	RTEX( "PosixFileSystem::copyFile not implemented" );
+	std::error_code ec;
+	std::filesystem::copy_file( canonicalpath( src ),canonicalpath( dest ),
+		std::filesystem::copy_options::overwrite_existing,ec );
+	return !ec;
 }
 
 bool PosixFileSystem::renameFile( const std::string &src,const std::string &dest ){
-	RTEX( "PosixFileSystem::renameFile not implemented" );
+	return rename( canonicalpath( src ).c_str(),canonicalpath( dest ).c_str() )==0;
 }
 
 bool PosixFileSystem::setCurrentDir( const std::string &dir ){
@@ -101,7 +112,8 @@ int PosixFileSystem::getFileType( const std::string &name )const{
 
 BBDir *PosixFileSystem::openDir( const std::string &name,int flags ){
 	std::string t=canonicalpath( name );
-	if( t.back()=='/' ) t=t.substr( 0,t.size()-1 );
+	if( t.size()>1 && t.back()=='/' ) t=t.substr( 0,t.size()-1 );
+	if( t.empty() ) t=".";
 
 	DIR *dp = opendir( t.c_str() );
 	if( !dp ) return 0;

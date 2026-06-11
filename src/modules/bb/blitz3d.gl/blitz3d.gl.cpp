@@ -93,6 +93,9 @@ public:
 	}
 
 	~GLMesh(){
+		if( vertex_array ) glDeleteVertexArrays( 1,&vertex_array );
+		if( vertex_buffer ) glDeleteBuffers( 1,&vertex_buffer );
+		if( index_buffer ) glDeleteBuffers( 1,&index_buffer );
 		delete[] verts;
 		delete[] tris;
 	}

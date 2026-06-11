@@ -161,10 +161,15 @@ GLCanvas::GLCanvas( ContextResources *res,int f ):GLCanvas(res,0,0,f){
 
 
 GLCanvas::~GLCanvas(){
-	if( pixmap ) {
-		delete pixmap;
-		pixmap=0;
+	// depthbuffer is only ever set when framebufferId() created the FBO,
+	// so it doubles as the ownership flag (setFramebuffer() leaves it 0)
+	if( depthbuffer ){
+		GL( glDeleteFramebuffers( 1,&framebuffer ) );
+		GL( glDeleteRenderbuffers( 1,&depthbuffer ) );
 	}
+	if( texture ) GL( glDeleteTextures( 1,&texture ) );
+	delete[] pixels;
+	delete pixmap;
 }
 
 void GLCanvas::resize( int w,int h,float d ){
@@ -1002,10 +1007,7 @@ void GLCanvas::setPixmap( BBPixmap *pm ){
 	dirty=true;
 
 	if( !pm ){
-		if( pixmap ){
-			delete pixmap->bits;
-			delete pixmap;
-		}
+		delete pixmap; // ~BBPixmap frees bits
 		pixmap=0;
 		return;
 	}

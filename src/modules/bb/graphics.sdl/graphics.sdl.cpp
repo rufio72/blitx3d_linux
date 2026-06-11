@@ -63,8 +63,8 @@ void SDLGraphics::copy( BBCanvas *dest,int dx,int dy,int dw,int dh,BBCanvas *src
 
 void SDLGraphics::setGamma( int r,int g,int b,float dr,float dg,float db ){
 	gamma_red[r&255]=dr*257.0f;
-	gamma_red[g&255]=dg*257.0f;
-	gamma_red[b&255]=db*257.0f;
+	gamma_green[g&255]=dg*257.0f;
+	gamma_blue[b&255]=db*257.0f;
 }
 
 void SDLGraphics::getGamma( int r,int g,int b,float *dr,float *dg,float *db ){

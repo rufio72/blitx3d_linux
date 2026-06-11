@@ -34,13 +34,16 @@
 GLuint _bbGLCompileProgram( const std::string &name,const std::string &src );
 
 
-// #ifdef NDEBUG
-// #define GL( func ) func;
-// #else
 void bbGLGraphicsCheckErrors( const char *file, int line );
 const char * bbGLFramebufferStatusString( GLenum status );
+
+// release builds skip the per-call glGetError: it forces a sync with the
+// driver thread and is by far the most frequent GL call in a frame
+#ifdef NDEBUG
+#define GL( func ) func;
+#else
 #define GL( func ) func; bbGLGraphicsCheckErrors( __FILE__,__LINE__ );
-// #endif
+#endif
 
 struct ContextResources{
 	unsigned int ubo;

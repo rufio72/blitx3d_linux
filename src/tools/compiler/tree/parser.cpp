@@ -114,8 +114,30 @@ void Parser::exp( const std::string &s ){
 	ex( "Expecting "+s );
 }
 
+#ifndef WIN32
+#include <filesystem>
+// Resolve a path case-insensitively against the filesystem. Windows projects
+// often mismatch include-file casing, which only breaks on Linux/macOS.
+static std::string resolvePathCI( const std::string &path ){
+	namespace fs=std::filesystem;
+	std::error_code ec;
+	if( fs::exists( path,ec ) ) return path;
+	fs::path p( path );
+	fs::path dir=p.parent_path();
+	if( dir.empty() ) dir=".";
+	if( !fs::is_directory( dir,ec ) ) return path;
+	std::string want=tolower( p.filename().string() );
+	for( const auto &entry:fs::directory_iterator( dir,ec ) ){
+		if( tolower( entry.path().filename().string() )==want ) return entry.path().string();
+	}
+	return path;
+}
+#endif
+
 std::string Parser::parseIdent(){
-	if( toker->curr()!=IDENT ) exp( "identifier" );
+	// 'This' is only a keyword inside methods; elsewhere it is a valid
+	// identifier (real-world Blitz3D code uses 'this' as a variable name)
+	if( toker->curr()!=IDENT && toker->curr()!=THIS ) exp( "identifier" );
 	std::string t=toker->text();
 	toker->next();
 	return t;
@@ -151,12 +173,19 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				if( toker->next()!=STRINGCONST ) exp( "include filename" );
 				std::string inc=toker->text();toker->next();
 				inc=inc.substr( 1,inc.size()-2 );
+#ifndef WIN32
+				// Windows projects use '\\' in include paths
+				for( size_t ci=0;ci<inc.size();++ci ) if( inc[ci]=='\\' ) inc[ci]='/';
+#endif
 
 				inc=fullfilename( inc );
 #ifdef WIN32
 				// TODO: find out why this was originally done. not good outside of
 				// windows
 				inc=tolower( inc );
+#else
+				// match the on-disk casing if the literal one doesn't exist
+				inc=resolvePathCI( inc );
 #endif
 
 				if( included.find( inc )!=included.end() ) break;
@@ -215,6 +244,11 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				bundle.files.push_back( BundleFile( path,abspath ) );
 			}
 			break;
+		case THIS:
+			// 'This' is an alias of Self only inside methods; outside a class
+			// it is an ordinary identifier (SCP-CB uses 'this' as a variable)
+			if( currentClassName.empty() ) goto this_as_ident_stmt;
+			/* fallthrough */
 		case SELF:
 			// Self is treated as a variable named "self"; both Self\x and Self.x work
 			{
@@ -258,6 +292,7 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			}
 			break;
 		case IDENT:
+			this_as_ident_stmt:
 			{
 				std::string ident=toker->text();
 				toker->next();std::string tag=parseTypeTag();
@@ -1110,6 +1145,10 @@ ExprNode *Parser::parsePrimary( bool opt ){
 	case BBFALSE:
 		result=d_new IntConstNode( 0 );
 		toker->next();break;
+	case THIS:
+		// alias of Self only inside methods; plain identifier elsewhere
+		if( currentClassName.empty() ) goto this_as_ident_expr;
+		/* fallthrough */
 	case SELF:
 		// Self is treated as a variable named "self"
 		toker->next();
@@ -1138,6 +1177,7 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		}
 		break;
 	case IDENT:
+		this_as_ident_expr:
 		ident=toker->text();
 		toker->next();tag=parseTypeTag();
 		if( toker->curr()=='(' && arrayDecls.find(ident)==arrayDecls.end() ){

@@ -46,6 +46,35 @@ _release/bin/**/*.toml
 _release/bin/blitzcc
 _release/bin/ide2
 _release/bin/mediaview
+_release/bin/docgen
+_release/bin/*-*/
+
+# GCC backend build artifacts: blitzcc leaves the executable and the
+# intermediate .c next to the .bb source
+_release/samples/**/*.c
+_release/Games/**/*.c
+_release/samples/benchmark/benchmark_results.txt
+_release/samples/AGore/BirdDemo/BirdDemo
+_release/samples/AGore/BirdDemo/KBSplines
+_release/samples/AGore/GrassDemo/Grass
+_release/samples/AGore/GrassDemo/Grass_debug
+_release/samples/Richard_Betson/emerald_gate/Emerald_Gate_1
+_release/samples/Skully/flares/flares
+_release/samples/Skully/start
+_release/samples/benchmark/benchmark
+_release/samples/benchmark/benchmark_test
+_release/samples/mak/anim/anim
+_release/samples/mak/anim/anim_debug
+_release/samples/mak/anim/anim_t
+_release/samples/mak/anim/anim_test
+_release/samples/mak/collide/collide
+_release/samples/mak/collide/collide_t
+_release/samples/mak/cubewater/cubewater
+_release/samples/mak/cubewater/cubewater_t
+_release/samples/mak/dragon/dragon
+_release/samples/mak/dragon/dragon_t
+_release/samples/mak/dragon/dragon_test
+_release/samples/test_pixel_collision
 _release/cfg/blitzide.prefs
 _release/cfg/blitzide.toml
 _release/help/index.html

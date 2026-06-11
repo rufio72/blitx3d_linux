@@ -172,13 +172,15 @@ ExprNode *SuperMethodCallNode::semant( Environ *e ){
 	StructType *parent = st->superType;
 	if( !parent ) ex( "Class '" + currentClass + "' has no parent class" );
 
-	// Build the function name: ParentClass_MethodName
-	resolved_ident = parent->ident + "_" + method;
-
-	// Find the function
+	// Walk up the inheritance chain: the method may be inherited from an ancestor
 	Type *ret_type = e->findType( tag );
-	sem_decl = e->findFunc( resolved_ident );
-	if( !sem_decl || !(sem_decl->kind & DECL_FUNC) ) {
+	sem_decl = 0;
+	for( StructType *p = parent; p; p = p->superType ){
+		resolved_ident = p->ident + "_" + method;
+		Decl *d = e->findFunc( resolved_ident );
+		if( d && (d->kind & DECL_FUNC) ){ sem_decl = d; break; }
+	}
+	if( !sem_decl ) {
 		ex( "Method '" + method + "' not found in parent class '" + parent->ident + "'" );
 	}
 

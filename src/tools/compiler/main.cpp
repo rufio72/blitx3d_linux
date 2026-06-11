@@ -388,19 +388,19 @@ int main( int argc,char *argv[] ){
 		}else if( t=="-l" ){
 			rtinfo=true;
 		}else if( t=="-r" ){
-			if( out_file.size() || k==argc-1 ) usageErr();
+			if( rt.size() || k==argc-1 ) usageErr();
 			rt=argv[++k];
 		}else if( t=="-o" ){
 			if( out_file.size() || k==argc-1 ) usageErr();
 			out_file=argv[++k];
 		}else if( t=="-target" ){
-			if( out_file.size() || k==argc-1 ) usageErr();
+			if( targetid.size() || k==argc-1 ) usageErr();
 			targetid=argv[++k];
 		}else if( t=="-sign" ){
-			if( out_file.size() || k==argc-1 ) usageErr();
+			if( signerId.size() || k==argc-1 ) usageErr();
 			signerId=argv[++k];
 		}else if( t=="-team" ){
-			if( out_file.size() || k==argc-1 ) usageErr();
+			if( teamId.size() || k==argc-1 ) usageErr();
 			teamId=argv[++k];
 		}else{
 			if( in_file.size() || t[0]=='-' || t[0]=='+' ) usageErr();

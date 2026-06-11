@@ -1,6 +1,7 @@
 #include "new.h"
 #include "../../ex.h"
 #include "../type.h"
+#include "../var/decl_var.h"
 
 ////////////////////
 // New expression //
@@ -38,6 +39,10 @@ ExprNode *NewNode::semant( Environ *e ){
 			ctor_args->castTo( params_without_self, e, f->cfunc );
 			params_without_self->decls.clear();
 			delete params_without_self;
+
+			// temp local so the x86 backend only creates the object once
+			Decl *d=e->decls->insertDecl( genLabel(),sem_type,DECL_LOCAL );
+			sem_temp=d_new DeclVarNode( d );
 		}else{
 			// No constructor found, but empty args is OK - just create object
 			ctor_decl = 0;
@@ -54,16 +59,20 @@ TNode *NewNode::translate( Codegen *g ){
 	if( ctor_args && ctor_decl ){
 		FuncType *f = ctor_decl->type->funcType();
 
+		// Store the new object in a temp: re-using the __bbObjNew node both
+		// as constructor arg and as result would emit (and delete) it twice
+		TNode *st = sem_temp->store( g,obj );
+
 		// Build args: first the object (self), then the other args
 		TNode *args_node = ctor_args->translate( g, f->cfunc );
-		TNode *r = d_new TNode( IR_ARG, obj, args_node, 0 );
+		TNode *r = d_new TNode( IR_ARG, sem_temp->load( g ), args_node, 0 );
 
-		TNode *l = global( "_f" + ident + "_Constructor" );
+		// identifiers are lowercased by the toker, so the emitted symbol is
+		// "_f<class>_constructor"
+		TNode *l = global( "_f" + ident + "_constructor" );
 		TNode *ctor_call = d_new TNode( IR_CALL, l, r, (ctor_args->size() + 1) * 4 );
 
-		// Sequence: create object, call constructor, return object
-		// We need the object value after constructor, so use SEQ to execute both
-		return d_new TNode( IR_SEQ, ctor_call, obj );
+		return seq( st,seq( ctor_call,sem_temp->load( g ) ) );
 	}
 
 	return obj;

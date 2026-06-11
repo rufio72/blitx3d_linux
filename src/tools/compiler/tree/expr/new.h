@@ -3,14 +3,16 @@
 
 #include "node.h"
 #include "expr_seq.h"
+#include "../var/node.h"
 
 struct NewNode : public ExprNode{
 	std::string ident;
 	ExprSeqNode *ctor_args;  // Constructor arguments (may be null)
 	Decl *ctor_decl;         // Constructor function declaration (may be null)
+	VarNode *sem_temp;       // temp holding the new object while the constructor runs
 
-	NewNode( const std::string &i, ExprSeqNode *args=0 ):ident(i),ctor_args(args),ctor_decl(0){}
-	~NewNode(){ delete ctor_args; }
+	NewNode( const std::string &i, ExprSeqNode *args=0 ):ident(i),ctor_args(args),ctor_decl(0),sem_temp(0){}
+	~NewNode(){ delete ctor_args;delete sem_temp; }
 	ExprNode *semant( Environ *e );
 	TNode *translate( Codegen *g );
 #ifdef USE_LLVM

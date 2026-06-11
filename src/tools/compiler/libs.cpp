@@ -281,7 +281,7 @@ const char *openLibs( const Target &t,const std::string &rt ){
 	home=std::string(buff);
 #else
 	char buff[PATH_MAX];
-	home=realpath( p,buff );
+	home=realpath( p,buff ) ? buff : p;
 #endif
 
 	if( t.host ){

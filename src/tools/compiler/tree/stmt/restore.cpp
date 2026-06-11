@@ -28,7 +28,8 @@ void RestoreNode::translate2( Codegen_LLVM *g ){
 #ifdef USE_GCC_BACKEND
 #include "../../codegen_c/codegen_c.h"
 void RestoreNode::translate3( Codegen_C *g ){
-	int offset = sem_label ? sem_label->data_sz : 0;
+	// each DATA entry occupies two bb_int_t slots (type tag + value)
+	int offset = sem_label ? sem_label->data_sz*2 : 0;
 	g->emitLine( "_bbRestore(bbData + " + std::to_string(offset) + ");" );
 }
 #endif

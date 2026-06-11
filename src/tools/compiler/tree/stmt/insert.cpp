@@ -9,7 +9,7 @@ void InsertNode::semant( Environ *e ){
 	StructType *t1=expr1->sem_type->structType();
 	StructType *t2=expr2->sem_type->structType();
 	if( !t1 || !t2 ) ex( "Illegal expression type" );
-	if( t1!=t2 ) ex( "Objects types are differnt" );
+	if( t1!=t2 ) ex( "Objects types are different" );
 }
 
 void InsertNode::translate( Codegen *g ){

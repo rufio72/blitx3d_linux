@@ -364,7 +364,8 @@ void ProgNode::translate3( Codegen_C *g, const std::vector<UserFunc> &userfuncs 
 	g->globals << "\n/* Forward declarations */\n";
 	for( int k=0; k<sem_env->funcDecls->size(); ++k ){
 		Decl *d = sem_env->funcDecls->decls[k];
-		if( d->kind != DECL_FUNC ) continue;
+		// kind carries access modifier bits too (DECL_PRIVATE etc)
+		if( !(d->kind & DECL_FUNC) ) continue;
 		FuncType *ft = d->type->funcType();
 		if( !ft ) continue;
 

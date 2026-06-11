@@ -200,6 +200,12 @@ void Toker::nextline(){
 				continue;
 			}
 
+			// 'This' and 'Self' may be consumed as plain identifiers outside
+			// classes: normalize their case like IDENT so This/this match
+			if( it->second==THIS || it->second==SELF ){
+				for( int n=from;n<k;++n ) line[n]=tolower(line[n]);
+			}
+
 			tokes.push_back( Toke( it->second,from,k ) );
 			continue;
 		}

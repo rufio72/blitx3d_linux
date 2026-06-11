@@ -135,9 +135,9 @@ static std::string resolvePathCI( const std::string &path ){
 #endif
 
 std::string Parser::parseIdent(){
-	// 'This' is only a keyword inside methods; elsewhere it is a valid
-	// identifier (real-world Blitz3D code uses 'this' as a variable name)
-	if( toker->curr()!=IDENT && toker->curr()!=THIS ) exp( "identifier" );
+	// 'This' and 'Self' are only keywords inside methods; elsewhere they are
+	// valid identifiers (classic Blitz3D code uses 'self'/'this' as names)
+	if( toker->curr()!=IDENT && toker->curr()!=THIS && toker->curr()!=SELF ) exp( "identifier" );
 	std::string t=toker->text();
 	toker->next();
 	return t;
@@ -245,11 +245,11 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			}
 			break;
 		case THIS:
-			// 'This' is an alias of Self only inside methods; outside a class
-			// it is an ordinary identifier (SCP-CB uses 'this' as a variable)
-			if( currentClassName.empty() ) goto this_as_ident_stmt;
-			/* fallthrough */
 		case SELF:
+			// aliases of the method receiver only inside methods; outside a
+			// class they are plain identifiers (SCP-CB uses 'this', classic
+			// Blitz code uses 'self' as variable/field names)
+			if( currentClassName.empty() ) goto this_as_ident_stmt;
 			// Self is treated as a variable named "self"; both Self\x and Self.x work
 			{
 				toker->next();
@@ -1146,10 +1146,10 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		result=d_new IntConstNode( 0 );
 		toker->next();break;
 	case THIS:
-		// alias of Self only inside methods; plain identifier elsewhere
-		if( currentClassName.empty() ) goto this_as_ident_expr;
-		/* fallthrough */
 	case SELF:
+		// aliases of the method receiver only inside methods; plain
+		// identifiers elsewhere (classic code uses 'self'/'this' as names)
+		if( currentClassName.empty() ) goto this_as_ident_expr;
 		// Self is treated as a variable named "self"
 		toker->next();
 		// Use parseVarOrMethodCall to support self\Method() / self.Method() syntax

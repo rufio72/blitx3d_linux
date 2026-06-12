@@ -6,11 +6,11 @@
 static Surface::Monitor nop_mon;
 
 Surface::Surface():
-mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),mon( &nop_mon ){
+mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),skin_owner(0),mon( &nop_mon ){
 }
 
 Surface::Surface( Monitor *m ):
-mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),mon(m){
+mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),skin_owner(0),mon(m){
 }
 
 Surface::~Surface(){
@@ -111,15 +111,21 @@ BBMesh *Surface::getMesh(){
 	return mesh;
 }
 
-BBMesh *Surface::getMesh( const std::vector<Bone> &bones ){
+BBMesh *Surface::getMesh( const std::vector<Bone> &bones,const void *owner,bool bones_moved ){
 
-	valid_vs=valid_ts=0;
+	if( !bones_moved && owner==skin_owner && mesh && valid_vs==vertices.size() && valid_ts==triangles.size() ) return mesh;
+	skin_owner=owner;
+
+	// vertices are re-skinned every call, but the indices only need
+	// (re)writing when the mesh is created or grows
+	valid_vs=0;
 
 	if( mesh_vs<vertices.size() || mesh_ts<triangles.size() ){
 		if( mesh ) bbScene->freeMesh( mesh );
 		mesh_vs=vertices.size();
 		mesh_ts=triangles.size();
 		mesh=bbScene->createMesh( mesh_vs,mesh_ts,0 );
+		valid_ts=0;
 	}
 
 	mesh->lock( true );

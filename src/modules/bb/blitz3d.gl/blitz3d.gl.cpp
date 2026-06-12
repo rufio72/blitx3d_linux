@@ -67,9 +67,11 @@ public:
 	unsigned int vertex_array=0;
 	unsigned int vertex_buffer=0,index_buffer=0;
 
-	// deferred upload: unlock() only marks the CPU copy dirty, upload()
-	// runs at draw time so N writers per frame cost a single transfer
-	bool gpu_dirty=false,ever_uploaded=false;
+	// deferred upload: setters only mark the CPU copy dirty, upload()
+	// runs at draw time so N writers per frame cost a single transfer.
+	// verts and tris are tracked separately: skinned meshes rewrite
+	// vertices every frame but their indices never change
+	bool verts_dirty=false,tris_dirty=false,ever_uploaded=false;
 
 	GLMesh( int mv,int mt,int f ):max_verts(mv),max_tris(mt),flags(f){
 		GL( glGenVertexArrays( 1,&vertex_array ) );
@@ -116,18 +118,24 @@ public:
 		// upload is deferred to draw time: sprites and skinned meshes
 		// lock/unlock the shared mesh once per object per frame, and an
 		// immediate glBufferData here meant one full-buffer transfer each
-		gpu_dirty=true;
 	}
 
 	void upload(){
-		if( !gpu_dirty || !verts ) return;
-		// re-uploaded buffers are dynamic by nature (sprites, skinning)
+		if( !(verts_dirty || tris_dirty) || !verts ) return;
+		// re-uploaded buffers are dynamic by nature (sprites, skinning);
+		// full glBufferData orphans the old store, so a rewrite never
+		// stalls on draws still reading the previous contents
 		GLenum usage=ever_uploaded ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
-		GL( glBindBuffer( GL_ARRAY_BUFFER,vertex_buffer ) );
-		GL( glBufferData( GL_ARRAY_BUFFER,max_verts*sizeof(GLVertex),verts,usage ) );
-		GL( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,index_buffer ) );
-		GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,max_tris*3*sizeof(unsigned int),tris,usage ) );
-		gpu_dirty=false;
+		if( verts_dirty ){
+			GL( glBindBuffer( GL_ARRAY_BUFFER,vertex_buffer ) );
+			GL( glBufferData( GL_ARRAY_BUFFER,max_verts*sizeof(GLVertex),verts,usage ) );
+			verts_dirty=false;
+		}
+		if( tris_dirty ){
+			GL( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,index_buffer ) );
+			GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,max_tris*3*sizeof(unsigned int),tris,usage ) );
+			tris_dirty=false;
+		}
 		ever_uploaded=true;
 	}
 
@@ -160,6 +168,7 @@ public:
 	}
 
 	void setVertex( int n,const float coords[3],const float normal[3],unsigned argb,const float tex_coords[2][2] ){
+		verts_dirty=true;
 		verts[n].coords[0]=coords[0];verts[n].coords[1]=coords[1];verts[n].coords[2]=coords[2];
 		verts[n].normal[0]=normal[0];verts[n].normal[1]=normal[1];verts[n].normal[2]=normal[2];
 		verts[n].tex_coord0[0]=tex_coords[0][0];verts[n].tex_coord0[1]=tex_coords[0][1];
@@ -168,6 +177,7 @@ public:
 	}
 
 	void setTriangle( int n,int v0,int v1,int v2 ){
+		tris_dirty=true;
 		tris[n*3+0]=v2;
 		tris[n*3+1]=v1;
 		tris[n*3+2]=v0;

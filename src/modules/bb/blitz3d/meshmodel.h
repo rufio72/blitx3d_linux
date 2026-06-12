@@ -61,6 +61,8 @@ private:
 	std::vector<Brush> brushes;
 
 	std::vector<Surface::Bone> surf_bones;
+	//set by render(): did this model's bone pose change this frame?
+	bool skin_moved;
 
 	MeshModel &operator=(const MeshModel &);
 };

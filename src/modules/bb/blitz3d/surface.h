@@ -97,7 +97,10 @@ public:
 	void updateNormals();
 
 	BBMesh *getMesh();
-	BBMesh *getMesh( const std::vector<Bone> &bones );
+	//owner identifies the model copy skinning this surface; when the same
+	//owner skins again with bones_moved=false, the mesh is reused as-is
+	BBMesh *getMesh( const std::vector<Bone> &bones,const void *owner,bool bones_moved );
+	void clearSkinOwner( const void *owner ){ if( skin_owner==owner ) skin_owner=0; }
 
 	std::string getName()const{ return name; }
 	const Brush &getBrush()const{ return brush; }
@@ -114,6 +117,8 @@ private:
 	std::vector<Triangle> triangles;
 	int mesh_vs,mesh_ts;
 	int valid_vs,valid_ts;
+	//model copy whose pose the mesh currently holds; compared, never dereferenced
+	const void *skin_owner;
 	Monitor *mon;
 };
 

@@ -176,7 +176,13 @@ rep( t.rep ),brush_changes( rep->brush_changes-1 ){
 }
 
 MeshModel::~MeshModel(){
-	if( !--rep->ref_cnt ) delete rep;
+	if( !--rep->ref_cnt ){
+		delete rep;
+	}else{
+		//surfaces remember which copy last skinned them by address: make
+		//sure a recycled address can never match
+		for( unsigned int k=0;k<rep->surfaces.size();++k ) rep->surfaces[k]->clearSkinOwner( this );
+	}
 }
 
 void MeshModel::updateNormals(){
@@ -241,9 +247,14 @@ bool MeshModel::render( const RenderContext &rc ){
 	//OK, its boned!
 	const std::vector<Object*> &bones=getAnimator()->getObjects();
 
+	//detect whether this model's pose changed since its last render; if
+	//not, surfaces it already skinned can be reused as-is
+	skin_moved=false;
 	for( unsigned int k=0;k<bones.size();++k ){
 		Transform t=
 		bones[k]->getRenderTform() * rep->bone_tforms[k];
+		if( t==surf_bones[k].coord_tform ) continue;
+		skin_moved=true;
 		surf_bones[k].coord_tform=t;
 		surf_bones[k].normal_tform=t.m.cofactor();
 	}
@@ -252,7 +263,7 @@ bool MeshModel::render( const RenderContext &rc ){
 	for( unsigned int k=0;k<rep->surfaces.size();++k ){
 		Surface *s=rep->surfaces[k];
 		if( brushes[k].getBlend()==BBScene::BLEND_REPLACE ){
-			if( BBMesh *mesh=s->getMesh( surf_bones ) ){
+			if( BBMesh *mesh=s->getMesh( surf_bones,this,skin_moved ) ){
 				enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k] );
 			}
 		}else{
@@ -267,7 +278,7 @@ void MeshModel::renderQueue( int type ){
 		for( unsigned int k=0;k<rep->surfaces.size();++k ){
 			Surface *s=rep->surfaces[k];
 			if( brushes[k].getBlend()!=BBScene::BLEND_REPLACE ){
-				if( BBMesh *mesh=s->getMesh( surf_bones ) ){
+				if( BBMesh *mesh=s->getMesh( surf_bones,this,skin_moved ) ){
 					enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k] );
 				}
 			}

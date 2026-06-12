@@ -6,11 +6,11 @@
 static Surface::Monitor nop_mon;
 
 Surface::Surface():
-mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),skin_owner(0),mon( &nop_mon ){
+mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),skin_owner(0),skin_mesh(false),mon( &nop_mon ){
 }
 
 Surface::Surface( Monitor *m ):
-mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),skin_owner(0),mon(m){
+mesh(0),mesh_vs(0),mesh_ts(0),valid_vs(0),valid_ts(0),skin_owner(0),skin_mesh(false),mon(m){
 }
 
 Surface::~Surface(){
@@ -96,7 +96,7 @@ BBMesh *Surface::getMesh(){
 			mesh_vs=vertices.size();
 			mesh_ts=triangles.size();
 		}
-		mesh=bbScene->createMesh( mesh_vs,mesh_ts,0 );
+		mesh=bbScene->createMesh( mesh_vs,mesh_ts,skin_mesh ? BBScene::MESH_SKINNED : 0 );
 	}
 
 	mesh->lock( true );
@@ -151,6 +151,52 @@ BBMesh *Surface::getMesh( const std::vector<Bone> &bones,const void *owner,bool 
 			}
 			mesh->setVertex( valid_vs,tv,tn.normalized(),v.color,v.tex_coords );
 		}
+	}
+	for( ;valid_ts<triangles.size();++valid_ts ){
+		const Triangle &t=triangles[valid_ts];
+		mesh->setTriangle( valid_ts,t.verts[0],t.verts[1],t.verts[2] );
+	}
+	mesh->unlock();
+	return mesh;
+}
+
+BBMesh *Surface::getSkinMesh(){
+	if( mesh && mesh->dirty() ) valid_vs=0;
+
+	if( skin_mesh && valid_vs==vertices.size() && valid_ts==triangles.size() ) return mesh;
+
+	valid_vs=valid_ts=0;
+
+	if( !skin_mesh || mesh_vs<vertices.size() || mesh_ts<triangles.size() ){
+		if( mesh ) bbScene->freeMesh( mesh );
+		mesh_vs=vertices.size();
+		mesh_ts=triangles.size();
+		mesh=bbScene->createMesh( mesh_vs,mesh_ts,BBScene::MESH_SKINNED );
+		skin_mesh=true;
+	}
+
+	mesh->lock( true );
+	for( ;valid_vs<vertices.size();++valid_vs ){
+		const Vertex &v=vertices[valid_vs];
+		mesh->setVertex( valid_vs,&v );
+
+		//pack the vertex weights for the shader; CPU skinning semantics:
+		//no bone -> slot 0 (the mesh) at full weight, a single bone gets
+		//full weight regardless of its stored value, multiple bones are
+		//summed unnormalized
+		float w[4]={ 1,0,0,0 },b[4]={ 0,0,0,0 };
+		if( v.bone_bones[0]!=255 ){
+			b[0]=v.bone_bones[0];
+			if( v.bone_bones[1]!=255 ){
+				w[0]=v.bone_weights[0];
+				for( int n=1;n<MAX_SURFACE_BONES;++n ){
+					if( v.bone_bones[n]==255 ) break;
+					w[n]=v.bone_weights[n];
+					b[n]=v.bone_bones[n];
+				}
+			}
+		}
+		mesh->setVertexWeights( valid_vs,w,b );
 	}
 	for( ;valid_ts<triangles.size();++valid_ts ){
 		const Triangle &t=triangles[valid_ts];

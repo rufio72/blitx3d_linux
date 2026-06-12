@@ -63,6 +63,9 @@ private:
 	std::vector<Surface::Bone> surf_bones;
 	//set by render(): did this model's bone pose change this frame?
 	bool skin_moved;
+	//GPU skinning: column-major 4x4 world-space bone matrices, rebuilt
+	//when the pose changes; referenced by enqueued draws
+	std::vector<float> bone_mats;
 
 	MeshModel &operator=(const MeshModel &);
 };

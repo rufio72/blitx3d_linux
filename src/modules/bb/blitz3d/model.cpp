@@ -12,6 +12,9 @@ class Model::MeshQueue{
 	int fv,vc,ft,tc;
 	Brush brush;
 	int q_type;
+	//GPU skinning: borrowed pointer into the owning model's bone matrices
+	const float *bones;
+	int bone_cnt;
 //	bool opaque;
 
 	static MeshQueue *pool;
@@ -19,8 +22,8 @@ class Model::MeshQueue{
 public:
 	MeshQueue(){}
 
-	MeshQueue( BBMesh *m,int fv,int vc,int ft,int tc,const Brush &b ):
-	mesh(m),fv(fv),vc(vc),ft(ft),tc(tc),brush(b){
+	MeshQueue( BBMesh *m,int fv,int vc,int ft,int tc,const Brush &b,const float *bones=0,int bone_cnt=0 ):
+	mesh(m),fv(fv),vc(vc),ft(ft),tc(tc),brush(b),bones(bones),bone_cnt(bone_cnt){
 		int n=brush.getBlend();
 		q_type=(n==BBScene::BLEND_REPLACE) ? QUEUE_OPAQUE : QUEUE_TRANSPARENT;
 	}
@@ -32,6 +35,7 @@ public:
 		return brush;
 	}
 	void render(){
+		bbScene->setRenderBones( bones,bone_cnt );
 		bbScene->setRenderState( brush.getRenderState() );
 		bbScene->render( mesh,fv,vc,ft,tc );
 	}
@@ -120,6 +124,10 @@ void Model::enqueue( BBMesh *mesh,int fv,int vc,int ft,int tc ){
 
 void Model::enqueue( BBMesh *mesh,int fv,int vc,int ft,int tc,const Brush &brush ){
 	enqueue( new MeshQueue( mesh,fv,vc,ft,tc,brush ) );
+}
+
+void Model::enqueue( BBMesh *mesh,int fv,int vc,int ft,int tc,const Brush &brush,const float *bones,int bone_cnt ){
+	enqueue( new MeshQueue( mesh,fv,vc,ft,tc,brush,bones,bone_cnt ) );
 }
 
 void Model::renderQueue( int type ){

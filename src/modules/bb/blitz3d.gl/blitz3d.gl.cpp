@@ -17,6 +17,10 @@ static const float rtod=1/dtor;
 #define GLES
 #endif
 
+// GPU skinning: bone matrices live in a UBO (binding 3), so the cap is
+// bounded by the 16KB minimum UBO size, not the vertex uniform budget
+#define BB_GL_MAX_BONES 64
+
 class GLLight : public BBLightRep{
 public:
 	int type;
@@ -55,6 +59,11 @@ struct GLVertex{
 	float tex_coord1[2];
 };
 
+struct GLSkinVertex{
+	float weights[4];
+	float bones[4];
+};
+
 class GLMesh : public BBMesh{
 protected:
 	bool dirty()const{ return false; }
@@ -63,15 +72,16 @@ public:
 	int max_verts,max_tris,flags;
 	GLVertex *verts=0;
 	unsigned int *tris=0;
+	GLSkinVertex *skin=0;
 
 	unsigned int vertex_array=0;
-	unsigned int vertex_buffer=0,index_buffer=0;
+	unsigned int vertex_buffer=0,index_buffer=0,skin_buffer=0;
 
 	// deferred upload: setters only mark the CPU copy dirty, upload()
 	// runs at draw time so N writers per frame cost a single transfer.
 	// verts and tris are tracked separately: skinned meshes rewrite
 	// vertices every frame but their indices never change
-	bool verts_dirty=false,tris_dirty=false,ever_uploaded=false;
+	bool verts_dirty=false,tris_dirty=false,skin_dirty=false,ever_uploaded=false;
 
 	GLMesh( int mv,int mt,int f ):max_verts(mv),max_tris(mt),flags(f){
 		GL( glGenVertexArrays( 1,&vertex_array ) );
@@ -95,6 +105,15 @@ public:
 		GL( glVertexAttribPointer( 3,2,GL_FLOAT,GL_FALSE,sizeof( GLVertex ),(void*)offsetof( GLVertex,tex_coord0 ) ) );
 		GL( glVertexAttribPointer( 4,2,GL_FLOAT,GL_FALSE,sizeof( GLVertex ),(void*)offsetof( GLVertex,tex_coord1 ) ) );
 
+		if( flags&BBScene::MESH_SKINNED ){
+			GL( glGenBuffers( 1,&skin_buffer ) );
+			GL( glBindBuffer( GL_ARRAY_BUFFER,skin_buffer ) );
+			GL( glEnableVertexAttribArray( 5 ) );
+			GL( glEnableVertexAttribArray( 6 ) );
+			GL( glVertexAttribPointer( 5,4,GL_FLOAT,GL_FALSE,sizeof( GLSkinVertex ),(void*)offsetof( GLSkinVertex,weights ) ) );
+			GL( glVertexAttribPointer( 6,4,GL_FLOAT,GL_FALSE,sizeof( GLSkinVertex ),(void*)offsetof( GLSkinVertex,bones ) ) );
+		}
+
 		GL( glBindVertexArray( 0 ) );
 	}
 
@@ -102,14 +121,24 @@ public:
 		if( vertex_array ) glDeleteVertexArrays( 1,&vertex_array );
 		if( vertex_buffer ) glDeleteBuffers( 1,&vertex_buffer );
 		if( index_buffer ) glDeleteBuffers( 1,&index_buffer );
+		if( skin_buffer ) glDeleteBuffers( 1,&skin_buffer );
 		delete[] verts;
 		delete[] tris;
+		delete[] skin;
 	}
 
 	bool lock( bool all ){
 		// TODO: this should probably come from a pool
 		if( !verts ) verts=new GLVertex[max_verts];
 		if( !tris ) tris=new unsigned int[max_tris*3];
+		if( (flags&BBScene::MESH_SKINNED) && !skin ){
+			skin=new GLSkinVertex[max_verts];
+			for( int n=0;n<max_verts;++n ){
+				//default: full weight on slot 0 (the mesh itself)
+				skin[n].weights[0]=1;skin[n].weights[1]=skin[n].weights[2]=skin[n].weights[3]=0;
+				skin[n].bones[0]=skin[n].bones[1]=skin[n].bones[2]=skin[n].bones[3]=0;
+			}
+		}
 
 		return true;
 	}
@@ -121,7 +150,7 @@ public:
 	}
 
 	void upload(){
-		if( !(verts_dirty || tris_dirty) || !verts ) return;
+		if( !(verts_dirty || tris_dirty || skin_dirty) || !verts ) return;
 		// re-uploaded buffers are dynamic by nature (sprites, skinning);
 		// full glBufferData orphans the old store, so a rewrite never
 		// stalls on draws still reading the previous contents
@@ -135,6 +164,11 @@ public:
 			GL( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,index_buffer ) );
 			GL( glBufferData( GL_ELEMENT_ARRAY_BUFFER,max_tris*3*sizeof(unsigned int),tris,usage ) );
 			tris_dirty=false;
+		}
+		if( skin_dirty ){
+			GL( glBindBuffer( GL_ARRAY_BUFFER,skin_buffer ) );
+			GL( glBufferData( GL_ARRAY_BUFFER,max_verts*sizeof(GLSkinVertex),skin,GL_STATIC_DRAW ) );
+			skin_dirty=false;
 		}
 		ever_uploaded=true;
 	}
@@ -181,6 +215,15 @@ public:
 		tris[n*3+0]=v2;
 		tris[n*3+1]=v1;
 		tris[n*3+2]=v0;
+	}
+
+	void setVertexWeights( int n,const float weights[4],const float bones[4] ){
+		if( !skin ) return;
+		skin_dirty=true;
+		for( int i=0;i<4;++i ){
+			skin[n].weights[i]=weights[i];
+			skin[n].bones[i]=bones[i];
+		}
 	}
 };
 
@@ -246,6 +289,7 @@ private:
 		GLint world_matrix = -1;
 		GLint normal_matrix = -1; // Optimization #4
 		GLint camera_pos = -1;    // For cubemap reflections
+		GLint skin_count = -1;    // GPU skinning
 	} uniform_locs;
 
 	// Cached view matrix for normal matrix calculation (optimization #4)
@@ -254,7 +298,11 @@ private:
 	// Cached UBO handles (optimization #2)
 	GLuint light_ubo = 0;
 	GLuint render_ubo = 0;
+	GLuint bone_ubo = 0;
 	bool ubos_initialized = false;
+
+	// GPU skinning shadow state: bbSkinCount last set on the program
+	int cur_skin_count = -1;
 
 	// Texture state cache (optimization #5)
 	struct {
@@ -556,6 +604,33 @@ public:
 		}
 	}
 
+	int maxBones()const{
+#ifdef GLES
+		return 0;
+#else
+		return BB_GL_MAX_BONES;
+#endif
+	}
+
+	void setRenderBones( const float *matrices,int count ){
+		if( count ){
+			if( bone_ubo==0 ){
+				GL( glGenBuffers( 1,&bone_ubo ) );
+				GL( glBindBuffer( GL_UNIFORM_BUFFER,bone_ubo ) );
+				GL( glBufferData( GL_UNIFORM_BUFFER,BB_GL_MAX_BONES*16*sizeof(float),nullptr,GL_DYNAMIC_DRAW ) );
+				GL( glBindBufferRange( GL_UNIFORM_BUFFER,3,bone_ubo,0,BB_GL_MAX_BONES*16*sizeof(float) ) );
+			}else{
+				GL( glBindBuffer( GL_UNIFORM_BUFFER,bone_ubo ) );
+			}
+			GL( glBufferSubData( GL_UNIFORM_BUFFER,0,count*16*sizeof(float),matrices ) );
+			GL( glBindBuffer( GL_UNIFORM_BUFFER,0 ) );
+		}
+		if( count!=cur_skin_count ){
+			GL( glUniform1i( uniform_locs.skin_count,count ) );
+			cur_skin_count=count;
+		}
+	}
+
 	void setRenderState( const RenderState &rs ){
 		if( rs.fx&FX_ALPHATEST && !(rs.fx&FX_VERTEXALPHA) ){
 			us.alpha_test = 1;
@@ -782,12 +857,16 @@ public:
 			GLint renderIdx=GL( glGetUniformBlockIndex( defaultProgram,"BBRenderState" ) );
 			GL( glUniformBlockBinding( defaultProgram,renderIdx,2 ) );
 
+			GLint boneIdx=GL( glGetUniformBlockIndex( defaultProgram,"BBBoneState" ) );
+			if( boneIdx!=GL_INVALID_INDEX ){ GL( glUniformBlockBinding( defaultProgram,boneIdx,3 ) ); }
+
 			// Optimization #1: Cache uniform locations once
 			uniform_locs.proj_matrix = GL( glGetUniformLocation( defaultProgram,"bbProjMatrix" ) );
 			uniform_locs.view_matrix = GL( glGetUniformLocation( defaultProgram,"bbViewMatrix" ) );
 			uniform_locs.world_matrix = GL( glGetUniformLocation( defaultProgram,"bbWorldMatrix" ) );
 			uniform_locs.normal_matrix = GL( glGetUniformLocation( defaultProgram,"bbNormalMatrix" ) );
 			uniform_locs.camera_pos = GL( glGetUniformLocation( defaultProgram,"bbCameraPos" ) );
+			uniform_locs.skin_count = GL( glGetUniformLocation( defaultProgram,"bbSkinCount" ) );
 		}
 
 		GL( glUseProgram( defaultProgram ) );
@@ -802,6 +881,7 @@ public:
 		cur_blend=-1;
 		cur_cullface=1; // glEnable above
 		cur_polymode=-1;
+		cur_skin_count=-1;
 		last_us_valid=false;
 
 		lights.clear();

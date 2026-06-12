@@ -247,6 +247,8 @@ bool MeshModel::render( const RenderContext &rc ){
 	//OK, its boned!
 	const std::vector<Object*> &bones=getAnimator()->getObjects();
 
+	bool gpu=bbScene->maxBones()>=(int)bones.size();
+
 	//detect whether this model's pose changed since its last render; if
 	//not, surfaces it already skinned can be reused as-is
 	skin_moved=false;
@@ -256,15 +258,29 @@ bool MeshModel::render( const RenderContext &rc ){
 		if( t==surf_bones[k].coord_tform ) continue;
 		skin_moved=true;
 		surf_bones[k].coord_tform=t;
-		surf_bones[k].normal_tform=t.m.cofactor();
+		if( !gpu ) surf_bones[k].normal_tform=t.m.cofactor();
+	}
+
+	if( gpu && (skin_moved || bone_mats.size()!=bones.size()*16) ){
+		bone_mats.resize( bones.size()*16 );
+		for( unsigned int k=0;k<bones.size();++k ){
+			const Transform &t=surf_bones[k].coord_tform;
+			float *m=&bone_mats[k*16];
+			m[ 0]=t.m.i.x;m[ 1]=t.m.i.y;m[ 2]=t.m.i.z;m[ 3]=0;
+			m[ 4]=t.m.j.x;m[ 5]=t.m.j.y;m[ 6]=t.m.j.z;m[ 7]=0;
+			m[ 8]=t.m.k.x;m[ 9]=t.m.k.y;m[10]=t.m.k.z;m[11]=0;
+			m[12]=t.v.x;m[13]=t.v.y;m[14]=t.v.z;m[15]=1;
+		}
 	}
 
 	bool trans=false;
 	for( unsigned int k=0;k<rep->surfaces.size();++k ){
 		Surface *s=rep->surfaces[k];
 		if( brushes[k].getBlend()==BBScene::BLEND_REPLACE ){
-			if( BBMesh *mesh=s->getMesh( surf_bones,this,skin_moved ) ){
-				enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k] );
+			BBMesh *mesh=gpu ? s->getSkinMesh() : s->getMesh( surf_bones,this,skin_moved );
+			if( mesh ){
+				if( gpu ) enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k],&bone_mats[0],bones.size() );
+				else enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k] );
 			}
 		}else{
 			trans=true;
@@ -275,11 +291,14 @@ bool MeshModel::render( const RenderContext &rc ){
 
 void MeshModel::renderQueue( int type ){
 	if( type==QUEUE_TRANSPARENT && surf_bones.size() ){
+		bool gpu=bbScene->maxBones()>=(int)getAnimator()->getObjects().size();
 		for( unsigned int k=0;k<rep->surfaces.size();++k ){
 			Surface *s=rep->surfaces[k];
 			if( brushes[k].getBlend()!=BBScene::BLEND_REPLACE ){
-				if( BBMesh *mesh=s->getMesh( surf_bones,this,skin_moved ) ){
-					enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k] );
+				BBMesh *mesh=gpu ? s->getSkinMesh() : s->getMesh( surf_bones,this,skin_moved );
+				if( mesh ){
+					if( gpu ) enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k],&bone_mats[0],getAnimator()->getObjects().size() );
+					else enqueue( mesh,0,s->numVertices(),0,s->numTriangles(),brushes[k] );
 				}
 			}
 		}

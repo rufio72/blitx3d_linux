@@ -72,6 +72,10 @@ public:
 
 	void enqueue( BBMesh *mesh,int first_vert,int vert_cnt,int first_tri,int tri_cnt );
 	void enqueue( BBMesh *mesh,int first_vert,int vert_cnt,int first_tri,int tri_cnt,const Brush &b );
+	//GPU-skinned draw: bones points at column-major 4x4 world-space bone
+	//matrices owned by the model; they must stay valid until the frame's
+	//queues are flushed
+	void enqueue( BBMesh *mesh,int first_vert,int vert_cnt,int first_tri,int tri_cnt,const Brush &b,const float *bones,int bone_cnt );
 
 	int queueSize( int type )const{ return queues[type].size(); }
 

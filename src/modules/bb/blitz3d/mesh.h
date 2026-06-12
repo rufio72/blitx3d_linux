@@ -15,6 +15,8 @@ public:
   virtual void setVertex( int n,const float coords[3],const float normal[3],const float tex_coords[2][2] )=0;
   virtual void setVertex( int n,const float coords[3],const float normal[3],unsigned argb,const float tex_coords[2][2] )=0;
   virtual void setTriangle( int n,int v0,int v1,int v2 )=0;
+  //GPU skinning attributes; only meaningful on MESH_SKINNED meshes
+  virtual void setVertexWeights( int n,const float weights[4],const float bones[4] ){}
 };
 
 #endif

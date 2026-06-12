@@ -101,6 +101,9 @@ public:
 	//owner skins again with bones_moved=false, the mesh is reused as-is
 	BBMesh *getMesh( const std::vector<Bone> &bones,const void *owner,bool bones_moved );
 	void clearSkinOwner( const void *owner ){ if( skin_owner==owner ) skin_owner=0; }
+	//GPU skinning: bind-pose mesh with per-vertex weights, built once and
+	//shared by every model copy (the pose travels as per-draw bone matrices)
+	BBMesh *getSkinMesh();
 
 	std::string getName()const{ return name; }
 	const Brush &getBrush()const{ return brush; }
@@ -119,6 +122,8 @@ private:
 	int valid_vs,valid_ts;
 	//model copy whose pose the mesh currently holds; compared, never dereferenced
 	const void *skin_owner;
+	//mesh was created with MESH_SKINNED (bind pose + weight attributes)
+	bool skin_mesh;
 	Monitor *mon;
 };
 

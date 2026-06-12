@@ -39,6 +39,10 @@ public:
     BLEND_MULTIPLY2=5,
   };
   enum{
+    //createMesh flags
+    MESH_SKINNED=	1
+  };
+  enum{
     ZMODE_NORMAL=	0,
     ZMODE_DISABLE=	1,
     ZMODE_CMPONLY=	2
@@ -103,6 +107,12 @@ public:
   virtual BBMesh *createMesh( int max_verts,int max_tris,int flags )=0;
   BBMesh *verifyMesh( BBMesh *m );
   void freeMesh( BBMesh *mesh );
+
+  //GPU skinning; 0 = not supported, fall back to CPU skinning
+  virtual int maxBones()const{ return 0; }
+  //column-major 4x4 world-space bone matrices for subsequent draws;
+  //count=0 disables skinning
+  virtual void setRenderBones( const float *matrices,int count ){}
 
   //info
   virtual int getTrianglesDrawn()const=0;

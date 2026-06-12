@@ -50,6 +50,14 @@ layout(std140) uniform BBRenderState {
   int AlphaTest;
 } RS;
 
+// GPU skinning: world-space bone matrices; bbSkinCount==0 disables.
+// 64 mat4 = 4KB, well within the 16KB minimum UBO size.
+layout(std140) uniform BBBoneState {
+  mat4 Bone[64];
+} BS;
+
+uniform int bbSkinCount;
+
 #ifdef VERTEX
 #define varying out
 #else
@@ -94,22 +102,43 @@ layout(location = 1) in vec3 bbNormal;
 layout(location = 2) in vec4 bbColor;
 layout(location = 3) in vec2 bbTexCoord0;
 layout(location = 4) in vec2 bbTexCoord1;
+layout(location = 5) in vec4 bbBoneWeights;
+layout(location = 6) in vec4 bbBoneIndices;
 
 void main() {
   mat4 bbModelViewMatrix = bbViewMatrix * bbWorldMatrix;
   mat4 bbModelViewProjectionMatrix=bbProjMatrix * bbModelViewMatrix;
   // Optimization #4: bbNormalMatrix is now passed as uniform from CPU
 
-  bbVertex_Position = bbPosition;
+  // GPU skinning: vertices are stored in bind pose, bone matrices map
+  // straight to world space (the world matrix is identity for skinned
+  // models, which render in RENDER_SPACE_WORLD)
+  vec3 position = bbPosition;
+  vec3 normal = bbNormal;
+  if (bbSkinCount > 0) {
+    vec3 p = vec3(0.0);
+    vec3 n = vec3(0.0);
+    for (int i = 0; i < 4; i++) {
+      float w = bbBoneWeights[i];
+      if (w <= 0.0) break;
+      mat4 b = BS.Bone[int(bbBoneIndices[i] + 0.5)];
+      p += w * (b * vec4(bbPosition, 1.0)).xyz;
+      n += w * (mat3(b) * bbNormal);
+    }
+    position = p;
+    normal = normalize(n);
+  }
+
+  bbVertex_Position = position;
 
   // Calculate world space position and normal for cubemap reflections
-  vec4 worldPos = bbWorldMatrix * vec4(bbPosition, 1.0);
+  vec4 worldPos = bbWorldMatrix * vec4(position, 1.0);
   bbVertex_WorldPosition = worldPos.xyz;
-  bbVertex_WorldNormal = normalize(mat3(bbWorldMatrix) * bbNormal);
+  bbVertex_WorldNormal = normalize(mat3(bbWorldMatrix) * normal);
 
-  gl_Position = bbModelViewProjectionMatrix * vec4(bbPosition, 1.0);
+  gl_Position = bbModelViewProjectionMatrix * vec4(position, 1.0);
 
-  vec3 EyeNormal = bbNormalMatrix * bbNormal;
+  vec3 EyeNormal = bbNormalMatrix * normal;
 
   for( int i=0;i<RS.TexturesUsed;i++ ){
     vec2 coord;
@@ -138,7 +167,7 @@ void main() {
     vec4 Diffuse=vec4( 0.0 ),Specular=vec4( 0.0 );
 
     // Get vertex position in view space for point light calculations
-    vec3 vertexViewPos = (bbModelViewMatrix * vec4(bbPosition, 1.0)).xyz;
+    vec3 vertexViewPos = (bbModelViewMatrix * vec4(position, 1.0)).xyz;
 
     for( int i=0;i<LS.LightsUsed;i++ ){
       float nDotVP,nDotHV,pf;

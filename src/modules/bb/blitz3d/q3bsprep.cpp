@@ -732,6 +732,7 @@ void Q3BSPRep::render( Model *model,const RenderContext &rc ){
 
 	bbScene->setAmbient2( &ambient.x );
 	bbScene->setWorldMatrix( (BBScene::Matrix*)&model->getRenderTform() );
+	bbScene->setRenderBones( 0,0 ); //BSP draws bypass the mesh queues
 
 	int k;
 	for( k=0;k<r_surfs.size();++k ){

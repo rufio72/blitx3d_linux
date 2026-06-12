@@ -39,9 +39,11 @@ public:
     CUBEMODE_REFLECTION=1,
     CUBEMODE_NORMAL=2,
     CUBEMODE_POSITION=3,
+    //extension: reflection with fresnel/deep-color/glints water shading
+    //(reuses the value of the never-implemented CUBESPACE_CAMERA bit)
+    CUBEMODE_WATER=4,
 
-    CUBESPACE_WORLD=0,
-    CUBESPACE_CAMERA=4
+    CUBESPACE_WORLD=0
   };
 
 	virtual void unset()=0;

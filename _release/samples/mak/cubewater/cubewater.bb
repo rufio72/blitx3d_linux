@@ -110,6 +110,7 @@ Next
 water=LoadMesh("level/water.3ds")
 MoveEntity water,0,-2,0
 WaterMapTexture=CreateTexture(WaterMapSize,WaterMapSize,128+256+48)
+SetCubeMode WaterMapTexture,4  ; 4 = water (fresnel+glints); riflessione semplice e' il default
 EntityTexture water,WaterMapTexture
 EntityColor water,100,200,255
 EntityColor water,512,512,512

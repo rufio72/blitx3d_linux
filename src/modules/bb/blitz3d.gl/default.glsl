@@ -199,8 +199,14 @@ void main() {
       vec3 halfVector = normalize( LightDir + vec3( 0.0, 0.0, -1.0 ));
 
       nDotVP = max( 0.0, dot( bbVertex_Normal, LightDir ) );
-      nDotHV = max( 0.0, dot( bbVertex_Normal, vec3( halfVector )));
-      pf = pow( nDotHV, 100.0 ) * float(nDotVP != 0.0);
+
+      // EntityShininess drives the specular: 0 (the default) means none,
+      // like classic Blitz3D; the exponent scales with it as D3D7 did
+      pf = 0.0;
+      if( RS.BrushShininess > 0.0 ){
+        nDotHV = max( 0.0, dot( bbVertex_Normal, vec3( halfVector )));
+        pf = pow( nDotHV, 128.0 * RS.BrushShininess ) * RS.BrushShininess * float(nDotVP != 0.0);
+      }
 
       // Limit light contribution to prevent over-saturation
       vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
@@ -242,7 +248,12 @@ vec4 Sample2D( sampler2D tex,int i ){
   return texture( tex,bbVertex_TexCoord[i] );
 }
 
-vec4 SampleCube( samplerCube tex ){
+#define CUBEMODE_REFLECTION 1
+#define CUBEMODE_NORMAL     2
+#define CUBEMODE_POSITION   3
+#define CUBEMODE_WATER      4
+
+vec4 SampleCube( samplerCube tex,int mode ){
   // View direction: from camera to fragment (both in Blitz world space)
   vec3 I = normalize(bbVertex_WorldPosition - bbCameraPos);
 
@@ -250,8 +261,16 @@ vec4 SampleCube( samplerCube tex ){
   vec3 N = normalize(bbVertex_WorldNormal);
   if( dot(N, I) > 0.0 ) N = -N;
 
-  // Reflection vector
-  vec3 R = reflect(I, N);
+  // Lookup direction per cube mode (SetCubeMode)
+  vec3 R;
+  if( mode == CUBEMODE_NORMAL ){
+    R = N;
+  }else if( mode == CUBEMODE_POSITION ){
+    R = normalize(bbVertex_WorldPosition);
+  }else{
+    // CUBEMODE_REFLECTION / CUBEMODE_WATER
+    R = reflect(I, N);
+  }
 
   // Cube faces are stored via SetCubeFace/CopyRect with the up/down views in the
   // -Y/+Y faces and images copied 1:1 from the framebuffer; with that layout the
@@ -259,6 +278,8 @@ vec4 SampleCube( samplerCube tex ){
   R.y = -R.y;
 
   vec4 refl = texture(tex, R);
+
+  if( mode != CUBEMODE_WATER ) return refl;
 
   // Fresnel (Schlick-like): full reflection at grazing angles, darker water color
   // looking straight down. Local wave slope changes the angle, so ripples shade.
@@ -302,11 +323,11 @@ void main() {
 
   // TODO: ES doesn't allow dynamic indexing of uniforms
   // so this (should) force the various compilers to unroll.
-  #define ProcessTexture(i) if( i<RS.TexturesUsed ) bbFragColor=Blend( bbFragColor,RS.Texture[i].CubeMap!=1?Sample2D(bbTexture[i],i):SampleCube(bbTextureCube[i]),i );
+  #define ProcessTexture(i) if( i<RS.TexturesUsed ) bbFragColor=Blend( bbFragColor,RS.Texture[i].CubeMap==0?Sample2D(bbTexture[i],i):SampleCube(bbTextureCube[i],RS.Texture[i].CubeMap),i );
 
   // For cubemaps, use direct sampling without blend
-  if( 0<RS.TexturesUsed && RS.Texture[0].CubeMap==1 ){
-    bbFragColor = SampleCube(bbTextureCube[0]);
+  if( 0<RS.TexturesUsed && RS.Texture[0].CubeMap!=0 ){
+    bbFragColor = SampleCube(bbTextureCube[0],RS.Texture[0].CubeMap);
   } else {
     ProcessTexture(0);
   }

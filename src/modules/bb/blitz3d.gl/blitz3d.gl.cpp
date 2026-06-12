@@ -771,7 +771,8 @@ public:
 				us.texs[us.texs_used].sphere_map=flags&BBCanvas::CANVAS_TEX_SPHERE?1:0;
 				// Check both flag and target for cubemap
 				int is_cube = (flags&BBCanvas::CANVAS_TEX_CUBE) || (canvas->target == GL_TEXTURE_CUBE_MAP);
-				us.texs[us.texs_used].cube_map=is_cube?1:0;
+				// CubeMap carries the cube mode (SetCubeMode); 0 = not a cube
+				us.texs[us.texs_used].cube_map=is_cube?(canvas->cubeMode()?canvas->cubeMode():BBCanvas::CUBEMODE_REFLECTION):0;
 				us.texs[us.texs_used].flags=ts.flags;
 
 				us.texs_used++;

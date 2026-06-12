@@ -787,7 +787,7 @@ void GLCanvas::unlock(){
 }
 
 void GLCanvas::setCubeMode( int mode ){
-	RTEX( "GLCanvas::setCubeMode not implemented" );
+	cube_mode=mode;
 }
 
 void GLCanvas::setCubeFace( int face ){

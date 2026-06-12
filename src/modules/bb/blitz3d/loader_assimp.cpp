@@ -10,6 +10,9 @@
 
 // #define SHOW_BONES
 
+// animation keys are resampled to this many frames per second
+#define ANIM_FPS 60.0
+
 static bool conv,flip_tris;
 static Transform conv_tform;
 static bool collapse,animonly;
@@ -286,6 +289,12 @@ MeshModel *Loader_Assimp::load( const std::string &f,const Transform &t,int hint
 
 			if( a->mNumMeshChannels ) LOGD( "%s","vertex-based animations are not supported in loader" );
 
+			// key times arrive in format-specific ticks (glTF: 1000/s);
+			// normalize to classic Blitz frames at 60 per second so
+			// Animate mesh,1,1 plays at natural speed in a 60Hz loop
+			double tps=a->mTicksPerSecond>0 ? a->mTicksPerSecond : 25.0;
+			double scale=ANIM_FPS/tps;
+
 			for( int j=0;j<a->mNumChannels;j++ ){
 				aiNodeAnim *c=a->mChannels[j];
 
@@ -296,23 +305,24 @@ MeshModel *Loader_Assimp::load( const std::string &f,const Transform &t,int hint
 
 				for( int k=0;k<c->mNumPositionKeys;k++ ){
 					aiVectorKey key=c->mPositionKeys[k];
-					anim.setPositionKey( key.mTime,convertPos( key.mValue ) );
+					anim.setPositionKey( int( key.mTime*scale+.5 ),convertPos( key.mValue ) );
 				}
 
 				for( int k=0;k<c->mNumRotationKeys;k++ ){
 					aiQuatKey key=c->mRotationKeys[k];
-					anim.setRotationKey( key.mTime,convertQuat( key.mValue ) );
+					anim.setRotationKey( int( key.mTime*scale+.5 ),convertQuat( key.mValue ) );
 				}
 
 				for( int k=0;k<c->mNumScalingKeys;k++ ){
 					aiVectorKey key=c->mScalingKeys[k];
-					anim.setScaleKey( key.mTime,convertVec( key.mValue ) );
+					anim.setScaleKey( int( key.mTime*scale+.5 ),convertVec( key.mValue ) );
 				}
 
 				t->setAnimation( anim );
 			}
 
-			int anim_len=int( a->mDuration );
+			int anim_len=int( a->mDuration*scale+.5 );
+			if( anim_len<1 ) anim_len=1;
 
 			if( animator ){
 				animator->addSeq( anim_len );

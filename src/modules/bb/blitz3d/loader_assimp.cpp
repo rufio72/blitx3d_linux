@@ -5,6 +5,7 @@
 #include "meshutil.h"
 #include "pivot.h"
 
+#include <algorithm>
 #include <map>
 
 // #define SHOW_BONES
@@ -15,6 +16,8 @@ static bool collapse,animonly;
 
 static std::map<std::string,Object*> obj_map;
 static std::vector<Object*> bones;
+static std::map<Object*,Transform> bone_offsets;
+static MeshModel *skin_mesh;
 
 inline Vector convertPos( aiVector3D &pos ){
 	return Vector( pos.x,pos.y,-pos.z );
@@ -25,12 +28,29 @@ inline Vector convertVec( aiVector3D &scl ){
 }
 
 inline Quat convertQuat( aiQuaternion &rot ){
+	// RH->LH (z negated) would be (w,-x,-y,z) in Hamilton convention, but
+	// this engine's Quat multiplies in reverse order (geom.h), i.e. stores
+	// the conjugate: (w,x,y,-z)
 	return Quat( rot.w,Vector( rot.x,rot.y,-rot.z ) );
+}
+
+inline Transform convertTform( const aiMatrix4x4 &m ){
+	// aiMatrix4x4 is row-major acting on column vectors; engine Matrix
+	// holds columns i,j,k. RH->LH conjugation by S=diag(1,1,-1) negates
+	// every element with exactly one z index
+	Transform t;
+	t.m.i=Vector( m.a1,m.b1,-m.c1 );
+	t.m.j=Vector( m.a2,m.b2,-m.c2 );
+	t.m.k=Vector( -m.a3,-m.b3,m.c3 );
+	t.v=Vector( m.a4,m.b4,-m.c4 );
+	return t;
 }
 
 inline void reset(){
 	obj_map.clear();
 	bones.clear();
+	bone_offsets.clear();
+	skin_mesh=0;
 }
 
 static Object *allocBone(){
@@ -61,6 +81,7 @@ Object *Loader_Assimp::parseNode( const struct aiNode* nd,Object *parent ){
 
 		if( !animonly ){
 			bool normals=true;
+			bool skinned=false;
 			MeshLoader::beginMesh();
 
 			for( int n=0;n<nd->mNumMeshes;++n ){
@@ -128,27 +149,50 @@ Object *Loader_Assimp::parseNode( const struct aiNode* nd,Object *parent ){
 					}
 				}
 
+				if( mesh->mNumBones ) skinned=true;
+
 				for( int bi=0;bi<mesh->mNumBones;bi++ ){
 					const aiBone *b=mesh->mBones[bi];
 
 					Object *bone=obj_map[b->mName.C_Str()];
 					if( bone==0 ){
 						bone=allocBone();
-						bones.push_back( bone );
-
 						obj_map[b->mName.C_Str()]=bone;
 					}
+
+					// vertex bone indices are 1-based positions in `bones`
+					// (slot 0 is reserved for the skinned mesh itself)
+					int bone_index;
+					std::vector<Object*>::iterator it=std::find( bones.begin(),bones.end(),bone );
+					if( it==bones.end() ){
+						bones.push_back( bone );
+						bone_index=bones.size();
+					}else{
+						bone_index=int( it-bones.begin() )+1;
+					}
+
+					// the real inverse bind matrix: the node rest pose is not
+					// guaranteed to match the skin's bind pose
+					bone_offsets[bone]=convertTform( b->mOffsetMatrix );
 
 					for( int wi=0;wi<b->mNumWeights;wi++ ){
 						int vert=b->mWeights[wi].mVertexId;
 						float weight=b->mWeights[wi].mWeight;
-						MeshLoader::addBone( vertex_offset+vert,weight,bones.size() );
+						MeshLoader::addBone( vertex_offset+vert,weight,bone_index );
 					}
 				}
 			}
 
 			MeshLoader::endMesh( mesh );
 			if( !normals ) mesh->updateNormals();
+
+			// remember which model holds the skinned vertices: the animator
+			// must be bound to it, not to the scene root (glTF puts skinned
+			// geometry in child nodes)
+			if( skinned ){
+				if( !skin_mesh ) skin_mesh=mesh;
+				else LOGD( "%s","multiple skinned meshes in scene; only the first is animated" );
+			}
 		}
 	}else{
 		obj=obj_map[name];
@@ -206,22 +250,37 @@ MeshModel *Loader_Assimp::load( const std::string &f,const Transform &t,int hint
 	MeshModel *mesh=obj->getModel()->getMeshModel();
 
 	if( !collapse ){
-		float anim_len=0.0;
+		// the animator harvests keys from a fixed set of objects, so every
+		// channel-animated node must be in `bones` before it is created
+		if( bones.size() ){
+			for( int i=0;i<scene->mNumAnimations;i++ ){
+				aiAnimation *a=scene->mAnimations[i];
+				for( int j=0;j<a->mNumChannels;j++ ){
+					Object *t=obj_map[a->mChannels[j]->mNodeName.C_Str()];
+					if( t && std::count( bones.begin(),bones.end(),t )==0 ){
+						bones.push_back( t );
+					}
+				}
+			}
+		}
+
+		MeshModel *skin=skin_mesh ? skin_mesh : mesh;
+
+		// each aiAnimation becomes one animator sequence: set the keys on the
+		// nodes, then let the animator harvest them (addSeq clears them again)
+		Animator *animator=0;
 		for( int i=0;i<scene->mNumAnimations;i++ ){
 			aiAnimation *a=scene->mAnimations[i];
 
-			if( a->mNumMeshChannels ) LOGD( "%s","vertex-based animations are not support in loader" );
+			if( a->mNumMeshChannels ) LOGD( "%s","vertex-based animations are not supported in loader" );
 
-			std::map<Object*,Animation> anim;
 			for( int j=0;j<a->mNumChannels;j++ ){
 				aiNodeAnim *c=a->mChannels[j];
 
-				Object *obj=obj_map[c->mNodeName.C_Str()];
-				if( bones.size() && std::count( bones.begin(),bones.end(),obj )==0 ) {
-					bones.push_back( obj );
-				}
+				Object *t=obj_map[c->mNodeName.C_Str()];
+				if( !t ) continue;
 
-				Animation anim=obj->getAnimation();
+				Animation anim=t->getAnimation();
 
 				for( int k=0;k<c->mNumPositionKeys;k++ ){
 					aiVectorKey key=c->mPositionKeys[k];
@@ -238,20 +297,36 @@ MeshModel *Loader_Assimp::load( const std::string &f,const Transform &t,int hint
 					anim.setScaleKey( key.mTime,convertVec( key.mValue ) );
 				}
 
-				obj->setAnimation( anim );
+				t->setAnimation( anim );
 			}
 
-			anim_len=a->mDuration;
+			int anim_len=int( a->mDuration );
+
+			if( animator ){
+				animator->addSeq( anim_len );
+			}else if( bones.size() ){
+				bones.insert( bones.begin(),skin );
+				animator=d_new Animator( bones,anim_len );
+			}else{
+				animator=d_new Animator( obj,anim_len );
+			}
 		}
 
-		if( mesh && bones.size() ){
-			bones.insert( bones.begin(),mesh );
-			mesh->setAnimator( d_new Animator( bones,anim_len ) );
-			mesh->createBones();
-			bones.clear();
-		}else if( anim_len ){
-			obj->setAnimator( d_new Animator( obj,anim_len ) );
+		if( animator ){
+			if( bones.size() ){
+				skin->setAnimator( animator );
+				skin->createBones( bone_offsets );
+			}else{
+				obj->setAnimator( animator );
+			}
+		}else if( skin && bones.size() ){
+			// skinned but unanimated: bind anyway so bones can be driven
+			// manually (FindChild+RotateEntity)
+			bones.insert( bones.begin(),skin );
+			skin->setAnimator( d_new Animator( bones,0 ) );
+			skin->createBones( bone_offsets );
 		}
+		bones.clear();
 	}
 
 	reset();

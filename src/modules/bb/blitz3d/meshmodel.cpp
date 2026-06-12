@@ -193,6 +193,10 @@ void MeshModel::setRenderBrush( const Brush &b ){
 }
 
 void MeshModel::createBones(){
+	createBones( std::map<Object*,Transform>() );
+}
+
+void MeshModel::createBones( const std::map<Object*,Transform> &bind ){
 	setRenderSpace( RENDER_SPACE_WORLD );
 	const std::vector<Object*> &bones=getAnimator()->getObjects();
 
@@ -201,7 +205,8 @@ void MeshModel::createBones(){
 	rep->bone_tforms.resize( bones.size() );
 
 	for( unsigned int k=0;k<bones.size();++k ){
-		rep->bone_tforms[k]=-bones[k]->getWorldTform();
+		std::map<Object*,Transform>::const_iterator it=bind.find( bones[k] );
+		rep->bone_tforms[k]=it!=bind.end() ? it->second : -bones[k]->getWorldTform();
 	}
 }
 

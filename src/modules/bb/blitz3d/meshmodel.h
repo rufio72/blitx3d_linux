@@ -5,6 +5,8 @@
 #include "model.h"
 #include "surface.h"
 
+#include <map>
+
 class MeshCollider;
 
 class MeshModel : public Model{
@@ -29,6 +31,9 @@ public:
 
 	//boned mesh!
 	void createBones();
+	//bind: explicit inverse bind-pose tforms (e.g. glTF inverseBindMatrices);
+	//bones not in the map fall back to the inverse of their current world tform
+	void createBones( const std::map<Object*,Transform> &bind );
 
 	//MeshModel interface
 	Surface *createSurface( const Brush &b );

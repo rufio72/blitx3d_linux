@@ -633,6 +633,8 @@ BBLIB Entity * BBCALL bbLoadMesh( BBStr *f,Entity *p ){
 	return insertEntity( m,p );
 }
 
+static Animator *findAnimator( Object *o );
+
 BBLIB Entity * BBCALL bbLoadAnimMesh( BBStr *f,Entity *p ){
 	*f=bbResolvePath( *f );
 	debugParent(p);
@@ -640,7 +642,7 @@ BBLIB Entity * BBCALL bbLoadAnimMesh( BBStr *f,Entity *p ){
 	delete f;
 
 	if( !e ) return 0;
-	if( Animator *anim=e->getObject()->getAnimator() ){
+	if( Animator *anim=findAnimator( e->getObject() ) ){
 		anim->animate( 1,0,0,0 );
 	}
 	return insertEntity( e,p );
@@ -1508,14 +1510,26 @@ BBLIB Entity * BBCALL bbFindChild( Entity *e,BBStr *t ){
 ////////////////////////
 // ANIMATION COMMANDS //
 ////////////////////////
+
+// some loaders (assimp/glTF) bind the animator to the skinned mesh, which
+// may be a child of the entity returned by LoadAnimMesh: fall back to the
+// first animator found among descendants
+static Animator *findAnimator( Object *o ){
+	if( Animator *anim=o->getAnimator() ) return anim;
+	for( Entity *e=o->children();e;e=e->successor() ){
+		if( Animator *anim=findAnimator( e->getObject() ) ) return anim;
+	}
+	return 0;
+}
+
 BBLIB bb_int_t BBCALL bbLoadAnimSeq( Object *o,BBStr *f ){
 	*f=bbResolvePath( *f );
 	debugObject( o );
-	if( Animator *anim=o->getAnimator() ){
+	if( Animator *anim=findAnimator( o ) ){
 		Entity *t=loadEntity( f->c_str(),MeshLoader::HINT_ANIMONLY );
 		delete f;
 		if( t ){
-			if( Animator *p=t->getObject()->getAnimator() ){
+			if( Animator *p=findAnimator( t->getObject() ) ){
 				anim->addSeqs( p );
 			}
 			delete t;
@@ -1529,7 +1543,7 @@ BBLIB bb_int_t BBCALL bbLoadAnimSeq( Object *o,BBStr *f ){
 
 BBLIB void BBCALL bbSetAnimTime( Object *o,bb_float_t time,bb_int_t seq ){
 	debugObject( o );
-	if( Animator *anim=o->getAnimator() ){
+	if( Animator *anim=findAnimator( o ) ){
 		anim->setAnimTime( time,seq );
 	}else{
 		RTEX( "Entity has not animation" );
@@ -1538,7 +1552,7 @@ BBLIB void BBCALL bbSetAnimTime( Object *o,bb_float_t time,bb_int_t seq ){
 
 BBLIB void BBCALL bbAnimate( Object *o,bb_int_t mode,bb_float_t speed,bb_int_t seq,bb_float_t trans ){
 	debugObject( o );
-	if( Animator *anim=o->getAnimator() ){
+	if( Animator *anim=findAnimator( o ) ){
 		anim->animate( mode,speed,seq,trans );
 	}else{
 		RTEX( "Entity has no animation" );
@@ -1556,7 +1570,7 @@ BBLIB void BBCALL bbSetAnimKey( Object *o,bb_int_t frame,bb_int_t pos_key,bb_int
 
 BBLIB bb_int_t BBCALL bbExtractAnimSeq( Object *o,bb_int_t first,bb_int_t last,bb_int_t seq ){
 	debugObject( o );
-	if( Animator *anim=o->getAnimator() ){
+	if( Animator *anim=findAnimator( o ) ){
 		anim->extractSeq( first,last,seq );
 		return anim->numSeqs()-1;
 	}
@@ -1565,7 +1579,7 @@ BBLIB bb_int_t BBCALL bbExtractAnimSeq( Object *o,bb_int_t first,bb_int_t last,b
 
 BBLIB bb_int_t BBCALL bbAddAnimSeq( Object *o,bb_int_t length ){
 	debugObject( o );
-	Animator *anim=o->getAnimator();
+	Animator *anim=findAnimator( o );
 	if( anim ){
 		anim->addSeq( length );
 	}else{
@@ -1577,25 +1591,25 @@ BBLIB bb_int_t BBCALL bbAddAnimSeq( Object *o,bb_int_t length ){
 
 BBLIB bb_int_t BBCALL bbAnimSeq( Object *o ){
 	debugObject(o);
-	if( Animator *anim=o->getAnimator() ) return anim->animSeq();
+	if( Animator *anim=findAnimator( o ) ) return anim->animSeq();
 	return -1;
 }
 
 BBLIB bb_float_t BBCALL bbAnimTime( Object *o ){
 	debugObject(o);
-	if( Animator *anim=o->getAnimator() ) return anim->animTime();
+	if( Animator *anim=findAnimator( o ) ) return anim->animTime();
 	return -1;
 }
 
 BBLIB bb_int_t BBCALL bbAnimLength( Object *o ){
 	debugObject(o);
-	if( Animator *anim=o->getAnimator() ) return anim->animLen();
+	if( Animator *anim=findAnimator( o ) ) return anim->animLen();
 	return -1;
 }
 
 BBLIB bb_int_t BBCALL bbAnimating( Object *o ){
 	debugObject(o);
-	if( Animator *anim=o->getAnimator() ) return anim->animating();
+	if( Animator *anim=findAnimator( o ) ) return anim->animating();
 	return 0;
 }
 

@@ -85,6 +85,14 @@ struct CachedTexture::Rep{
 		gx_graphics->freeCanvas( t );
 	}
 
+	Rep( const void *data,size_t size,int flags ):
+	ref_cnt(1),flags(flags),w(0),h(0),first(0){
+		++active_texs;
+		if( BBCanvas *t=(BBCanvas*)gx_graphics->loadCanvas( data,size,flags ) ){
+			frames.push_back( t );
+		}
+	}
+
 	~Rep(){
 		--active_texs;
 		for( unsigned int k=0;k<frames.size();++k ) gx_graphics->freeCanvas( frames[k] );
@@ -104,6 +112,11 @@ CachedTexture::Rep *CachedTexture::findRep( const std::string &f,int flags,int w
 
 CachedTexture::CachedTexture( int w,int h,int flags,int cnt ):
 rep(d_new Rep(w,h,flags,cnt)){
+}
+
+CachedTexture::CachedTexture( const void *data,size_t size,int flags ):
+rep(d_new Rep(data,size,flags)){
+	//deliberately not in rep_set: there is no stable key to cache by
 }
 
 CachedTexture::CachedTexture( const std::string &f_,int flags,int w,int h,int first,int cnt ){

@@ -26,7 +26,16 @@ int BBPixmap::read( int x,int y ){
 
 // TODO: introduce a proper dynamic loader system like BlitzMax.
 BBPixmap *bbLoadPixmapWithFreeImage( const std::string &file );
+BBPixmap *bbLoadPixmapWithFreeImage( const void *data,size_t size );
 extern "C" BBPixmap *bbLoadPixmapWithUIKit( const char *file );
+
+BBPixmap *bbLoadPixmap( const void *data,size_t size ){
+#ifdef BB_IOS
+	return 0;
+#else
+	return bbLoadPixmapWithFreeImage( data,size );
+#endif
+}
 
 BBPixmap *bbLoadPixmap( const std::string &file ){
 	std::string f=canonicalpath( file );

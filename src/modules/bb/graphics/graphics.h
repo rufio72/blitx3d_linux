@@ -62,6 +62,8 @@ public:
 	//OBJECTS
 	virtual BBCanvas *createCanvas( int width,int height,int flags )=0;
 	virtual BBCanvas *loadCanvas( const std::string &file,int flags )=0;
+	//in-memory encoded image (e.g. glTF embedded textures); optional
+	virtual BBCanvas *loadCanvas( const void *data,size_t size,int flags ){ return 0; }
 	BBCanvas *verifyCanvas( BBCanvas *canvas );
 	void freeCanvas( BBCanvas *canvas );
 

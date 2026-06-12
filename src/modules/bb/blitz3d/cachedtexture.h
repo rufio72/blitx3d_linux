@@ -11,6 +11,8 @@ class CachedTexture{
 public:
 	CachedTexture( int w,int h,int flags,int cnt );
 	CachedTexture( const std::string &f,int flags,int w,int h,int first,int cnt );
+	//in-memory encoded image (e.g. glTF embedded textures); not cached
+	CachedTexture( const void *data,size_t size,int flags );
 	CachedTexture( const CachedTexture &t );
 	~CachedTexture();
 

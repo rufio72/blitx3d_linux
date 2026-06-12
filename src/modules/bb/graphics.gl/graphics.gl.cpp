@@ -178,6 +178,20 @@ BBCanvas *GLGraphics::loadCanvas( const std::string &file,int flags ){
 	return canvas;
 }
 
+BBCanvas *GLGraphics::loadCanvas( const void *data,size_t size,int flags ){
+	BBPixmap *pixmap=bbLoadPixmap( data,size );
+	if( !pixmap ) return 0;
+
+	pixmap->flipVertically();
+	pixmap->swapBytes0and2();
+
+	GLCanvas *canvas=d_new GLCanvas( &res,flags );
+	canvas->setPixmap( pixmap );
+	canvas_set.insert( canvas );
+
+	return canvas;
+}
+
 BBMovie *GLGraphics::openMovie( const std::string &file,int flags ){
 	return 0;
 }

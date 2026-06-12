@@ -136,7 +136,7 @@ void Animator::beginTrans(){
 }
 
 void Animator::setAnimTime( float time,int seq ){
-	if( seq<0 || seq>_seqs.size() ) return;
+	if( seq<0 || seq>=_seqs.size() ) return;
 
 	_mode=0;
 	_speed=0;

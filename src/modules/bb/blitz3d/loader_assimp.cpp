@@ -100,9 +100,21 @@ Object *Loader_Assimp::parseNode( const struct aiNode* nd,Object *parent ){
 					aiString path;
 
 					if( mtl->GetTexture( aiTextureType_DIFFUSE,ti,&path )==AI_SUCCESS ){
-						Texture tex( path.C_Str(),0 );
-						b.setTexture( ti,tex,0 );
-						b.setColor( Vector( 1,1,1 ) ); // TODO: this is what the existing loaders do...seems limiting...
+						if( const aiTexture *at=scene->GetEmbeddedTexture( path.C_Str() ) ){
+							// GLB-style embedded texture: compressed (png/jpg)
+							// when mHeight==0, raw BGRA texels otherwise
+							if( at->mHeight==0 ){
+								Texture tex( at->pcData,(size_t)at->mWidth,0 );
+								b.setTexture( ti,tex,0 );
+								b.setColor( Vector( 1,1,1 ) );
+							}else{
+								LOGD( "%s","uncompressed embedded textures are not supported in loader" );
+							}
+						}else{
+							Texture tex( path.C_Str(),0 );
+							b.setTexture( ti,tex,0 );
+							b.setColor( Vector( 1,1,1 ) ); // TODO: this is what the existing loaders do...seems limiting...
+						}
 					}
 				}
 

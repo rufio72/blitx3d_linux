@@ -87,6 +87,7 @@ public:
 	//OBJECTS
 	BBCanvas *createCanvas( int width,int height,int flags );
 	BBCanvas *loadCanvas( const std::string &file,int flags );
+	BBCanvas *loadCanvas( const void *data,size_t size,int flags );
 
 	// b2dgraphics
 	BBMovie *openMovie( const std::string &file,int flags );

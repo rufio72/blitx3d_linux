@@ -23,12 +23,56 @@ long DLL_CALLCONV tellProc(fi_handle handle) {
 	return ((std::streambuf*)handle)->pubseekoff( 0,std::ios_base::cur );
 }
 
-BBPixmap *bbLoadPixmapWithFreeImage( const std::string &path ){
+static void initFreeImage(){
 	static bool inited=false;
 	if( !inited ){
 		FreeImage_Initialise();
 		inited=true;
 	}
+}
+
+static BBPixmap *makePixmap( FIBITMAP *t_dib ){
+	BBPixmap *pm=d_new BBPixmap();
+	pm->trans=FreeImage_GetBPP( t_dib )==32||FreeImage_IsTransparent( t_dib );
+
+	FIBITMAP *dib=FreeImage_ConvertTo32Bits( t_dib );
+	pm->format=PF_RGBA;
+
+	if( dib ) FreeImage_Unload( t_dib );
+	else dib=t_dib;
+
+	pm->width=FreeImage_GetWidth( dib );
+	pm->height=FreeImage_GetHeight( dib );
+	pm->pitch=FreeImage_GetPitch( dib );
+	pm->bpp=FreeImage_GetBPP( dib )/8;
+
+	int size=pm->width*pm->bpp*pm->height;
+	pm->bits=new unsigned char[size];
+	memcpy( pm->bits,FreeImage_GetBits( dib ),size );
+
+	FreeImage_Unload( dib );
+
+	return pm;
+}
+
+BBPixmap *bbLoadPixmapWithFreeImage( const void *data,size_t size ){
+	initFreeImage();
+
+	FIMEMORY *mem=FreeImage_OpenMemory( (BYTE*)data,(DWORD)size );
+	if( !mem ) return 0;
+
+	FREE_IMAGE_FORMAT fmt=FreeImage_GetFileTypeFromMemory( mem,0 );
+	if( fmt==FIF_UNKNOWN ){ FreeImage_CloseMemory( mem );return 0; }
+
+	FIBITMAP *t_dib=FreeImage_LoadFromMemory( fmt,mem,0 );
+	FreeImage_CloseMemory( mem );
+	if( !t_dib ) return 0;
+
+	return makePixmap( t_dib );
+}
+
+BBPixmap *bbLoadPixmapWithFreeImage( const std::string &path ){
+	initFreeImage();
 
 	FreeImageIO io;
 	io.read_proc  = readProc;
@@ -50,38 +94,8 @@ BBPixmap *bbLoadPixmapWithFreeImage( const std::string &path ){
 	}
 
 	FIBITMAP *t_dib=FreeImage_LoadFromHandle( fmt,&io,(fi_handle)buf,0 );
-	if( !t_dib ){ delete buf;return 0; }
-
-
-	BBPixmap *pm=d_new BBPixmap();
-	pm->trans=FreeImage_GetBPP( t_dib )==32||FreeImage_IsTransparent( t_dib );
-
-	// TODO: it would be nice, from a memory perspective, to
-	// support other pixel formats beyond RGBA.
-	// switch( int bpp=FreeImage_GetBPP( t_dib ) ){
-	// case 32:pm->format=PF_RGBA;break;
-	// case 24:pm->format=PF_RGB;break;
-	// case 8:case 4:pm->format=PF_RGB;break;
-	// default:RTEX( ("Unhandled image format: "+std::string(itoa(bpp))+" bpps").c_str() );
-	// }
-
-	FIBITMAP *dib=FreeImage_ConvertTo32Bits( t_dib );
-	pm->format=PF_RGBA;
-
-	if( dib ) FreeImage_Unload( t_dib );
-	else dib=t_dib;
-
-	pm->width=FreeImage_GetWidth( dib );
-	pm->height=FreeImage_GetHeight( dib );
-	pm->pitch=FreeImage_GetPitch( dib );
-	pm->bpp=FreeImage_GetBPP( dib )/8;
-
-	int size=pm->width*pm->bpp*pm->height;
-	pm->bits=new unsigned char[size];
-	memcpy( pm->bits,FreeImage_GetBits( dib ),size );
-
-	FreeImage_Unload( dib );
 	delete buf;
+	if( !t_dib ) return 0;
 
-	return pm;
+	return makePixmap( t_dib );
 }

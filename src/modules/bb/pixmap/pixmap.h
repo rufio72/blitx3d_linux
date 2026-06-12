@@ -35,7 +35,9 @@ struct BBPixmap{
 
 #ifdef __cplusplus
 #include <string>
+#include <cstddef>
 BBPixmap *bbLoadPixmap( const std::string &file );
+BBPixmap *bbLoadPixmap( const void *data,size_t size );
 #endif
 
 #endif

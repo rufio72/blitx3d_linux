@@ -14,6 +14,8 @@ public:
 	Texture();
 	Texture( const std::string &file,int flags );
 	Texture( const std::string &file,int flags,int w,int h,int first,int cnt );
+	//in-memory encoded image (e.g. glTF embedded textures)
+	Texture( const void *data,size_t size,int flags );
 	Texture( int width,int height,int flags,int cnt );
 	Texture( const Texture &texture );
 	~Texture();

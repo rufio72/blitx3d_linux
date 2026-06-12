@@ -59,6 +59,17 @@ struct Texture::Rep{
 		memset( &matrix,0,sizeof( matrix ) );
 	}
 
+	Rep( const void *data,size_t size,int flags ):
+	ref_cnt(1),cached_tex( data,size,flags ),
+	tex_blend(BBScene::BLEND_MULTIPLY),tex_flags(0),
+	sx(1),sy(1),tx(0),ty(0),rot(0),mat_used(false){
+		tex_frames=cached_tex.getFrames();
+		transparent=
+			(flags & BBCanvas::CANVAS_TEX_ALPHA) &&
+			!(flags & BBCanvas::CANVAS_TEX_MASK);
+		memset( &matrix,0,sizeof( matrix ) );
+	}
+
 	Rep( const Rep &t ):
 	ref_cnt(1),cached_tex(t.cached_tex),tex_frames(t.tex_frames),
 	tex_blend(t.tex_blend),tex_flags(t.tex_flags),
@@ -81,6 +92,12 @@ Texture::Texture( const std::string &f,int flags,int w,int h,int first,int cnt )
 	flags=filterFile( f,flags )|BBCanvas::CANVAS_TEXTURE;
 	if( flags & BBCanvas::CANVAS_TEX_MASK ) flags|=BBCanvas::CANVAS_TEX_RGB|BBCanvas::CANVAS_TEX_ALPHA;
 	rep=d_new Rep( f,flags,w,h,first,cnt );
+}
+
+Texture::Texture( const void *data,size_t size,int flags ){
+	flags|=BBCanvas::CANVAS_TEXTURE;
+	if( flags & BBCanvas::CANVAS_TEX_MASK ) flags|=BBCanvas::CANVAS_TEX_RGB|BBCanvas::CANVAS_TEX_ALPHA;
+	rep=d_new Rep( data,size,flags );
 }
 
 Texture::Texture( int w,int h,int flags,int cnt ){

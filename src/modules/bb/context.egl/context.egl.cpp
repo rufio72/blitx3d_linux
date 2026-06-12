@@ -52,7 +52,8 @@ void EGLGraphics::onAppChange( void *data,void *context ){
 }
 
 EGLGraphics::EGLGraphics( int w,int h ){
-	for( int k=0;k<256;++k ) gamma_red[k]=gamma_green[k]=gamma_blue[k]=k;
+	//identity ramp: gamma ramps are 16-bit (0..65535)
+	for( int k=0;k<256;++k ) gamma_red[k]=gamma_green[k]=gamma_blue[k]=k*257;
 
 	window_width=drawable_width=w;
 	window_height=drawable_height=h;
@@ -84,12 +85,13 @@ void EGLGraphics::copy( BBCanvas *dest,int dx,int dy,int dw,int dh,BBCanvas *src
 
 void EGLGraphics::setGamma( int r,int g,int b,float dr,float dg,float db ){
 	gamma_red[r&255]=dr*257.0f;
-	gamma_red[g&255]=dg*257.0f;
-	gamma_red[b&255]=db*257.0f;
+	gamma_green[g&255]=dg*257.0f;
+	gamma_blue[b&255]=db*257.0f;
 }
 
 void EGLGraphics::getGamma( int r,int g,int b,float *dr,float *dg,float *db ){
-	*dr=gamma_red[r&255];*dg=gamma_green[g&255];*db=gamma_blue[b&255];
+	//undo the 16-bit scaling applied by setGamma
+	*dr=gamma_red[r&255]/257.0f;*dg=gamma_green[g&255]/257.0f;*db=gamma_blue[b&255]/257.0f;
 }
 
 void EGLGraphics::updateGamma( bool calibrate ){

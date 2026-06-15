@@ -32,6 +32,15 @@ public:
 
 	bool render( const RenderContext &rc );
 
+	//Order-independent, unordered sprites are coalesced into one draw call per
+	//brush instead of one per sprite. World calls these once per camera/mirror
+	//pass: clearBatch() before models render, renderBatch() during the opaque
+	//phase (BLEND_REPLACE), renderAddBatch() during the transparent phase
+	//(BLEND_ADD).
+	static void clearBatch();
+	static void renderBatch();
+	static void renderAddBatch();
+
 private:
 	float xhandle,yhandle;
 	float rot,xscale,yscale;

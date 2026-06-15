@@ -3,6 +3,7 @@
 #include "std.h"
 #include <queue>
 #include "world.h"
+#include "sprite.h"
 
 //0=tris compared for collision
 //1=max proj err of terrain
@@ -629,6 +630,9 @@ void World::render( Camera *cam,Mirror *mirror ){
 	//initialize render context
 	RenderContext rc( cam_tform,cam->getFrustum(),mirror!=0 );
 
+	//start collecting opaque sprites for this pass
+	Sprite::clearBatch();
+
 	//draw everything in order
 	unsigned int ord=0;
 	bbScene->setZMode( BBScene::ZMODE_DISABLE );
@@ -645,8 +649,13 @@ void World::render( Camera *cam,Mirror *mirror ){
 		if( !mod->doAutoFade( cam_tform.v ) ) continue;
 		render( mod,rc,true );
 	}
+	//flush coalesced opaque sprites while depth testing/writing is still on
+	Sprite::renderBatch();
 	bbScene->setZMode( BBScene::ZMODE_CMPONLY );
 	flushTransparent();
+	//additive sprites are commutative; flush them coalesced on top of the
+	//depth-sorted alpha-blended transparents
+	Sprite::renderAddBatch();
 
 	bbScene->setZMode( BBScene::ZMODE_DISABLE );
 	while( ord<ord_mods.size() ){

@@ -62,6 +62,9 @@ public:
 	virtual void setFX( int n ){ brush.setFX(n);w_brush=true; }
 
 	const Brush &getBrush()const{ return brush; }
+	//brush actually used this frame (carries auto-fade alpha); only valid
+	//after doAutoFade() has run for the current pass
+	const Brush &getRenderBrush()const{ return render_brush; }
 
 	void setRenderSpace( int n ){ space=n; }
 	int getRenderSpace()const{ return space; }

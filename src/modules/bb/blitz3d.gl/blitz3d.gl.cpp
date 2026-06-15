@@ -274,6 +274,7 @@ class GLScene : public BBScene{
 private:
 	int context_width,context_height;
 	bool wireframe;
+	int tris_drawn=0;
 	UniformState us={ 0 };
 	GLuint defaultProgram=0;
 	int viewport[4];
@@ -909,6 +910,8 @@ public:
 	void render( BBMesh *m,int first_vert,int vert_cnt,int first_tri,int tri_cnt ){
 		GLMesh *mesh=(GLMesh*)m;
 
+		tris_drawn+=tri_cnt;
+
 		GL( glBindVertexArray( mesh->vertex_array ) );
 #ifdef GLES
 		// GLES doesn't support glDrawElementsBaseVertex, so we need to re-upload with offset
@@ -950,7 +953,7 @@ public:
 	}
 
 	//info
-	int getTrianglesDrawn()const{ return 0; }
+	int getTrianglesDrawn()const{ return tris_drawn; }
 };
 
 BBScene *GLB3DGraphics::createScene( int w,int h,float d,int flags ){

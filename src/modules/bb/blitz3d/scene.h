@@ -116,6 +116,7 @@ public:
 
   //info
   virtual int getTrianglesDrawn()const=0;
+  virtual int getDrawsDrawn()const{ return 0; }
 
 };
 

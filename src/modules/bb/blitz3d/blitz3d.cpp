@@ -19,6 +19,7 @@ B3DGraphics *bbSceneDriver;
 BBScene *bbScene;
 
 static int tri_count;
+static int draw_count;
 static World *world;
 
 static std::set<Brush*> brush_set;
@@ -327,8 +328,10 @@ BBLIB void BBCALL bbRenderWorld( bb_float_t tween ){
 
 #ifndef BETA
 	tri_count=bbScene->getTrianglesDrawn();
+	draw_count=bbScene->getDrawsDrawn();
 	world->render( tween );
 	tri_count=bbScene->getTrianglesDrawn()-tri_count;
+	draw_count=bbScene->getDrawsDrawn()-draw_count;
 	return;
 #else
 
@@ -374,6 +377,10 @@ BBLIB 	extern void BBCALL bbDelay(bb_int_t);
 
 BBLIB bb_int_t BBCALL bbTrisRendered(){
 	return tri_count;
+}
+
+BBLIB bb_int_t BBCALL bbDrawsRendered(){
+	return draw_count;
 }
 
 BBLIB bb_float_t BBCALL bbStats3D( bb_int_t n ){
@@ -2057,6 +2064,7 @@ void blitz3d_close(){
 
 BBMODULE_CREATE( blitz3d ){
 	tri_count=0;
+	draw_count=0;
 	bbScene=0;world=0;
 	return true;
 }

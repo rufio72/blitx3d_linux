@@ -22,6 +22,7 @@ BBMODULE_LINK( blitz3d ){
 	rtSym( "ClearWorld%entities=1%brushes=1%textures=1","bbClearWorld",bbClearWorld );
 	rtSym( "%ActiveTextures","bbActiveTextures",bbActiveTextures );
 	rtSym( "%TrisRendered","bbTrisRendered",bbTrisRendered );
+	rtSym( "%DrawsRendered","bbDrawsRendered",bbDrawsRendered );
 	rtSym( "#Stats3D%type","bbStats3D",bbStats3D );
 	rtSym( "%CreateTexture%width%height%flags=0%frames=1","bbCreateTexture",bbCreateTexture );
 	rtSym( "%LoadTexture$file%flags=1","bbLoadTexture",bbLoadTexture );

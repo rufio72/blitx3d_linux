@@ -275,6 +275,7 @@ private:
 	int context_width,context_height;
 	bool wireframe;
 	int tris_drawn=0;
+	int draws_drawn=0;
 	UniformState us={ 0 };
 	GLuint defaultProgram=0;
 	int viewport[4];
@@ -889,6 +890,7 @@ public:
 		GLMesh *mesh=(GLMesh*)m;
 
 		tris_drawn+=tri_cnt;
+		draws_drawn++;
 
 		GL( glBindVertexArray( mesh->vertex_array ) );
 #ifdef GLES
@@ -932,6 +934,7 @@ public:
 
 	//info
 	int getTrianglesDrawn()const{ return tris_drawn; }
+	int getDrawsDrawn()const{ return draws_drawn; }
 };
 
 BBScene *GLB3DGraphics::createScene( int w,int h,float d,int flags ){

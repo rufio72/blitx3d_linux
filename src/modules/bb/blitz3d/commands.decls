@@ -15,6 +15,7 @@ RenderWorld( tween#=1 ):"bbRenderWorld"
 ClearWorld( entities%=1,brushes%=1,textures%=1 ):"bbClearWorld"
 ActiveTextures%():"bbActiveTextures"
 TrisRendered%():"bbTrisRendered"
+DrawsRendered%():"bbDrawsRendered"
 Stats3D#( type% ):"bbStats3D"
 
 CreateTexture.Texture( width%,height%,flags%=0,frames%=1 ):"bbCreateTexture"

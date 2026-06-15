@@ -27,6 +27,7 @@ void BBCALL bbRenderWorld( bb_float_t tween );
 void BBCALL bbClearWorld( bb_int_t entities,bb_int_t brushes,bb_int_t textures );
 bb_int_t BBCALL bbActiveTextures(  );
 bb_int_t BBCALL bbTrisRendered(  );
+bb_int_t BBCALL bbDrawsRendered(  );
 bb_float_t BBCALL bbStats3D( bb_int_t type );
 Texture * BBCALL bbCreateTexture( bb_int_t width,bb_int_t height,bb_int_t flags,bb_int_t frames );
 Texture * BBCALL bbLoadTexture( BBStr *file,bb_int_t flags );

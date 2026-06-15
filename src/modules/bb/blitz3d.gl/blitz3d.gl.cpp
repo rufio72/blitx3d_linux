@@ -556,8 +556,7 @@ public:
 		// Optimization #1: Use cached uniform location
 		GL( glUniformMatrix4fv( uniform_locs.world_matrix,1,GL_FALSE,mat ) );
 
-		// Optimization #4: Calculate normal matrix on CPU (transpose of inverse of upper-left 3x3 of modelview)
-		// ModelView = View * World
+		// Optimization #4: Calculate normal matrix on CPU. ModelView = View*World.
 		float mv[16];
 		// Multiply cached_view_matrix * mat (column-major)
 		for( int i=0; i<4; i++ ){
@@ -569,40 +568,19 @@ public:
 			}
 		}
 
-		// Extract upper-left 3x3 and compute inverse-transpose
-		// For orthonormal matrices (rotation only), inverse-transpose = original
-		// For general case, we compute the proper inverse-transpose
-		float m3[9] = {
-			mv[0], mv[1], mv[2],
-			mv[4], mv[5], mv[6],
-			mv[8], mv[9], mv[10]
+		// Normal matrix = cofactor of the modelview's upper-left 3x3 (= det *
+		// inverse-transpose). The shader normalizes the transformed normal, so
+		// the det scalar cancels: this matches Matrix::cofactor() used elsewhere
+		// in the engine and avoids the inverse's division and degenerate branch.
+		float xx=mv[0],xy=mv[1],xz=mv[2];
+		float yx=mv[4],yy=mv[5],yz=mv[6];
+		float zx=mv[8],zy=mv[9],zz=mv[10];
+		float normal_mat[9] = {
+			yy*zz-yz*zy, yz*zx-yx*zz, yx*zy-yy*zx,
+			xz*zy-xy*zz, xx*zz-xz*zx, xy*zx-xx*zy,
+			xy*yz-xz*yy, xz*yx-xx*yz, xx*yy-xy*yx
 		};
-
-		// Compute determinant of 3x3
-		float det = m3[0]*(m3[4]*m3[8] - m3[5]*m3[7])
-		          - m3[1]*(m3[3]*m3[8] - m3[5]*m3[6])
-		          + m3[2]*(m3[3]*m3[7] - m3[4]*m3[6]);
-
-		if( fabs(det) > 0.0001f ){
-			float invDet = 1.0f / det;
-			// Compute inverse (already transposed for column-major layout)
-			float normal_mat[9] = {
-				(m3[4]*m3[8] - m3[5]*m3[7]) * invDet,
-				(m3[5]*m3[6] - m3[3]*m3[8]) * invDet,
-				(m3[3]*m3[7] - m3[4]*m3[6]) * invDet,
-				(m3[2]*m3[7] - m3[1]*m3[8]) * invDet,
-				(m3[0]*m3[8] - m3[2]*m3[6]) * invDet,
-				(m3[1]*m3[6] - m3[0]*m3[7]) * invDet,
-				(m3[1]*m3[5] - m3[2]*m3[4]) * invDet,
-				(m3[2]*m3[3] - m3[0]*m3[5]) * invDet,
-				(m3[0]*m3[4] - m3[1]*m3[3]) * invDet
-			};
-			GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,normal_mat ) );
-		} else {
-			// Fallback to identity if matrix is degenerate
-			float identity[9] = { 1,0,0, 0,1,0, 0,0,1 };
-			GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,identity ) );
-		}
+		GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,normal_mat ) );
 	}
 
 	int maxBones()const{

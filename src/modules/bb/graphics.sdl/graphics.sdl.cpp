@@ -166,6 +166,11 @@ BBGraphics *SDLContextDriver::openGraphics( int w,int h,int d,int driver,int fla
 			SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 8 );
 			SDL_GL_SetAttribute( SDL_GL_DEPTH_SIZE, 24 );
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
+			// MSAA 4x: anti-aliasing dei bordi (la scena 3D va sul framebuffer di
+			// default, quindi basta un contesto multisampled). Fallback piu' sotto
+			// se il driver non lo supporta.
+			SDL_GL_SetAttribute( SDL_GL_MULTISAMPLEBUFFERS, 1 );
+			SDL_GL_SetAttribute( SDL_GL_MULTISAMPLESAMPLES, 4 );
 #else
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION,3 );
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION,0 );
@@ -194,9 +199,25 @@ BBGraphics *SDLContextDriver::openGraphics( int w,int h,int d,int driver,int fla
 #endif
 		SDL_ShowWindow( wnd );
 
-		if( !(context=SDL_GL_CreateContext( wnd )) ){
-			LOGD( "%s",SDL_GetError() );
-			return 0;
+		context=SDL_GL_CreateContext( wnd );
+		if( !context ){
+			// Driver senza MSAA al sample count richiesto: ricrea finestra+contesto
+			// senza multisample (la pixel-format MSAA si fissa alla creazione finestra).
+			LOGD( "GL context with MSAA failed (%s); retry without MSAA",SDL_GetError() );
+			SDL_DestroyWindow( wnd );
+			SDL_GL_SetAttribute( SDL_GL_MULTISAMPLEBUFFERS, 0 );
+			SDL_GL_SetAttribute( SDL_GL_MULTISAMPLESAMPLES, 0 );
+			wnd=SDL_CreateWindow( bbApp().title.c_str(),SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,1,1,SDL_WINDOW_OPENGL|SDL_WINDOW_ALLOW_HIGHDPI );
+			if( wnd==NULL ){ LOGD( "%s","failed to create window" ); return 0; }
+#ifdef BB_DESKTOP
+			SDL_SetWindowSize( wnd,w,h );
+			SDL_SetWindowResizable( wnd,scaled?SDL_TRUE:SDL_FALSE );
+#endif
+			SDL_ShowWindow( wnd );
+			if( !(context=SDL_GL_CreateContext( wnd )) ){
+				LOGD( "%s",SDL_GetError() );
+				return 0;
+			}
 		}
 
 		if( SDL_GL_MakeCurrent( wnd,context ) ){

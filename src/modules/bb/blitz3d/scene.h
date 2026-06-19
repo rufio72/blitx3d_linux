@@ -107,6 +107,11 @@ public:
   virtual void beginShadowPass( const Matrix *lightView,float fov_deg,float nr,float fr ){}
   virtual void endShadowPass( int lightIndex ){}
 
+  //omnidirectional (cube) shadow map for a point light: 6 faces, 90deg each.
+  virtual void beginShadowCube( const float lightPos[3],float nr,float fr ){}
+  virtual void shadowCubeFace( int face,const Matrix *faceView ){}
+  virtual void endShadowCube( int lightIndex ){}
+
   //lighting
   virtual BBLightRep *createLight( int flags )=0;
   virtual void freeLight( BBLightRep *l )=0;

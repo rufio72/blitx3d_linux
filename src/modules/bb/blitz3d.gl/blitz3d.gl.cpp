@@ -293,7 +293,10 @@ private:
 		GLint camera_pos = -1;    // For cubemap reflections
 		GLint skin_count = -1;    // GPU skinning
 		GLint shadow_light = -1;     // index of shadow-casting light (-1 = none)
-		GLint light_view_proj = -1;  // world -> shadow light clip
+		GLint light_view_proj = -1;  // world -> shadow light clip (2D mode)
+		GLint shadow_cube = -1;      // 1 = use cube map (point light)
+		GLint shadow_light_pos = -1; // world pos of shadow light (cube mode)
+		GLint shadow_near_far = -1;  // near/far of cube faces (cube mode)
 	} uniform_locs;
 
 	// Cached view matrix for normal matrix calculation (optimization #4)
@@ -312,6 +315,13 @@ private:
 	GLuint shadow_tex = 0;
 	float shadow_viewproj[16];
 	int saved_vp[4];
+
+	// Omnidirectional (cube) shadow map for a point light.
+	static const int SHADOW_CUBE_SIZE = 1024;
+	GLuint shadow_cube_fbo = 0;
+	GLuint shadow_cube_tex = 0;
+	float shadow_cube_pos[3];
+	float shadow_cube_near = 0.2f, shadow_cube_far = 30.0f;
 
 	// GPU skinning shadow state: bbSkinCount last set on the program
 	int cur_skin_count = -1;
@@ -667,6 +677,58 @@ public:
 		GL( glUniform1i( uniform_locs.shadow_light,lightIndex ) );
 	}
 
+	void ensureShadowCube(){
+		if( shadow_cube_fbo ) return;
+		GL( glGenTextures( 1,&shadow_cube_tex ) );
+		GL( glActiveTexture( GL_TEXTURE0+2*MAX_TEXTURES+1 ) );
+		GL( glBindTexture( GL_TEXTURE_CUBE_MAP,shadow_cube_tex ) );
+		for( int i=0;i<6;i++ )
+			GL( glTexImage2D( GL_TEXTURE_CUBE_MAP_POSITIVE_X+i,0,GL_DEPTH_COMPONENT24,SHADOW_CUBE_SIZE,SHADOW_CUBE_SIZE,0,GL_DEPTH_COMPONENT,GL_FLOAT,0 ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MIN_FILTER,GL_LINEAR ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MAG_FILTER,GL_LINEAR ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_COMPARE_MODE,GL_COMPARE_REF_TO_TEXTURE ) );
+		GL( glTexParameteri( GL_TEXTURE_CUBE_MAP,GL_TEXTURE_COMPARE_FUNC,GL_LEQUAL ) );
+		GL( glGenFramebuffers( 1,&shadow_cube_fbo ) );
+		GL( glActiveTexture( GL_TEXTURE0 ) );
+	}
+
+	// Omnidirectional shadow: bind the cube FBO and set a 90deg proj shared by all
+	// faces; remember the light world pos + near/far for the main-pass sampling.
+	void beginShadowCube( const float lightPos[3],float nr,float fr ){
+		ensureShadowCube();
+		shadow_cube_pos[0]=lightPos[0]; shadow_cube_pos[1]=lightPos[1]; shadow_cube_pos[2]=lightPos[2];
+		shadow_cube_near=nr; shadow_cube_far=fr;
+		GL( glGetIntegerv( GL_VIEWPORT,saved_vp ) );
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,shadow_cube_fbo ) );
+		GL( glViewport( 0,0,SHADOW_CUBE_SIZE,SHADOW_CUBE_SIZE ) );
+		GL( glScissor( 0,0,SHADOW_CUBE_SIZE,SHADOW_CUBE_SIZE ) );
+		float n=nr,f=fr,P[16]={0};
+		P[0]=1.0f; P[5]=1.0f; P[10]=-(f+n)/(f-n); P[11]=-1.0f; P[14]=-2.0f*f*n/(f-n);
+		setProj( P );
+	}
+
+	void shadowCubeFace( int face,const Matrix *faceView ){
+		GL( glFramebufferTexture2D( GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_CUBE_MAP_POSITIVE_X+face,shadow_cube_tex,0 ) );
+		GL( glClear( GL_DEPTH_BUFFER_BIT ) );
+		setViewMatrix( faceView );   // proj already set in beginShadowCube
+	}
+
+	void endShadowCube( int lightIndex ){
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,0 ) );
+		GL( glViewport( saved_vp[0],saved_vp[1],saved_vp[2],saved_vp[3] ) );
+		GL( glScissor( saved_vp[0],saved_vp[1],saved_vp[2],saved_vp[3] ) );
+		GL( glActiveTexture( GL_TEXTURE0+2*MAX_TEXTURES+1 ) );
+		GL( glBindTexture( GL_TEXTURE_CUBE_MAP,shadow_cube_tex ) );
+		GL( glActiveTexture( GL_TEXTURE0 ) );
+		GL( glUniform1i( uniform_locs.shadow_light,lightIndex ) );
+		GL( glUniform1i( uniform_locs.shadow_cube,1 ) );
+		GL( glUniform3fv( uniform_locs.shadow_light_pos,1,shadow_cube_pos ) );
+		GL( glUniform2f( uniform_locs.shadow_near_far,shadow_cube_near,shadow_cube_far ) );
+	}
+
 	int maxBones()const{
 #ifdef GLES
 		return 0;
@@ -933,11 +995,15 @@ public:
 			uniform_locs.skin_count = GL( glGetUniformLocation( defaultProgram,"bbSkinCount" ) );
 			uniform_locs.shadow_light = GL( glGetUniformLocation( defaultProgram,"bbShadowLight" ) );
 			uniform_locs.light_view_proj = GL( glGetUniformLocation( defaultProgram,"bbLightViewProj" ) );
+			uniform_locs.shadow_cube = GL( glGetUniformLocation( defaultProgram,"bbShadowCube" ) );
+			uniform_locs.shadow_light_pos = GL( glGetUniformLocation( defaultProgram,"bbShadowLightPos" ) );
+			uniform_locs.shadow_near_far = GL( glGetUniformLocation( defaultProgram,"bbShadowNearFar" ) );
 
-			// shadow map sampler lives on texture unit 2*MAX_TEXTURES (past 2D 0..7
-			// and cube 8..15); shadows off by default (bbShadowLight = -1).
+			// shadow samplers: 2D map on unit 2*MAX_TEXTURES, cube map on +1.
 			GLint shadowLoc = GL( glGetUniformLocation( defaultProgram,"bbShadowMap" ) );
 			GL( glUniform1i( shadowLoc,2*MAX_TEXTURES ) );
+			GLint shadowCubeLoc = GL( glGetUniformLocation( defaultProgram,"bbShadowCubeMap" ) );
+			GL( glUniform1i( shadowCubeLoc,2*MAX_TEXTURES+1 ) );
 			GL( glUniform1i( uniform_locs.shadow_light,-1 ) );
 		}
 
@@ -946,6 +1012,7 @@ public:
 		// shadows off by default each frame; the shadow pass (if any) re-enables
 		// by setting bbShadowLight in endShadowPass. Avoids a stale index/map.
 		GL( glUniform1i( uniform_locs.shadow_light,-1 ) );
+		GL( glUniform1i( uniform_locs.shadow_cube,0 ) );
 
 		GL( glEnable( GL_SCISSOR_TEST ) );
 		GL( glEnable( GL_CULL_FACE ) );

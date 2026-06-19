@@ -7,14 +7,20 @@ uniform mat4 bbWorldMatrix;
 uniform mat3 bbNormalMatrix; // Optimization #4
 uniform vec3 bbCameraPos;    // Camera world position for reflections
 
-// Shadow mapping (perspective, one shadow-casting light). bbShadowLight is the
-// index into LS.Light of the light that casts; -1 disables (default) -> no change.
-uniform mat4 bbLightViewProj; // world space -> shadow light clip space
+// Shadow mapping (one shadow-casting light). bbShadowLight is the index into
+// LS.Light of the light that casts; -1 disables (default) -> no change.
+// Two modes: a 2D perspective shadow map (spot/forward), or an omnidirectional
+// CUBE depth map for a point light (bbShadowCube==1).
+uniform mat4 bbLightViewProj; // world -> shadow light clip (2D mode)
 uniform int  bbShadowLight;   // index of shadow-casting light, -1 = none
+uniform int  bbShadowCube;    // 1 = sample the cube map, 0 = the 2D map
+uniform vec3 bbShadowLightPos;// world position of the shadow light (cube mode)
+uniform vec2 bbShadowNearFar; // x=near, y=far of the cube faces (cube mode)
 
 uniform sampler2D bbTexture[8];
 uniform samplerCube bbTextureCube[8];
 uniform sampler2DShadow bbShadowMap;
+uniform samplerCubeShadow bbShadowCubeMap;
 
 #define FOG_NONE   0
 #define FOG_LINEAR 1
@@ -309,6 +315,28 @@ float shadowFactor( vec3 worldPos ){
   return sh / 9.0;
 }
 
+// Omnidirectional shadow from a point light via a cube depth map. The lookup
+// direction is the world-space vector light->fragment; the compare value is the
+// projected depth on the cube face along the major axis (matches how the 6 faces
+// were rendered with a 90deg perspective, near/far = bbShadowNearFar). 1 = lit.
+float shadowFactorCube( vec3 worldPos ){
+  vec3 D = worldPos - bbShadowLightPos;
+  float z = max( max( abs(D.x),abs(D.y) ),abs(D.z) );   // eye depth on the major-axis face
+  float n = bbShadowNearFar.x, f = bbShadowNearFar.y;
+  if( z >= f ) return 1.0;                               // beyond range -> lit
+  float depth = 0.5*( (f+n)/(f-n) - (2.0*f*n)/((f-n)*z) ) + 0.5;
+  float bias = 0.004;
+  // small fixed 3D offsets around D for soft edges (cheap PCF)
+  float sh = 0.0;
+  const float o = 0.012;
+  vec3 off[5];
+  off[0]=vec3(0.0); off[1]=vec3(o,o,-o); off[2]=vec3(-o,o,o);
+  off[3]=vec3(o,-o,o); off[4]=vec3(-o,-o,-o);
+  for( int i=0;i<5;i++ )
+    sh += texture( bbShadowCubeMap, vec4( D + off[i]*z, depth - bias ) );
+  return sh / 5.0;
+}
+
 void main() {
   // Per-pixel lighting (moved here from the vertex shader). Uses the
   // interpolated view-space normal and position; identical light model.
@@ -356,7 +384,10 @@ void main() {
       vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
       // shadow: only the shadow-casting light is modulated; others stay lit.
       // bbShadowLight defaults to -1 (engine) so this is a no-op until enabled.
-      float sh = ( i == bbShadowLight ) ? shadowFactor( bbVertex_WorldPosition ) : 1.0;
+      float sh = 1.0;
+      if( i == bbShadowLight )
+        sh = ( bbShadowCube==1 ) ? shadowFactorCube( bbVertex_WorldPosition )
+                                 : shadowFactor( bbVertex_WorldPosition );
       Diffuse  += lightColor * nDotVP * attenuation * sh;
       Specular += lightColor * pf * attenuation * sh;
     }

@@ -267,12 +267,40 @@ vec4 Blend( vec4 t0,vec4 t1,int i ){
   }
 }
 
+// Per-fragment tangent frame from screen-space derivatives (Christian Schueler,
+// http://www.thetenthplanet.de/archives/1180). Lets a tangent-space normal map
+// perturb the normal WITHOUT per-vertex tangents: T/B are derived from how the
+// view-space position p and the uv change between neighbouring pixels. N is the
+// (geometric) eye-space normal, the resulting frame maps tangent space -> eye.
+mat3 cotangentFrame( vec3 N,vec3 p,vec2 uv ){
+  vec3 dp1 = dFdx( p ),  dp2 = dFdy( p );
+  vec2 du1 = dFdx( uv ), du2 = dFdy( uv );
+  vec3 dp2perp = cross( dp2,N );
+  vec3 dp1perp = cross( N,dp1 );
+  vec3 T = dp2perp*du1.x + dp1perp*du2.x;
+  vec3 B = dp2perp*du1.y + dp1perp*du2.y;
+  float invmax = inversesqrt( max( dot(T,T),dot(B,B) ) );
+  return mat3( T*invmax,B*invmax,N );
+}
+
 void main() {
   // Per-pixel lighting (moved here from the vertex shader). Uses the
   // interpolated view-space normal and position; identical light model.
   vec4 litColor;
   if( RS.FullBright==0 ){
     vec3 N = normalize( bbVertex_Normal );
+
+    // Normal (bump) mapping: a texture whose blend is BLEND_DOT3 is treated as a
+    // tangent-space normal map (OpenGL convention, +Y up). Sample it, build a
+    // tangent frame from derivatives and perturb N BEFORE lighting, so diffuse +
+    // specular react to the relief. Unrolled (constant sampler index) because ES
+    // forbids dynamic sampler indexing; the guards are on uniforms (dynamically
+    // uniform), so the texture fetch is well-defined. BUMP_STRENGTH scales the xy.
+    const float BUMP_STRENGTH = 1.0;
+    #define ApplyNormalMap(i) if( i<RS.TexturesUsed && RS.Texture[i].Blend==BLEND_DOT3 && RS.Texture[i].CubeMap==0 ){ vec3 nt=texture(bbTexture[i],bbVertex_TexCoord[i]).xyz*2.0-1.0; nt.xy*=BUMP_STRENGTH; N=normalize( cotangentFrame(N,bbVertex_ViewPos,bbVertex_TexCoord[i])*nt ); }
+    ApplyNormalMap(0) ApplyNormalMap(1) ApplyNormalMap(2) ApplyNormalMap(3)
+    ApplyNormalMap(4) ApplyNormalMap(5) ApplyNormalMap(6) ApplyNormalMap(7)
+
     vec4 Diffuse = vec4( 0.0 ), Specular = vec4( 0.0 );
     for( int i=0;i<LS.LightsUsed;i++ ){
       float nDotVP,nDotHV,pf;
@@ -313,7 +341,9 @@ void main() {
 
   // TODO: ES doesn't allow dynamic indexing of uniforms
   // so this (should) force the various compilers to unroll.
-  #define ProcessTexture(i) if( i<RS.TexturesUsed ) bbFragColor=Blend( bbFragColor,RS.Texture[i].CubeMap==0?Sample2D(bbTexture[i],i):SampleCube(bbTextureCube[i],RS.Texture[i].CubeMap),i );
+  // A BLEND_DOT3 slot is a normal map (consumed above to perturb N), so skip it
+  // here - otherwise its raw RGB would tint the surface blue.
+  #define ProcessTexture(i) if( i<RS.TexturesUsed && RS.Texture[i].Blend!=BLEND_DOT3 ) bbFragColor=Blend( bbFragColor,RS.Texture[i].CubeMap==0?Sample2D(bbTexture[i],i):SampleCube(bbTextureCube[i],RS.Texture[i].CubeMap),i );
 
   // For cubemaps, use direct sampling without blend
   if( 0<RS.TexturesUsed && RS.Texture[0].CubeMap!=0 ){

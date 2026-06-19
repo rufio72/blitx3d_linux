@@ -586,40 +586,18 @@ void World::render( float tween ){
 	// main pass samples it. Reuses the normal draw path with the light's view/proj.
 	if( shadowLight ){
 		const Transform &ltf=shadowLight->getRenderTform();
-		float nr=0.2f;
+		float nr=0.3f;
 		float fr=shadowLight->getRange(); if( fr<nr+1.0f ) fr=nr+1.0f;
+		float fov=120.0f;
+		bbScene->beginShadowPass( (BBScene::Matrix*)&(-ltf),fov,nr,fr );
+		float half=nr*tanf( fov*0.5f*3.14159265f/180.0f );
+		Frustum lf( nr,fr,half,half );
+		RenderContext rc_sh( ltf,lf,false );
 		bbScene->setZMode( BBScene::ZMODE_NORMAL );
-
-		if( shadowLight->getType()==Light::LIGHT_POINT ){
-			float lpos[3]={ ltf.v.x,ltf.v.y,ltf.v.z };
-			bbScene->beginShadowCube( lpos,nr,fr );
-			// 6 cube faces: forward + up per face (engine convention right=up x fwd).
-			static const Vector fdir[6]={ Vector(1,0,0),Vector(-1,0,0),Vector(0,1,0),Vector(0,-1,0),Vector(0,0,1),Vector(0,0,-1) };
-			static const Vector fup [6]={ Vector(0,-1,0),Vector(0,-1,0),Vector(0,0,1),Vector(0,0,-1),Vector(0,-1,0),Vector(0,-1,0) };
-			for( int f=0;f<6;f++ ){
-				Vector fwd=fdir[f],up=fup[f];
-				Vector right=up.cross( fwd );
-				Transform ct( Matrix(right,up,fwd),ltf.v );
-				Transform view=-ct;
-				bbScene->shadowCubeFace( f,(BBScene::Matrix*)&view );
-				Frustum lf( nr,fr,nr,nr );   // 90deg -> half = near
-				RenderContext rc_f( ct,lf,false );
-				for( unsigned int k=0;k<unord_mods.size();++k )
-					render( unord_mods[k],rc_f,false );
-				while( transparents.size() ) transparents.pop();
-			}
-			bbScene->endShadowCube( shadowIndex );
-		}else{
-			float fov=120.0f;
-			bbScene->beginShadowPass( (BBScene::Matrix*)&(-ltf),fov,nr,fr );
-			float half=nr*tanf( fov*0.5f*3.14159265f/180.0f );
-			Frustum lf( nr,fr,half,half );
-			RenderContext rc_sh( ltf,lf,false );
-			for( unsigned int k=0;k<unord_mods.size();++k )
-				render( unord_mods[k],rc_sh,false );
-			while( transparents.size() ) transparents.pop();
-			bbScene->endShadowPass( shadowIndex );
-		}
+		for( unsigned int k=0;k<unord_mods.size();++k )
+			render( unord_mods[k],rc_sh,false );
+		while( transparents.size() ) transparents.pop();
+		bbScene->endShadowPass( shadowIndex );
 	}
 
 	BBCanvas *org_canvas=gx_canvas;

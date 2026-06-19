@@ -581,6 +581,17 @@ public:
 			xz*zy-xy*zz, xx*zz-xz*zx, xy*zx-xx*zy,
 			xy*yz-xz*yy, xz*yx-xx*yz, xx*yy-xy*yx
 		};
+
+		// cofactor = det * inverse-transpose. The shader normalizes the result, so
+		// the |det| magnitude cancels - but the SIGN does not: when the modelview
+		// has negative determinant (it does: setViewMatrix flips Z for Blitz's
+		// left-handed -> GL right-handed conversion, a reflection) the cofactor
+		// points the transformed normal the WRONG way. Fold sign(det) back in so
+		// lighting normals face outward. det = first row of mv . first row of cofactor.
+		float det=xx*normal_mat[0]+xy*normal_mat[1]+xz*normal_mat[2];
+		if( det<0.0f ){
+			for( int k=0;k<9;k++ ) normal_mat[k]=-normal_mat[k];
+		}
 		GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,normal_mat ) );
 	}
 

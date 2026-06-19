@@ -205,8 +205,13 @@ out vec4 bbFragColor;
 #define BLEND_DOT3      4
 #define BLEND_MULTIPLY2 5
 
+// Parallax-occlusion UV shift, computed once in main() from the height packed in
+// the normal map's alpha; added to every 2D texture fetch so diffuse + normal map
+// move together with the apparent depth. Zero unless a height map is present.
+vec2 gParallax = vec2( 0.0 );
+
 vec4 Sample2D( sampler2D tex,int i ){
-  return texture( tex,bbVertex_TexCoord[i] );
+  return texture( tex,bbVertex_TexCoord[i] + gParallax );
 }
 
 #define CUBEMODE_REFLECTION 1
@@ -295,6 +300,34 @@ mat3 cotangentFrame( vec3 N,vec3 p,vec2 uv ){
   return mat3( T*invmax,B*invmax,N );
 }
 
+// Parallax-occlusion mapping: ray-march the height stored in the normal map's
+// ALPHA (1 = brick face, 0 = deepest groove) along the view direction expressed
+// in tangent space, returning the displaced uv. Gives real apparent depth +
+// self-occlusion as you move, within the flat polygon. heightTex must be passed
+// with a CONSTANT sampler index (ES forbids dynamic sampler indexing).
+vec2 parallaxUV( sampler2D heightTex,vec2 uv,vec3 viewT,float scale ){
+  const int STEPS = 24;
+  // total uv displacement from surface (depth 0) to bottom (depth 1)
+  vec2 P = viewT.xy / max( viewT.z,0.30 ) * scale;
+  vec2 dUV = P / float( STEPS );
+  float layer = 1.0 / float( STEPS );
+  float curLayer = 0.0;
+  vec2 cuv = uv;
+  float h = 1.0 - texture( heightTex,cuv ).a;       // depth at the surface
+  for( int i=0;i<STEPS;i++ ){
+    if( curLayer >= h ) break;
+    cuv -= dUV;
+    h = 1.0 - texture( heightTex,cuv ).a;
+    curLayer += layer;
+  }
+  // occlusion refine: interpolate the crossing between the last two layers
+  vec2 prevUV = cuv + dUV;
+  float after  = h - curLayer;
+  float before = (1.0 - texture( heightTex,prevUV ).a) - (curLayer - layer);
+  float w = after / ( after - before );
+  return mix( cuv,prevUV,clamp( w,0.0,1.0 ) );
+}
+
 // Perspective shadow map test for the shadow-casting light. Returns 1 = lit,
 // 0 = fully shadowed, with 3x3 PCF for soft edges. Fragments outside the light
 // frustum (or beyond its far plane) are treated as lit, so the rest of the scene
@@ -351,7 +384,19 @@ void main() {
     // forbids dynamic sampler indexing; the guards are on uniforms (dynamically
     // uniform), so the texture fetch is well-defined. BUMP_STRENGTH scales the xy.
     const float BUMP_STRENGTH = 1.0;
-    #define ApplyNormalMap(i) if( i<RS.TexturesUsed && RS.Texture[i].Blend==BLEND_DOT3 && RS.Texture[i].CubeMap==0 ){ vec3 nt=texture(bbTexture[i],bbVertex_TexCoord[i]).xyz*2.0-1.0; nt.xy*=BUMP_STRENGTH; N=normalize( cotangentFrame(N,bbVertex_ViewPos,bbVertex_TexCoord[i])*nt ); }
+    const float PARALLAX_SCALE = 0.16;
+
+    // Parallax-occlusion mapping: the first DOT3 slot whose alpha carries a height
+    // map displaces the UVs (gParallax) so diffuse + normal map gain real apparent
+    // depth as you move. No-op when the alpha is flat (1.0). View dir frag->eye in
+    // tangent space drives the march. Same constant-index unrolling as below.
+    vec3 Vw = normalize( -bbVertex_ViewPos );
+    #define ApplyParallax(i) if( i<RS.TexturesUsed && RS.Texture[i].Blend==BLEND_DOT3 && RS.Texture[i].CubeMap==0 ){ mat3 ptbn=cotangentFrame(N,bbVertex_ViewPos,bbVertex_TexCoord[i]); vec3 vt=vec3(dot(Vw,ptbn[0]),dot(Vw,ptbn[1]),dot(Vw,ptbn[2])); gParallax = parallaxUV(bbTexture[i],bbVertex_TexCoord[i],vt,PARALLAX_SCALE) - bbVertex_TexCoord[i]; }
+    ApplyParallax(0) ApplyParallax(1) ApplyParallax(2) ApplyParallax(3)
+    ApplyParallax(4) ApplyParallax(5) ApplyParallax(6) ApplyParallax(7)
+
+    // normal map sampled at the parallax-shifted uv so the relief lines up.
+    #define ApplyNormalMap(i) if( i<RS.TexturesUsed && RS.Texture[i].Blend==BLEND_DOT3 && RS.Texture[i].CubeMap==0 ){ vec3 nt=texture(bbTexture[i],bbVertex_TexCoord[i]+gParallax).xyz*2.0-1.0; nt.xy*=BUMP_STRENGTH; N=normalize( cotangentFrame(N,bbVertex_ViewPos,bbVertex_TexCoord[i]+gParallax)*nt ); }
     ApplyNormalMap(0) ApplyNormalMap(1) ApplyNormalMap(2) ApplyNormalMap(3)
     ApplyNormalMap(4) ApplyNormalMap(5) ApplyNormalMap(6) ApplyNormalMap(7)
 

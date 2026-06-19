@@ -550,13 +550,21 @@ void World::render( float tween ){
 
 	enumVisible();
 
+	Light *shadowLight=0; int shadowIndex=-1;   // first shadow-casting light
 	std::vector<Object*>::const_iterator it;
 	for( it=_visible.begin();it!=_visible.end();++it ){
 		Object *o=*it;
 
 		if( !o->beginRender(tween) ) continue;
 
-		if( Light *t=o->getLight() ) _lights.push_back(t->getRep());
+		if( Light *t=o->getLight() ){
+			// the shadow light's index must match its slot in the light UBO,
+			// which is filled from _lights in order (capped at 8).
+			if( shadowLight==0 && t->getCastShadows() && _lights.size()<8 ){
+				shadowLight=t; shadowIndex=(int)_lights.size();
+			}
+			_lights.push_back(t->getRep());
+		}
 		else if( Camera *t=o->getCamera() ) cam_que.push(t);
 		else if( Mirror *t=o->getMirror() ) _mirrors.push_back(t);
 		else if( Listener *t=o->getListener() ) _listeners.push_back(t);
@@ -571,6 +579,26 @@ void World::render( float tween ){
 //	_bbDebugLog( "RenderWorld" );
 
 	if( !bbScene->begin( _lights ) ) return;
+
+	// --- shadow pass: render opaque casters from the shadow-casting light into
+	// a depth map (perspective, looking along the light's forward). The main pass
+	// then samples it. Reuses the normal draw path with the light's view/proj.
+	if( shadowLight ){
+		const Transform &ltf=shadowLight->getRenderTform();
+		float nr=0.3f;
+		float fr=shadowLight->getRange(); if( fr<nr+1.0f ) fr=nr+1.0f;
+		float fov=120.0f;
+		bbScene->beginShadowPass( (BBScene::Matrix*)&(-ltf),fov,nr,fr );
+		float half=nr*tanf( fov*0.5f*3.14159265f/180.0f );
+		Frustum lf( nr,fr,half,half );
+		RenderContext rc_sh( ltf,lf,false );
+		bbScene->setZMode( BBScene::ZMODE_NORMAL );
+		for( unsigned int k=0;k<unord_mods.size();++k ){
+			render( unord_mods[k],rc_sh,false );
+		}
+		while( transparents.size() ) transparents.pop();
+		bbScene->endShadowPass( shadowIndex );
+	}
 
 	BBCanvas *org_canvas=gx_canvas;
 	for( ;cam_que.size();cam_que.pop() ){

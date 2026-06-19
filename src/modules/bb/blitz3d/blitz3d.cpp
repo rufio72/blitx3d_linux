@@ -1176,6 +1176,11 @@ BBLIB void BBCALL bbLightRange( Light *light,bb_float_t range ){
 	light->setRange( range );
 }
 
+BBLIB void BBCALL bbLightShadows( Light *light,bb_int_t enable ){
+	debugLight(light);
+	light->setCastShadows( enable!=0 );
+}
+
 BBLIB void BBCALL bbLightConeAngles( Light *light,bb_float_t inner,bb_float_t outer ){
 	debugLight(light);
 	inner*=dtor;

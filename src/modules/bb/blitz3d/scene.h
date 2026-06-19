@@ -99,6 +99,14 @@ public:
   virtual void render( BBMesh *mesh,int first_vert,int vert_cnt,int first_tri,int tri_cnt )=0;
   virtual void end()=0;
 
+  //shadow mapping (perspective, one shadow-casting light). Default no-op so
+  //backends without shadow support are unaffected. Between begin/end:
+  //beginShadowPass binds a depth-only target and the light view/proj; the caller
+  //re-draws the opaque casters; endShadowPass restores state and wires the shadow
+  //map + lightViewProj + light index into the main program.
+  virtual void beginShadowPass( const Matrix *lightView,float fov_deg,float nr,float fr ){}
+  virtual void endShadowPass( int lightIndex ){}
+
   //lighting
   virtual BBLightRep *createLight( int flags )=0;
   virtual void freeLight( BBLightRep *l )=0;

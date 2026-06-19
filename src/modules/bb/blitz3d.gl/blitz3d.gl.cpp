@@ -292,6 +292,8 @@ private:
 		GLint normal_matrix = -1; // Optimization #4
 		GLint camera_pos = -1;    // For cubemap reflections
 		GLint skin_count = -1;    // GPU skinning
+		GLint shadow_light = -1;     // index of shadow-casting light (-1 = none)
+		GLint light_view_proj = -1;  // world -> shadow light clip
 	} uniform_locs;
 
 	// Cached view matrix for normal matrix calculation (optimization #4)
@@ -302,6 +304,14 @@ private:
 	GLuint render_ubo = 0;
 	GLuint bone_ubo = 0;
 	bool ubos_initialized = false;
+
+	// Shadow mapping: depth-only FBO + sampleable depth texture, and the
+	// world->light clip matrix captured during the shadow pass for the main pass.
+	static const int SHADOW_SIZE = 2048;
+	GLuint shadow_fbo = 0;
+	GLuint shadow_tex = 0;
+	float shadow_viewproj[16];
+	int saved_vp[4];
 
 	// GPU skinning shadow state: bbSkinCount last set on the program
 	int cur_skin_count = -1;
@@ -595,6 +605,68 @@ public:
 		GL( glUniformMatrix3fv( uniform_locs.normal_matrix,1,GL_FALSE,normal_mat ) );
 	}
 
+	void ensureShadowTarget(){
+		if( shadow_fbo ) return;
+		GL( glGenTextures( 1,&shadow_tex ) );
+		GL( glActiveTexture( GL_TEXTURE0+2*MAX_TEXTURES ) );
+		GL( glBindTexture( GL_TEXTURE_2D,shadow_tex ) );
+		GL( glTexImage2D( GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,SHADOW_SIZE,SHADOW_SIZE,0,GL_DEPTH_COMPONENT,GL_FLOAT,0 ) );
+		GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR ) );
+		GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR ) );
+		GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE ) );
+		GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE ) );
+		// hardware compare for sampler2DShadow PCF
+		GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE,GL_COMPARE_REF_TO_TEXTURE ) );
+		GL( glTexParameteri( GL_TEXTURE_2D,GL_TEXTURE_COMPARE_FUNC,GL_LEQUAL ) );
+		GL( glGenFramebuffers( 1,&shadow_fbo ) );
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,shadow_fbo ) );
+		GL( glFramebufferTexture2D( GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,shadow_tex,0 ) );
+		GL( glDrawBuffer( GL_NONE ) );
+		GL( glReadBuffer( GL_NONE ) );
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,0 ) );
+		GL( glActiveTexture( GL_TEXTURE0 ) );
+	}
+
+	// Render-from-light setup. Binds the depth FBO and sets the light's view +
+	// perspective proj (reusing the default program's cached uniform locations);
+	// captures world->light clip into shadow_viewproj for the main pass. The
+	// caller then re-draws the opaque casters; bbShadowLight stays -1 during the
+	// pass (set in begin()) so the fragment never samples the map it's writing.
+	void beginShadowPass( const Matrix *lightView,float fov_deg,float nr,float fr ){
+		ensureShadowTarget();
+		GL( glGetIntegerv( GL_VIEWPORT,saved_vp ) );
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,shadow_fbo ) );
+		GL( glViewport( 0,0,SHADOW_SIZE,SHADOW_SIZE ) );
+		GL( glScissor( 0,0,SHADOW_SIZE,SHADOW_SIZE ) );
+		GL( glClear( GL_DEPTH_BUFFER_BIT ) );
+
+		setViewMatrix( lightView );   // fills cached_view_matrix (processed)
+
+		float half = nr * tanf( fov_deg*0.5f*3.14159265f/180.0f );
+		// perspective proj (same formula as setPerspProj), kept to build viewproj
+		float P[16]={0};
+		P[0]=nr/half; P[5]=nr/half; P[10]=-(fr+nr)/(fr-nr); P[11]=-1.0f;
+		P[14]=-(2.0f*fr*nr)/(fr-nr);
+		setProj( P );
+
+		// shadow_viewproj = P * cached_view_matrix (column-major)
+		for( int c=0;c<4;c++ ) for( int r=0;r<4;r++ ){
+			float s=0; for( int k=0;k<4;k++ ) s+=P[k*4+r]*cached_view_matrix[c*4+k];
+			shadow_viewproj[c*4+r]=s;
+		}
+	}
+
+	void endShadowPass( int lightIndex ){
+		GL( glBindFramebuffer( GL_FRAMEBUFFER,0 ) );
+		GL( glViewport( saved_vp[0],saved_vp[1],saved_vp[2],saved_vp[3] ) );
+		GL( glScissor( saved_vp[0],saved_vp[1],saved_vp[2],saved_vp[3] ) );
+		GL( glActiveTexture( GL_TEXTURE0+2*MAX_TEXTURES ) );
+		GL( glBindTexture( GL_TEXTURE_2D,shadow_tex ) );
+		GL( glActiveTexture( GL_TEXTURE0 ) );
+		GL( glUniformMatrix4fv( uniform_locs.light_view_proj,1,GL_FALSE,shadow_viewproj ) );
+		GL( glUniform1i( uniform_locs.shadow_light,lightIndex ) );
+	}
+
 	int maxBones()const{
 #ifdef GLES
 		return 0;
@@ -859,9 +931,21 @@ public:
 			uniform_locs.normal_matrix = GL( glGetUniformLocation( defaultProgram,"bbNormalMatrix" ) );
 			uniform_locs.camera_pos = GL( glGetUniformLocation( defaultProgram,"bbCameraPos" ) );
 			uniform_locs.skin_count = GL( glGetUniformLocation( defaultProgram,"bbSkinCount" ) );
+			uniform_locs.shadow_light = GL( glGetUniformLocation( defaultProgram,"bbShadowLight" ) );
+			uniform_locs.light_view_proj = GL( glGetUniformLocation( defaultProgram,"bbLightViewProj" ) );
+
+			// shadow map sampler lives on texture unit 2*MAX_TEXTURES (past 2D 0..7
+			// and cube 8..15); shadows off by default (bbShadowLight = -1).
+			GLint shadowLoc = GL( glGetUniformLocation( defaultProgram,"bbShadowMap" ) );
+			GL( glUniform1i( shadowLoc,2*MAX_TEXTURES ) );
+			GL( glUniform1i( uniform_locs.shadow_light,-1 ) );
 		}
 
 		GL( glUseProgram( defaultProgram ) );
+
+		// shadows off by default each frame; the shadow pass (if any) re-enables
+		// by setting bbShadowLight in endShadowPass. Avoids a stale index/map.
+		GL( glUniform1i( uniform_locs.shadow_light,-1 ) );
 
 		GL( glEnable( GL_SCISSOR_TEST ) );
 		GL( glEnable( GL_CULL_FACE ) );

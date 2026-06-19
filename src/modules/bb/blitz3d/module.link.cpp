@@ -146,6 +146,7 @@ BBMODULE_LINK( blitz3d ){
 	rtSym( "LightColor%light#red#green#blue","bbLightColor",bbLightColor );
 	rtSym( "LightRange%light#range","bbLightRange",bbLightRange );
 	rtSym( "LightConeAngles%light#inner_angle#outer_angle","bbLightConeAngles",bbLightConeAngles );
+	rtSym( "LightShadows%light%enable","bbLightShadows",bbLightShadows );
 	rtSym( "%CreatePivot%parent=0","bbCreatePivot",bbCreatePivot );
 	rtSym( "%CreateSprite%parent=0","bbCreateSprite",bbCreateSprite );
 	rtSym( "%LoadSprite$file%texture_flags=1%parent=0","bbLoadSprite",bbLoadSprite );

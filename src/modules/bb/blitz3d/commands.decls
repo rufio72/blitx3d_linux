@@ -149,6 +149,7 @@ CreateLight.Entity( type%=1,parent.Entity=0 ):"bbCreateLight"
 LightColor( light.Light,red#,green#,blue# ):"bbLightColor"
 LightRange( light.Light,range# ):"bbLightRange"
 LightConeAngles( light.Light,inner_angle#,outer_angle# ):"bbLightConeAngles"
+LightShadows( light.Light,enable% ):"bbLightShadows"
 
 CreatePivot.Entity( parent.Entity=0 ):"bbCreatePivot"
 

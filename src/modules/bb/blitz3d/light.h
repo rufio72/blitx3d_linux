@@ -38,6 +38,9 @@ public:
 	void getConeAngles( float &inner,float &outer );
 	void setConeAngles( float inner,float outer );
 
+	bool getCastShadows()const{ return cast_shadows; }
+	void setCastShadows( bool b ){ cast_shadows=b; }
+
 	bool beginRender( float tween );
 
 	BBLightRep *getRep()const{ return rep; }
@@ -50,6 +53,7 @@ private:
 	float range;
 	Vector color;
 	float innerAngle,outerAngle;
+	bool cast_shadows=false;
 };
 
 #endif

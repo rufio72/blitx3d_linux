@@ -7,8 +7,14 @@ uniform mat4 bbWorldMatrix;
 uniform mat3 bbNormalMatrix; // Optimization #4
 uniform vec3 bbCameraPos;    // Camera world position for reflections
 
+// Shadow mapping (perspective, one shadow-casting light). bbShadowLight is the
+// index into LS.Light of the light that casts; -1 disables (default) -> no change.
+uniform mat4 bbLightViewProj; // world space -> shadow light clip space
+uniform int  bbShadowLight;   // index of shadow-casting light, -1 = none
+
 uniform sampler2D bbTexture[8];
 uniform samplerCube bbTextureCube[8];
+uniform sampler2DShadow bbShadowMap;
 
 #define FOG_NONE   0
 #define FOG_LINEAR 1
@@ -283,6 +289,26 @@ mat3 cotangentFrame( vec3 N,vec3 p,vec2 uv ){
   return mat3( T*invmax,B*invmax,N );
 }
 
+// Perspective shadow map test for the shadow-casting light. Returns 1 = lit,
+// 0 = fully shadowed, with 3x3 PCF for soft edges. Fragments outside the light
+// frustum (or beyond its far plane) are treated as lit, so the rest of the scene
+// is unaffected. worldPos = fragment position in Blitz world space.
+float shadowFactor( vec3 worldPos ){
+  vec4 lp = bbLightViewProj * vec4( worldPos,1.0 );
+  if( lp.w <= 0.0 ) return 1.0;                 // behind the light
+  vec3 proj = lp.xyz / lp.w * 0.5 + 0.5;        // NDC -> [0,1]
+  if( proj.z >= 1.0 ) return 1.0;               // beyond far plane
+  if( proj.x < 0.0 || proj.x > 1.0 ||
+      proj.y < 0.0 || proj.y > 1.0 ) return 1.0; // outside the cone
+  float bias = 0.0015;
+  vec2 texel = 1.0 / vec2( textureSize( bbShadowMap,0 ) );
+  float sh = 0.0;
+  for( int y=-1;y<=1;y++ )
+    for( int x=-1;x<=1;x++ )
+      sh += texture( bbShadowMap, vec3( proj.xy + vec2(x,y)*texel, proj.z - bias ) );
+  return sh / 9.0;
+}
+
 void main() {
   // Per-pixel lighting (moved here from the vertex shader). Uses the
   // interpolated view-space normal and position; identical light model.
@@ -328,8 +354,11 @@ void main() {
         pf = pow( nDotHV, 128.0 * RS.BrushShininess ) * RS.BrushShininess * float(nDotVP != 0.0);
       }
       vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
-      Diffuse  += lightColor * nDotVP * attenuation;
-      Specular += lightColor * pf * attenuation;
+      // shadow: only the shadow-casting light is modulated; others stay lit.
+      // bbShadowLight defaults to -1 (engine) so this is a no-op until enabled.
+      float sh = ( i == bbShadowLight ) ? shadowFactor( bbVertex_WorldPosition ) : 1.0;
+      Diffuse  += lightColor * nDotVP * attenuation * sh;
+      Specular += lightColor * pf * attenuation * sh;
     }
     litColor = RS.Ambient * bbVertex_Color + Diffuse * bbVertex_Color + Specular * vec4( 1.0 );
     litColor = clamp( litColor, 0.0, 1.0 );

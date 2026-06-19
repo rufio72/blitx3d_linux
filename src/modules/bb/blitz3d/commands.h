@@ -151,6 +151,7 @@ Entity * BBCALL bbCreateLight( bb_int_t type,Entity *parent );
 void BBCALL bbLightColor( Light *light,bb_float_t red,bb_float_t green,bb_float_t blue );
 void BBCALL bbLightRange( Light *light,bb_float_t range );
 void BBCALL bbLightConeAngles( Light *light,bb_float_t inner_angle,bb_float_t outer_angle );
+void BBCALL bbLightShadows( Light *light,bb_int_t enable );
 Entity * BBCALL bbCreatePivot( Entity *parent );
 Entity * BBCALL bbCreateSprite( Entity *parent );
 Entity * BBCALL bbLoadSprite( BBStr *file,bb_int_t texture_flags,Entity *parent );

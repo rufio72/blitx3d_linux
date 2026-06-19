@@ -267,3 +267,37 @@ Questi punti diventeranno una checklist a parte quando la feature è verde sulla
 ```
 shader → asset → test scene → build/verify → commit → [poi] dungeon
 ```
+
+---
+
+## 11. Parallax-occlusion mapping (POM) — FATTO (commit `d9ebfea`)
+
+Estensione del normal mapping: dà **profondità apparente reale** (i mattoni si
+spostano e i solchi si occludono mentre la camera si muove), entro il poligono
+piatto — niente geometria in più. È il passo oltre il normal mapping (che finge
+solo la luce). Per il rilievo *fisico* della silhouette servirebbe displacement/
+tessellation (non fatto).
+
+### 11.1 Sorgente altezza: ALPHA della normal map
+La height è impacchettata nel **canale alpha** della normal map DOT3 (`1` = faccia
+del mattone, `0` = fondo del solco). `LoadTexture` carica sempre RGBA (la canvas
+usa 4 canali) quindi l'alpha si preserva; nessuna texture/slot in più.
+`gen_normalmap.py` la genera (param `height_depth`, derivata dalla maschera malta).
+**No-op se l'alpha è piatto (1.0)** → le vecchie normal map RGB restano identiche.
+
+### 11.2 Shader (`default.glsl`)
+- `parallaxUV(heightTex, uv, viewT, scale)`: steep-parallax march a 24 step +
+  occlusion refine. Il sampler height è passato con indice COSTANTE (ES-safe).
+- `viewT` = direzione vista (frag→occhio) nello spazio tangente, dal TBN
+  per-fragment (`cotangentFrame`, lo stesso del normal mapping).
+- In `main`: `ApplyParallax` (unrollato sugli 8 slot, stesse guardie del normal
+  map) calcola UN solo shift `gParallax` dal primo slot DOT3; `Sample2D` e il
+  fetch della normale lo aggiungono → colore e rilievo si muovono insieme.
+- `PARALLAX_SCALE` (const, ~0.16) regola la profondità.
+
+### 11.3 Note / limiti
+- L'effetto è **sottile da fermo** (il parallax sposta solo le zone dei solchi) e
+  **vivo in movimento**; uno screenshot statico lo sottostima.
+- Costo: un ray-march per-fragment sui materiali con height (pochi nel dungeon).
+  Possibile ottimizzazione: meno step a vista frontale, programma dedicato.
+- Asset DM: `gen_normalmap.py` con `height_depth>0` → `test_n.png` RGBA.

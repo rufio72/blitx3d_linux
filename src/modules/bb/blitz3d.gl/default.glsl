@@ -71,6 +71,7 @@ varying vec4 bbVertex_Color;
 varying vec3 bbVertex_Normal;
 varying vec2 bbVertex_TexCoord[8];
 varying float bbVertex_FogFactor;
+varying vec3 bbVertex_ViewPos;   // view-space position (per-pixel lighting)
 
 float fogFactorLinear(
   const float dist,
@@ -163,65 +164,13 @@ void main() {
   // Always pass normal for cubemap reflections (even with fullbright)
   bbVertex_Normal = normalize( EyeNormal );
 
-  if( RS.FullBright==0 ){
-    vec4 Diffuse=vec4( 0.0 ),Specular=vec4( 0.0 );
-
-    // Get vertex position in view space for point light calculations
-    vec3 vertexViewPos = (bbModelViewMatrix * vec4(position, 1.0)).xyz;
-
-    for( int i=0;i<LS.LightsUsed;i++ ){
-      float nDotVP,nDotHV,pf;
-      float attenuation = 1.0;
-      vec3 LightDir;
-
-      int lightType = int(LS.Light[i].Position.w);
-      float lightRange = LS.Light[i].Params.x;
-
-      if( lightType == 1 ){
-        // Directional light: world direction precomputed on the CPU
-        // (equivalent to the old mat3(TForm*rotX(90))*vec3(0,1,0))
-        LightDir = normalize( mat3( bbViewMatrix ) * LS.Light[i].Direction.xyz );
-      } else {
-        // Point light (type 2) or Spot light (type 3)
-        vec3 lightWorldPos = LS.Light[i].Position.xyz;
-        vec3 lightViewPos = (bbViewMatrix * vec4(lightWorldPos, 1.0)).xyz;
-        vec3 lightToVertex = vertexViewPos - lightViewPos;
-        float distance = length(lightToVertex);
-        LightDir = -normalize(lightToVertex);
-
-        // Attenuation based on range
-        if( lightRange > 0.0 ){
-          attenuation = clamp(1.0 - (distance / lightRange), 0.0, 1.0);
-          attenuation = attenuation * attenuation; // Quadratic falloff
-        }
-      }
-
-      vec3 halfVector = normalize( LightDir + vec3( 0.0, 0.0, -1.0 ));
-
-      nDotVP = max( 0.0, dot( bbVertex_Normal, LightDir ) );
-
-      // EntityShininess drives the specular: 0 (the default) means none,
-      // like classic Blitz3D; the exponent scales with it as D3D7 did
-      pf = 0.0;
-      if( RS.BrushShininess > 0.0 ){
-        nDotHV = max( 0.0, dot( bbVertex_Normal, vec3( halfVector )));
-        pf = pow( nDotHV, 128.0 * RS.BrushShininess ) * RS.BrushShininess * float(nDotVP != 0.0);
-      }
-
-      // Limit light contribution to prevent over-saturation
-      vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
-      Diffuse  += lightColor * nDotVP * attenuation;
-      Specular += lightColor * pf * attenuation;
-    }
-
-    bbVertex_Color = RS.Ambient * bbMaterialColor +
-                     Diffuse    * bbMaterialColor +
-                     Specular   * vec4( 1.0 );
-    bbVertex_Color = clamp( bbVertex_Color, 0.0, 1.0 );
-    bbVertex_Color.a = bbMaterialColor.a; // TODO: is this right?
-  }else{
-    bbVertex_Color = bbMaterialColor;
-  }
+  // Per-pixel lighting: the light loop now lives in the FRAGMENT shader, so the
+  // vertex shader only forwards the UNLIT material color and the view-space
+  // position (the view-space normal is already in bbVertex_Normal). This was
+  // Gouraud/per-vertex before; per-pixel is needed for smooth wall lighting and
+  // for normal/bump mapping.
+  bbVertex_ViewPos = (bbModelViewMatrix * vec4(position, 1.0)).xyz;
+  bbVertex_Color = bbMaterialColor;
 
   switch( RS.FogMode ){
   case FOG_NONE: break;
@@ -319,7 +268,48 @@ vec4 Blend( vec4 t0,vec4 t1,int i ){
 }
 
 void main() {
-  bbFragColor=bbVertex_Color;
+  // Per-pixel lighting (moved here from the vertex shader). Uses the
+  // interpolated view-space normal and position; identical light model.
+  vec4 litColor;
+  if( RS.FullBright==0 ){
+    vec3 N = normalize( bbVertex_Normal );
+    vec4 Diffuse = vec4( 0.0 ), Specular = vec4( 0.0 );
+    for( int i=0;i<LS.LightsUsed;i++ ){
+      float nDotVP,nDotHV,pf;
+      float attenuation = 1.0;
+      vec3 LightDir;
+      int lightType = int(LS.Light[i].Position.w);
+      float lightRange = LS.Light[i].Params.x;
+      if( lightType == 1 ){
+        LightDir = normalize( mat3( bbViewMatrix ) * LS.Light[i].Direction.xyz );
+      } else {
+        vec3 lightViewPos = (bbViewMatrix * vec4(LS.Light[i].Position.xyz, 1.0)).xyz;
+        vec3 lightToFrag = bbVertex_ViewPos - lightViewPos;
+        float dist = length(lightToFrag);
+        LightDir = -normalize(lightToFrag);
+        if( lightRange > 0.0 ){
+          attenuation = clamp(1.0 - (dist / lightRange), 0.0, 1.0);
+          attenuation = attenuation * attenuation;
+        }
+      }
+      vec3 halfVector = normalize( LightDir + vec3( 0.0, 0.0, -1.0 ));
+      nDotVP = max( 0.0, dot( N, LightDir ) );
+      pf = 0.0;
+      if( RS.BrushShininess > 0.0 ){
+        nDotHV = max( 0.0, dot( N, halfVector ));
+        pf = pow( nDotHV, 128.0 * RS.BrushShininess ) * RS.BrushShininess * float(nDotVP != 0.0);
+      }
+      vec4 lightColor = clamp(LS.Light[i].Color, 0.0, 1.0);
+      Diffuse  += lightColor * nDotVP * attenuation;
+      Specular += lightColor * pf * attenuation;
+    }
+    litColor = RS.Ambient * bbVertex_Color + Diffuse * bbVertex_Color + Specular * vec4( 1.0 );
+    litColor = clamp( litColor, 0.0, 1.0 );
+    litColor.a = bbVertex_Color.a;
+  } else {
+    litColor = bbVertex_Color;
+  }
+  bbFragColor = litColor;
 
   // TODO: ES doesn't allow dynamic indexing of uniforms
   // so this (should) force the various compilers to unroll.

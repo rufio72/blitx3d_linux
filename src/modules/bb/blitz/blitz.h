@@ -107,6 +107,13 @@ struct BBArray{
 
 #include <string>
 
+// BBStr deriva da std::string: NON deve ereditare il #pragma pack(1) attivo qui
+// (vale per le struct ABI C come BBObj/BBField). Impacchettare a 1 byte una classe
+// che contiene std::string le dà allineamento 1: su Windows (MinGW) il pool che
+// ricicla la memoria degli slot finisce per gestire std::string mal-allineate e
+// corrompe l'heap (su Linux GCC lo tollerava). Ripristino l'allineamento naturale
+// solo per BBStr, poi rimetto pack(1) per le struct che seguono.
+#pragma pack( pop )
 struct BBStr : public std::string{
 	BBStr *next,*prev;
 
@@ -126,6 +133,7 @@ struct BBStr : public std::string{
 	void *operator new( size_t size,const char *file,int line ){ return operator new( size ); }
 	void operator delete( void *q,const char *file,int line ){ operator delete( q ); }
 };
+#pragma pack( push,1 )
 
 #endif
 

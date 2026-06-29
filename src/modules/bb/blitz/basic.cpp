@@ -77,7 +77,16 @@ static void insertStr( BBStr *str,BBStr *next ){
 	next->prev=str;
 }
 
+// Su Windows (MinGW/UCRT) il pool a free-list che ricicla la memoria grezza degli
+// slot BBStr corrompe l'heap (overrun sensibile al layout, rilevato dall'heap UCRT;
+// su Linux/glibc passa inosservato e il pool funziona). Per NON alterare il
+// comportamento Linux, il pool resta invariato su Linux; solo su Windows si usano
+// new/delete standard, che eliminano la corruzione. Le liste freeStrs/usedStrs e
+// removeStr/insertStr restano usate sul ramo Linux e dal BBMODULE_DESTROY.
 void *BBStr::operator new( size_t size ){
+#ifdef _WIN32
+	return bbMalloc( size );
+#else
 	if( freeStrs.next==&freeStrs ){
 		BBStr *t=(BBStr*)bbMalloc( sizeof(BBStr)*STR_NEW_INC );
 		for( int k=0;k<STR_NEW_INC;++k ) insertStr( t++,&freeStrs );
@@ -85,12 +94,17 @@ void *BBStr::operator new( size_t size ){
 	BBStr *t=freeStrs.next;
 	removeStr( t );insertStr( t,&usedStrs );
 	return t;
+#endif
 }
 
 void BBStr::operator delete( void *q ){
 	if( !q ) return;
+#ifdef _WIN32
+	bbFree( q );
+#else
 	BBStr *t=(BBStr*)q;
 	removeStr( t );insertStr( t,&freeStrs );
+#endif
 }
 
 BBStr::BBStr(){
@@ -158,7 +172,10 @@ bb_int_t BBCALL _bbStrToInt( BBStr *s ){
 #ifdef BB32
 	int n=atoi( *s );
 #else
-	long n=atol( *s );
+	// NB: must parse the FULL width of bb_int_t. atol()/ltoa() use `long`,
+	// which is only 32-bit on Windows (LLP64) and silently truncates 64-bit
+	// values such as entity/texture handles -> wild pointers. Use 64-bit.
+	bb_int_t n=(bb_int_t)strtoll( s->c_str(),0,10 );
 #endif
 	delete s;return n;
 }
@@ -167,7 +184,7 @@ BBStr * BBCALL _bbStrFromInt( bb_int_t n ){
 #ifdef BB32
 	return d_new BBStr( itoa( n ) );
 #else
-	return d_new BBStr( ltoa( n ) );
+	return d_new BBStr( std::to_string( (long long)n ) );
 #endif
 }
 

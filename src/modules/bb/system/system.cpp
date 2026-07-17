@@ -61,8 +61,17 @@ bb_int_t BBCALL bbExecFile( BBStr *f ){
 	SetForegroundWindow( GetDesktopWindow() );
 
 	n=(bb_int_t)ShellExecute( GetDesktopWindow(),0,cmd.c_str(),params.size() ? params.c_str() : 0,0,SW_SHOW )>32;
-#else
-	// TODO: ...
+#elif defined(BB_LINUX) || defined(BB_MACOS)
+	// esegue la command line in una shell, in un processo STACCATO
+	// (setsid): il figlio sopravvive anche se il programma Blitz termina
+	// subito dopo (es. launcher che si riavviano a vicenda).
+	pid_t pid=fork();
+	if( pid==0 ){
+		setsid();
+		execl( "/bin/sh","sh","-c",t.c_str(),(char*)0 );
+		_exit( 127 );
+	}
+	n=pid>0;
 #endif
 	if( !bbRuntimeIdle() ) RTEX( 0 );
 	return n;

@@ -103,7 +103,7 @@ ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::stri
 				ExprNode *obj_expr=d_new VarExprNode( var.release() );
 
 				// Create method call node
-				ExprNode *method_call=d_new MethodCallNode( obj_expr,field_ident,field_tag,exprs.release() );
+				a_ptr<ExprNode> method_call( d_new MethodCallNode( obj_expr,field_ident,field_tag,exprs.release() ) );
 
 				// Check for chained method calls or field access
 				while( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
@@ -117,13 +117,14 @@ ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::stri
 						a_ptr<ExprSeqNode> next_exprs( parseExprSeq() );
 						if( toker->curr()!=')' ) exp( "')'" );
 						toker->next();
-						method_call=d_new MethodCallNode( method_call,next_ident,next_tag,next_exprs.release() );
+						ExprNode *prev=method_call.release();
+						method_call=d_new MethodCallNode( prev,next_ident,next_tag,next_exprs.release() );
 					}else{
 						// Field access after method call - not supported yet
 						ex( "Field access after method call not yet supported" );
 					}
 				}
-				return method_call;
+				return method_call.release();
 			}
 
 			// Regular field access
@@ -345,10 +346,10 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		// Check for constructor arguments: New ClassName(args)
 		if( toker->curr()=='(' ){
 			toker->next();
-			ExprSeqNode *args = parseExprSeq();
+			a_ptr<ExprSeqNode> args( parseExprSeq() );
 			if( toker->curr()!=')' ) exp( "')'" );
 			toker->next();
-			result=d_new NewNode( t, args );
+			result=d_new NewNode( t, args.release() );
 		}else{
 			result=d_new NewNode( t );
 		}

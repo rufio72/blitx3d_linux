@@ -126,6 +126,10 @@ DeclNode *Parser::parseClassDecl(){
 				toker->next();
 				DeclNode *fieldDecl = parseVarDecl( DECL_FIELD | accessMod, false );
 				fields->push_back( fieldDecl );
+				// New non applica gli inizializzatori dei campi: nei Class si
+				// rifiutano (nei Type restano ignorati come in Blitz3D)
+				VarDeclNode *vd=dynamic_cast<VarDeclNode*>( fieldDecl );
+				if( vd && vd->expr ) ex( "Field initializers are not supported in Class; assign the field in Method Constructor()" );
 			}while( toker->curr()==',' );
 		}else if( toker->curr()==STATIC ){
 			toker->next();

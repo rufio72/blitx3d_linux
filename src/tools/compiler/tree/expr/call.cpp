@@ -163,6 +163,9 @@ llvm::Value *CallNode::translate2( Codegen_LLVM *g ){
 
 std::string CallNode::translate3( Codegen_C *g ){
 	FuncType *f = sem_decl->type->funcType();
+	// le userlib (.decls) non hanno un simbolo nel backend C: meglio un
+	// errore qui che un undefined symbol al link
+	if( f->userlib ) ex( "Userlib function '"+ident+"' is not supported by the C backend" );
 
 	// Get the C symbol name
 	// Runtime functions have symbol set (e.g., "bbPrint")

@@ -238,18 +238,18 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			// Self is treated as a variable named "self"; both Self\x and Self.x work
 			{
 				toker->next();
-				ExprNode *expr_or_var=parseVarOrMethodCall( "self","",true );
-				if( dynamic_cast<MethodCallNode*>(expr_or_var) ){
+				a_ptr<ExprNode> expr_or_var( parseVarOrMethodCall( "self","",true ) );
+				if( dynamic_cast<MethodCallNode*>( (ExprNode*)expr_or_var ) ){
 					// Method call as statement: Self\Method() / Self.Method()
-					result=d_new ExprStmtNode( expr_or_var );
+					result=d_new ExprStmtNode( expr_or_var.release() );
 				}else{
-					VarExprNode *var_expr=dynamic_cast<VarExprNode*>(expr_or_var);
+					VarExprNode *var_expr=dynamic_cast<VarExprNode*>( (ExprNode*)expr_or_var );
 					if( !var_expr ) ex( "Unexpected expression" );
 					if( toker->curr()!='=' ) exp( "variable assignment" );
 					toker->next();ExprNode *expr=parseExpr( false );
 					VarNode *var=var_expr->var;
 					var_expr->var=0; // prevent double delete
-					delete var_expr;
+					delete expr_or_var.release();
 					result=d_new AssNode( var,expr );
 				}
 			}
@@ -286,7 +286,7 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				if( arrayDecls.find(ident)==arrayDecls.end()
 					&& toker->curr()!='=' && toker->curr()!='\\' && toker->curr()!='[' ){
 					//must be a function
-					ExprSeqNode *exprs;
+					a_ptr<ExprSeqNode> exprs;
 					if( toker->curr()=='(' ){
 						//ugly lookahead for optional '()' around statement params
 						int nest=1,k;
@@ -303,18 +303,18 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 							toker->next();
 						}else exprs=parseExprSeq();
 					}else exprs=parseExprSeq();
-					CallNode *call=d_new CallNode( ident,tag,exprs );
+					CallNode *call=d_new CallNode( ident,tag,exprs.release() );
 					result=d_new ExprStmtNode( call );
 				}else{
 					//must be a var or method call
-					ExprNode *expr_or_var = parseVarOrMethodCall( ident,tag );
+					a_ptr<ExprNode> expr_or_var( parseVarOrMethodCall( ident,tag ) );
 					// Check if it's a method call (statement) or var (needs assignment)
-					if( dynamic_cast<MethodCallNode*>(expr_or_var) ){
+					if( dynamic_cast<MethodCallNode*>( (ExprNode*)expr_or_var ) ){
 						// Method call as statement
-						result=d_new ExprStmtNode( expr_or_var );
+						result=d_new ExprStmtNode( expr_or_var.release() );
 					}else{
 						// Must be a var assignment
-						VarExprNode *var_expr = dynamic_cast<VarExprNode*>(expr_or_var);
+						VarExprNode *var_expr = dynamic_cast<VarExprNode*>( (ExprNode*)expr_or_var );
 						if( !var_expr ) ex( "Unexpected expression" );
 						if( toker->curr()!='=' ) exp( "variable assignment" );
 						toker->next();ExprNode *rhs=parseExpr( false );
@@ -340,7 +340,7 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 							}
 						}
 						var_expr->var = 0; // prevent double delete
-						delete var_expr;
+						delete expr_or_var.release();
 						result=d_new AssNode( var,rhs );
 					}
 				}

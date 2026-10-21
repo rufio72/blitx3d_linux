@@ -9,10 +9,21 @@ void DeleteNode::semant( Environ *e ){
 	StructType *st = expr->sem_type->structType();
 	if( st==0 ) ex( "Can't delete non-Newtype" );
 
-	// Look for destructor: classname_destructor
-	std::string dtor_name = st->ident + "_destructor";
-	dtor_decl = e->findFunc( dtor_name );
-	// Destructor is optional, so don't error if not found
+	// Cerca <classe>_destructor risalendo la catena superType: il destructor
+	// si eredita come i metodi (primo trovato dal tipo statico in su, nessun
+	// dispatch dinamico). Gira solo su Delete esplicito, non su Delete Each
+	// né sul rilascio per refcount. È facoltativo: nessun errore se manca.
+	dtor_decl = 0;
+	dtor_ident.clear();
+	for( StructType *c = st; c; c = c->superType ){
+		std::string name = c->ident + "_destructor";
+		Decl *d = e->findFunc( name );
+		if( d && (d->kind & DECL_FUNC) ){
+			dtor_decl = d;
+			dtor_ident = name;
+			break;
+		}
+	}
 }
 
 void DeleteNode::translate( Codegen *g ){
@@ -57,11 +68,14 @@ void DeleteNode::translate2( Codegen_LLVM *g ){
 void DeleteNode::translate3( Codegen_C *g ){
 	std::string obj = expr->translate3( g );
 
-	// Call destructor if it exists
+	// Con destructor l'operando si valuta una volta sola in un temporaneo,
+	// usato sia per il destructor sia per _bbObjDelete (es. Delete Pop())
 	if( dtor_decl ){
-		StructType *st = expr->sem_type->structType();
-		std::string dtorName = g->toCSafeName( "f" + st->ident + "_destructor" );
-		g->emitLine( dtorName + "(" + obj + ");" );
+		std::string tmp = g->newTemp();
+		g->emitLine( "bb_obj_t " + tmp + " = " + obj + ";" );
+		g->emitLine( g->toCSafeName( "f" + dtor_ident ) + "(" + tmp + ");" );
+		g->emitLine( "_bbObjDelete(" + tmp + ");" );
+		return;
 	}
 
 	g->emitLine( "_bbObjDelete((bb_obj_t)" + obj + ");" );

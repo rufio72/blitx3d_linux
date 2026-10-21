@@ -7,6 +7,7 @@
 struct DeleteNode : public StmtNode{
 	ExprNode *expr;
 	Decl *dtor_decl;  // Destructor declaration (may be null)
+	std::string dtor_ident;  // nome risolto del destructor, es. "A_destructor"
 	DeleteNode( ExprNode *e ):expr(e),dtor_decl(0){}
 	~DeleteNode(){ delete expr; }
 	void semant( Environ *e );

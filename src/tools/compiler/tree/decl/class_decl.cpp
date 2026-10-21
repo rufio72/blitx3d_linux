@@ -182,8 +182,12 @@ void ClassDeclNode::translate2( Codegen_LLVM *g ){
 	structfields.push_back( llvm::ConstantArray::get( template_typesary,template_types ) );
 	auto init=llvm::ConstantStruct::get( ty2,structfields );
 	temp->setInitializer( init );
+}
 
-	// Translate methods
+// Corpi dei metodi: eseguito da ProgNode::translate2 dopo
+// structs->translate2, così i campi di classi e Type dichiarati più avanti
+// hanno già il body llvm (niente GEP su struct opache).
+void ClassDeclNode::translate2Methods( Codegen_LLVM *g ){
 	methods->translate2( g );
 }
 #endif

@@ -20,6 +20,7 @@ struct DeclSeqNode : public Node{
 
 #ifdef USE_LLVM
 	void translate2( Codegen_LLVM *g );
+	void translate2Methods( Codegen_LLVM *g );
 	void transdata2( Codegen_LLVM *g );
 #endif
 #ifdef USE_GCC_BACKEND

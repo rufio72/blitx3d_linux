@@ -15,6 +15,7 @@ struct DeclNode : public Node{
 	virtual void transdata( Codegen *g ){}
 #ifdef USE_LLVM
 	virtual void translate2( Codegen_LLVM *g );
+	virtual void translate2Methods( Codegen_LLVM *g ){}
 	virtual void transdata2( Codegen_LLVM *g );
 #endif
 #ifdef USE_GCC_BACKEND

@@ -81,6 +81,17 @@ void DeclSeqNode::translate2( Codegen_LLVM *g ){
 	}
 }
 
+void DeclSeqNode::translate2Methods( Codegen_LLVM *g ){
+	for( int k=0;k<decls.size();++k ){
+		try{ decls[k]->translate2Methods( g ); }
+		catch( Ex &x ){
+			if( x.pos<0 ) x.pos=decls[k]->pos;
+			if(!x.file.size() ) x.file=decls[k]->file;
+			throw;
+		}
+	}
+}
+
 void DeclSeqNode::transdata2( Codegen_LLVM *g ){
 	for( int k=0;k<decls.size();++k ){
 		try{ decls[k]->transdata2( g ); }

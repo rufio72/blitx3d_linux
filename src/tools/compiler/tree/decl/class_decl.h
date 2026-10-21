@@ -20,6 +20,7 @@ struct ClassDeclNode : public DeclNode{
 	void translate( Codegen *g );
 #ifdef USE_LLVM
 	void translate2( Codegen_LLVM *g );
+	void translate2Methods( Codegen_LLVM *g );
 #endif
 #ifdef USE_GCC_BACKEND
 	void translate3( Codegen_C *g );

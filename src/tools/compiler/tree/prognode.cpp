@@ -247,6 +247,7 @@ void ProgNode::translate2( Codegen_LLVM *g,const std::vector<UserFunc> &userfunc
 	g->bbData->setInitializer( llvm::ConstantArray::get( ty,g->data_values ) );
 
 	structs->translate2( g );
+	structs->translate2Methods( g );
 
 	funcs->translate2( g );
 

@@ -1,5 +1,6 @@
 #include "prognode.h"
 #include "../libs.h"
+#include "decl/class_decl.h"
 
 //////////////////
 // The program! //
@@ -29,6 +30,13 @@ Environ *ProgNode::semant( Environ *e ){
 void ProgNode::translate( Codegen *g,const std::vector<UserFunc> &usrfuncs ){
 
 	int k;
+
+	// Il codegen x86 non sa passare self e argomenti alle chiamate OOP
+	// (IR_ARG con figli scartato da munchReg): rifiuta le classi subito.
+	for( k=0;k<structs->size();++k ){
+		ClassDeclNode *c=dynamic_cast<ClassDeclNode*>( structs->decls[k] );
+		if( c ) ex( "OOP is not supported by the x86 code generator; use a 64-bit target",c->pos,c->file );
+	}
 
 	if( g->debug ) g->s_data( stmts->file,file_lab );
 

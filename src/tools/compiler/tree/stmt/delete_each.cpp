@@ -21,6 +21,8 @@ void DeleteEachNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
+#ifdef USE_GCC_BACKEND
 void DeleteEachNode::translate3( Codegen_C *g ){
 	g->emitLine( "_bbObjDeleteEach((BBObjType*)&_t" + g->toCSafeName( typeIdent ) + ");" );
 }
+#endif

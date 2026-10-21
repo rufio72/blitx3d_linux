@@ -7,7 +7,7 @@ struct FloatConstNode : public ConstNode{
 	float value;
 	FloatConstNode( float f );
 	TNode *translate( Codegen *g );
-	int intValue();
+	bb_int_t intValue();
 	float floatValue();
 	std::string stringValue();
 	json toJSON( Environ *e );

@@ -2,6 +2,7 @@
 #define CODEGEN_C_H
 
 #include <string>
+#include <cstdint>
 #include <map>
 #include <vector>
 #include <sstream>
@@ -79,7 +80,7 @@ public:
     std::string toCSafeName(const std::string &name);
 
     // Constants
-    std::string constantInt(int i);
+    std::string constantInt(int64_t i);
     std::string constantFloat(double f);
     std::string constantString(const std::string &s);
 

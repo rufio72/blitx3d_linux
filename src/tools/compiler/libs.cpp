@@ -125,7 +125,7 @@ static const char *linkRuntime(std::string rt){
 					if( s[k]=='-' ) ++k;
 					for( ;isdigit( s[k] );++k ){}
 					if( t==Type::int_type ){
-						int n=atoi( s.substr( from,k-from ) );
+						bb_int_t n=atoi( s.substr( from,k-from ) );
 						defType=d_new ConstType( n );
 					}else{
 						float n=atof( s.substr( from,k-from ) );
@@ -373,7 +373,7 @@ void parseSymbols( const Target &t ){
 						if( s[k]=='-' ) ++k;
 						for( ;isdigit( s[k] );++k ){}
 						if( t==Type::int_type ){
-							int n=atoi( s.substr( from,k-from ) );
+							bb_int_t n=atoi( s.substr( from,k-from ) );
 							defType=d_new ConstType( n );
 						}else{
 							float n=atof( s.substr( from,k-from ) );

@@ -3,6 +3,8 @@
 
 #include "../std.h"
 #include <cstdlib>
+#include <cerrno>
+#include <cstdint>
 #include "parser.h"
 
 #include "expr/after.h"
@@ -299,6 +301,30 @@ ExprNode *Parser::parseUniExpr( bool opt ){
 	return result;
 }
 
+#ifdef BB64
+// Parses an integer literal token (decimal, %binary or $hex) into a 64-bit value.
+// Binary/hex literals are the plain 64-bit bit pattern (up to 64/16 digits);
+// decimal literals must not exceed INT64_MAX. Returns false on overflow.
+static bool parseIntLiteral( const std::string &t,bb_int_t &out ){
+	uint64_t n=0;
+	if( t[0]=='%' || t[0]=='$' ){
+		int bits=t[0]=='%' ? 1 : 4;
+		for( size_t k=1;k<t.size();++k ){
+			if( n>>(64-bits) ) return false;
+			int d=bits==1 ? (t[k]=='1') : ( isdigit(t[k]) ? t[k]&0xf : (t[k]&7)+9 );
+			n=(n<<bits)|(uint64_t)d;
+		}
+	}else{
+		errno=0;
+		unsigned long long v=strtoull( t.c_str(),0,10 );
+		if( errno==ERANGE || v>(unsigned long long)INT64_MAX ) return false;
+		n=v;
+	}
+	out=(bb_int_t)n;
+	return true;
+}
+#endif
+
 ExprNode *Parser::parsePrimary( bool opt ){
 
 	a_ptr<ExprNode> expr;
@@ -339,17 +365,17 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		result=d_new NullNode();
 		toker->next();
 		break;
+#ifdef BB64
+	case INTCONST:case BINCONST:case HEXCONST:{
+		bb_int_t v;
+		if( !parseIntLiteral( toker->text(),v ) ) ex( "Integer constant too large" );
+		result=d_new IntConstNode( v );
+		toker->next();
+		break;
+	}
+#else
 	case INTCONST:
 		result=d_new IntConstNode( atoi( toker->text() ) );
-		toker->next();
-		break;
-	case FLOATCONST:
-		result=d_new FloatConstNode( atof( toker->text() ) );
-		toker->next();
-		break;
-	case STRINGCONST:
-		t=toker->text();
-		result=d_new StringConstNode( t.substr( 1,t.size()-2 ) );
 		toker->next();
 		break;
 	case BINCONST:
@@ -362,6 +388,16 @@ ExprNode *Parser::parsePrimary( bool opt ){
 		n=0;t=toker->text();
 		for( k=1;k<t.size();++k ) n=(n<<4)|( isdigit(t[k]) ? t[k]&0xf : (t[k]&7)+9 );
 		result=d_new IntConstNode( n );
+		toker->next();
+		break;
+#endif
+	case FLOATCONST:
+		result=d_new FloatConstNode( atof( toker->text() ) );
+		toker->next();
+		break;
+	case STRINGCONST:
+		t=toker->text();
+		result=d_new StringConstNode( t.substr( 1,t.size()-2 ) );
 		toker->next();
 		break;
 	case PI:

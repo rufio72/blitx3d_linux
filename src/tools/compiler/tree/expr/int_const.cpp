@@ -3,12 +3,12 @@
 //////////////////////
 // Integer constant //
 //////////////////////
-IntConstNode::IntConstNode( int n ):value(n){
+IntConstNode::IntConstNode( bb_int_t n ):value(n){
 	sem_type=Type::int_type;
 }
 
 TNode *IntConstNode::translate( Codegen *g ){
-	return d_new TNode( IR_CONST,0,0,value );
+	return d_new TNode( IR_CONST,0,0,(int)value );
 }
 
 #ifdef USE_LLVM
@@ -17,7 +17,7 @@ llvm::Value *IntConstNode::translate2( Codegen_LLVM *g ){
 }
 #endif
 
-int IntConstNode::intValue(){
+bb_int_t IntConstNode::intValue(){
 	return value;
 }
 
@@ -26,7 +26,7 @@ float IntConstNode::floatValue(){
 }
 
 std::string IntConstNode::stringValue(){
-	return itoa( value );
+	return std::to_string( value );
 }
 
 json IntConstNode::toJSON( Environ *e ){

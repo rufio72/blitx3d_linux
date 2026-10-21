@@ -36,12 +36,15 @@ ExprNode *ArithExprNode::semant( Environ *e ){
 		if( sem_type==Type::string_type ){
 			expr=d_new StringConstNode( lc->stringValue()+rc->stringValue() );
 		}else if( sem_type==Type::int_type ){
+			// Fold with two's complement wrap-around (no signed overflow UB);
+			// x / -1 and x Mod -1 are special-cased to avoid trapping on MIN / -1.
+			bb_int_t a=lc->intValue(),b=rc->intValue();
 			switch( op ){
-			case '+':expr=d_new IntConstNode( lc->intValue()+rc->intValue() );break;
-			case '-':expr=d_new IntConstNode( lc->intValue()-rc->intValue() );break;
-			case '*':expr=d_new IntConstNode( lc->intValue()*rc->intValue() );break;
-			case '/':expr=d_new IntConstNode( lc->intValue()/rc->intValue() );break;
-			case MOD:expr=d_new IntConstNode( lc->intValue()%rc->intValue() );break;
+			case '+':expr=d_new IntConstNode( (bb_int_t)((bb_uint_t)a+(bb_uint_t)b) );break;
+			case '-':expr=d_new IntConstNode( (bb_int_t)((bb_uint_t)a-(bb_uint_t)b) );break;
+			case '*':expr=d_new IntConstNode( (bb_int_t)((bb_uint_t)a*(bb_uint_t)b) );break;
+			case '/':expr=d_new IntConstNode( b==-1 ? (bb_int_t)(0-(bb_uint_t)a) : a/b );break;
+			case MOD:expr=d_new IntConstNode( b==-1 ? 0 : a%b );break;
 			}
 		}else{
 			switch( op ){

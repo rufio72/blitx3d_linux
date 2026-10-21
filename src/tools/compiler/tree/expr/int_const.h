@@ -4,10 +4,10 @@
 #include "const.h"
 
 struct IntConstNode : public ConstNode{
-	int value;
-	IntConstNode( int n );
+	bb_int_t value;
+	IntConstNode( bb_int_t n );
 	TNode *translate( Codegen *g );
-	int intValue();
+	bb_int_t intValue();
 	float floatValue();
 	std::string stringValue();
 	json toJSON( Environ *e );

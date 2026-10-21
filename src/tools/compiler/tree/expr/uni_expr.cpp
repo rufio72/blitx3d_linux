@@ -15,8 +15,9 @@ ExprNode *UniExprNode::semant( Environ *e ){
 		if( sem_type==Type::int_type ){
 			switch( op ){
 			case '+':e=d_new IntConstNode( +c->intValue() );break;
-			case '-':e=d_new IntConstNode( -c->intValue() );break;
-			case ABS:e=d_new IntConstNode( c->intValue()>=0 ? c->intValue() : -c->intValue() );break;
+			// Negation wraps (no UB on the minimum value).
+			case '-':e=d_new IntConstNode( (bb_int_t)(0-(bb_uint_t)c->intValue()) );break;
+			case ABS:e=d_new IntConstNode( c->intValue()>=0 ? c->intValue() : (bb_int_t)(0-(bb_uint_t)c->intValue()) );break;
 			case SGN:e=d_new IntConstNode( c->intValue()>0 ? 1 : (c->intValue()<0 ? -1 : 0) );break;
 			}
 		}else{

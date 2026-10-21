@@ -2,6 +2,7 @@
 #ifndef TYPE_H
 #define TYPE_H
 
+#include "../../../config.h"
 #include "decl.h"
 
 #ifdef USE_LLVM
@@ -135,10 +136,10 @@ struct StructType : public Type{
 
 struct ConstType : public Type{
 	Type *valueType;
-	int intValue;
+	bb_int_t intValue;
 	float floatValue;
 	std::string stringValue;
-	ConstType( int n ):intValue(n),valueType(Type::int_type){}
+	ConstType( bb_int_t n ):intValue(n),valueType(Type::int_type){}
 	ConstType( float n ):floatValue(n),valueType(Type::float_type){}
 	ConstType( const std::string &n ):stringValue(n),valueType(Type::string_type){}
 	ConstType *constType(){ return this; }

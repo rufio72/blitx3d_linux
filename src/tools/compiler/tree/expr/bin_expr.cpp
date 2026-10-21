@@ -10,13 +10,16 @@ ExprNode *BinExprNode::semant( Environ *e ){
 	ConstNode *lc=lhs->constNode(),*rc=rhs->constNode();
 	if( lc && rc ){
 		ExprNode *expr;
+		// Shift counts are masked to the integer width, as x86 hardware does.
+		bb_int_t a=lc->intValue();
+		int s=(int)(rc->intValue() & (bb_int_t)(sizeof(bb_int_t)*8-1));
 		switch( op ){
-		case AND:expr=d_new IntConstNode( lc->intValue() & rc->intValue() );break;
-		case OR: expr=d_new IntConstNode( lc->intValue() | rc->intValue() );break;
-		case XOR:expr=d_new IntConstNode( lc->intValue() ^ rc->intValue() );break;
-		case SHL:expr=d_new IntConstNode( lc->intValue()<< rc->intValue() );break;
-		case SHR:expr=d_new IntConstNode( (unsigned)lc->intValue()>>rc->intValue() );break;
-		case SAR:expr=d_new IntConstNode( lc->intValue()>> rc->intValue() );break;
+		case AND:expr=d_new IntConstNode( a & rc->intValue() );break;
+		case OR: expr=d_new IntConstNode( a | rc->intValue() );break;
+		case XOR:expr=d_new IntConstNode( a ^ rc->intValue() );break;
+		case SHL:expr=d_new IntConstNode( (bb_int_t)((bb_uint_t)a<<s) );break;
+		case SHR:expr=d_new IntConstNode( (bb_int_t)((bb_uint_t)a>>s) );break;
+		case SAR:expr=d_new IntConstNode( a>>s );break;
 		}
 		delete this;
 		return expr;

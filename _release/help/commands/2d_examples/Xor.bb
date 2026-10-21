@@ -1,4 +1,4 @@
-num=%11110000111100001111000011110000 ; Define a bit pattern which is easy  to recognize
+num=%11110000111100001111000011110000 ; Define a bit pattern which is easy  to recognize (binary and hex literals are plain 64-bit values: this is 4042322160, not a negative number)
 
 bitmask=Rnd(-2147483648,2147483647) ; Define a RANDOM Xor 32bit wide bitmask
 

@@ -347,7 +347,7 @@ void ProgNode::translate3( Codegen_C *g, const std::vector<UserFunc> &userfuncs 
 		if( d->type == Type::int_type ){
 			ctype = "bb_int_t";
 			if( d->defType && d->defType->valueType == Type::int_type ){
-				initVal = std::to_string( d->defType->intValue ) + "LL";
+				initVal = g->constantInt( d->defType->intValue );
 			}
 		}
 		else if( d->type == Type::float_type ){

@@ -11,7 +11,7 @@ TNode *FloatConstNode::translate( Codegen *g ){
 	return d_new TNode( IR_CONST,0,0,*(int*)&value );
 }
 
-int FloatConstNode::intValue(){
+bb_int_t FloatConstNode::intValue(){
 // TODO: figure out a proper, cross platform implementation
 #ifdef BB_WIN32
 	float flt=value;

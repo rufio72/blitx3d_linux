@@ -74,7 +74,7 @@ void DataDeclNode::transdata3( Codegen_C *g ){
 	if( expr->sem_type==Type::int_type ){
 		// Type 1 = int
 		g->dataValues.push_back( "1" );
-		g->dataValues.push_back( std::to_string( c->intValue() ) );
+		g->dataValues.push_back( g->constantInt( c->intValue() ) );
 	}else if( expr->sem_type==Type::float_type ){
 		// Type 2 = float (stored as int bits)
 		float n=c->floatValue();

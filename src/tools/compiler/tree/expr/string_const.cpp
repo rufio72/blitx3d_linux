@@ -31,8 +31,13 @@ std::string StringConstNode::translate3( Codegen_C *g ){
 }
 #endif
 
-int StringConstNode::intValue(){
+bb_int_t StringConstNode::intValue(){
+#ifdef BB64
+	// Same conversion as the 64-bit runtime (_bbStrToInt uses strtoll).
+	return (bb_int_t)strtoll( value.c_str(),0,10 );
+#else
 	return atoi( value );
+#endif
 }
 
 float StringConstNode::floatValue(){

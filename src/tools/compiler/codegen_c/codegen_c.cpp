@@ -603,7 +603,9 @@ std::string Codegen_C::toCSafeName(const std::string &name) {
     return "bb_" + result;
 }
 
-std::string Codegen_C::constantInt(int i) {
+std::string Codegen_C::constantInt(int64_t i) {
+    // INT64_MIN cannot be written as a single C literal
+    if (i == INT64_MIN) return "(-9223372036854775807LL-1)";
     return std::to_string(i) + "LL";
 }
 

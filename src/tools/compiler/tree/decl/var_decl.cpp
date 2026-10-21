@@ -66,11 +66,11 @@ json VarDeclNode::toJSON( Environ *e ){
 #include "../../codegen_c/codegen_c.h"
 
 void VarDeclNode::translate3( Codegen_C *g ){
-	// Generate assignment for variables with initial values (both Global and Local)
+	// Inizializzatore (Global e Local): usa store3, così stringhe e oggetti
+	// passano da _bbStrStore/_bbObjStore e rilasciano il valore precedente
 	if( expr ){
-		std::string varName = sem_var->translate3( g );
 		std::string value = expr->translate3( g );
-		g->emitLine( varName + " = " + value + ";" );
+		sem_var->store3( g,value );
 	}
 }
 #endif

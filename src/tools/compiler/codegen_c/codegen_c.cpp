@@ -127,6 +127,7 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_float_t bbSqr(bb_float_t n);\n";
     header << "extern bb_float_t bbAbs(bb_float_t n);\n";
     header << "extern bb_int_t _bbAbs(bb_int_t n);\n";
+    header << "extern bb_int_t _bbSgn(bb_int_t n);\n";
     header << "extern bb_float_t bbTan(bb_float_t n);\n";
     header << "extern bb_float_t bbASin(bb_float_t n);\n";
     header << "extern bb_float_t bbACos(bb_float_t n);\n";

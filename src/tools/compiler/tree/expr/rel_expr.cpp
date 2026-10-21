@@ -115,6 +115,12 @@ std::string RelExprNode::translate3( Codegen_C *g ){
 		return "(bb_int_t)(_bbStrCompare(" + l + ", " + r + ") " + cmpOp + " 0)";
 	}
 
+	if( opType->structType() ){
+		// Oggetti: come x86/LLVM confronta o->fields, così un oggetto
+		// cancellato con Delete risulta uguale a Null.
+		return "(bb_int_t)(_bbObjCompare((bb_obj_t)(" + l + "), (bb_obj_t)(" + r + ")) " + cmpOp + " 0)";
+	}
+
 	return "(bb_int_t)((" + l + ") " + cmpOp + " (" + r + "))";
 }
 #endif

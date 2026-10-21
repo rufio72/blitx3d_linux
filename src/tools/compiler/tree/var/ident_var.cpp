@@ -5,6 +5,8 @@
 ///////////////
 void IdentVarNode::semant( Environ *e ){
 	if( sem_decl ) return;
+	// Inside a class 'self' is always the Self/This keyword: a Static Method has no instance
+	if( e->staticMethod && ident=="self" ) ex( "Self cannot be used inside a Static Method" );
 	Type *t=tagType( tag,e );if( !t ) t=Type::int_type;
 	if( (sem_decl=e->findDecl( ident )) ){
 		if( !(sem_decl->kind&(DECL_GLOBAL|DECL_LOCAL|DECL_PARAM)) ){

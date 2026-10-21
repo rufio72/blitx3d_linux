@@ -34,6 +34,9 @@ void FuncDeclNode::semant( Environ *e ){
 		if( !decls->insertDecl( d->name,d->type,d->kind ) ) ex( "duplicate identifier" );
 	}
 
+	// A method without the 'self' parameter is a Static Method
+	sem_env->staticMethod=!ownerClassName.empty() && !sem_env->getCurrentClass();
+
 	stmts->semant( sem_env );
 }
 

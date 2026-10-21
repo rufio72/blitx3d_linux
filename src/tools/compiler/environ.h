@@ -30,6 +30,7 @@ public:
 	Type *returnType;
 	std::string funcLabel,breakLabel;
 	std::list<Environ*> children;		//for delete!
+	bool staticMethod;			// true while analysing the body of a Static Method
 
 	Environ( const std::string &f,Type *r,int l,Environ *gs );
 	~Environ();

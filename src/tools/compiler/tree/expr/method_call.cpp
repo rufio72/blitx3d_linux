@@ -162,6 +162,11 @@ json MethodCallNode::toJSON( Environ *e ){
 // Super method call      //
 ////////////////////////////
 ExprNode *SuperMethodCallNode::semant( Environ *e ){
+	// Super needs the 'self' parameter of the enclosing method: a Static Method
+	// has none (and a Global named 'self' must not be used in its place)
+	if( !e->getCurrentClass() ) ex( "Super cannot be used inside a Static Method" );
+	self_decl = e->decls->findDecl( "self" );
+
 	// Find the current class type
 	Type *t = e->findType( currentClass );
 	if( !t ) ex( "Class '" + currentClass + "' not found" );
@@ -183,10 +188,6 @@ ExprNode *SuperMethodCallNode::semant( Environ *e ){
 	if( !sem_decl ) {
 		ex( "Method '" + method + "' not found in parent class '" + parent->ident + "'" );
 	}
-
-	// Find 'self' in the current environment
-	self_decl = e->findDecl( "self" );
-	if( !self_decl ) ex( "Super can only be used inside a method" );
 
 	FuncType *f = sem_decl->type->funcType();
 	if( ret_type && f->returnType != ret_type ) ex( "incorrect method return type" );

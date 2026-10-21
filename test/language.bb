@@ -1,3 +1,4 @@
+Include "language/access.bb"
 Include "language/arith.bb"
 Include "language/array.bb"
 Include "language/assignment.bb"

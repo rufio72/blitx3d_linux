@@ -37,7 +37,11 @@ void ClassDeclNode::semant( Environ *e ){
 			Decl *parentDecl=parentFields->decls[k];
 			// Insert inherited field (with same type and kind)
 			Decl *d=sem_type->fields->insertDecl( parentDecl->name,parentDecl->type,parentDecl->kind,parentDecl->defType );
-			if( d ) d->offset=k*4;
+			if( d ){
+				d->offset=k*4;
+				// keep the declaring class as owner, also across several levels
+				d->ownerClass=parentDecl->ownerClass;
+			}
 			inherited_offset=(k+1)*4;
 		}
 	}
@@ -48,6 +52,7 @@ void ClassDeclNode::semant( Environ *e ){
 	int own_start=inherited_offset/4;
 	for( int k=own_start;k<sem_type->fields->size();++k ){
 		sem_type->fields->decls[k]->offset=k*4;
+		sem_type->fields->decls[k]->ownerClass=sem_type;
 	}
 }
 

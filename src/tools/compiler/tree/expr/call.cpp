@@ -83,6 +83,16 @@ ExprNode *CallNode::semant( Environ *e ){
 	Type *t=e->findType( tag );
 	sem_decl=e->findFunc( ident );
 	if( !sem_decl || !(sem_decl->kind & DECL_FUNC) ) ex( "Function '"+ident+"' not found" );
+	// Mangled method calls (ClassName_MethodName) obey the same access control
+	if( sem_decl->ownerClass ){
+		StructType *cc=e->getCurrentClass();
+		if( (sem_decl->kind & DECL_PRIVATE) && (!cc || cc!=sem_decl->ownerClass) ){
+			ex( "Cannot access private method '"+ident+"'" );
+		}
+		if( (sem_decl->kind & DECL_PROTECTED) && (!cc || !cc->isSubclassOf( sem_decl->ownerClass )) ){
+			ex( "Cannot access protected method '"+ident+"'" );
+		}
+	}
 	FuncType *f=sem_decl->type->funcType();
 	if( t && f->returnType!=t ) ex( "incorrect function return type" );
 	exprs->semant( e );

@@ -3,7 +3,7 @@
 #include "environ.h"
 
 Environ::Environ( const std::string &f,Type *r,int l,Environ *gs )
-:funcLabel(f),returnType(r),level(l),globals(gs),staticMethod(false){
+:funcLabel(f),returnType(r),level(l),globals(gs),currentClass(0),staticMethod(false){
 	decls=d_new DeclSeq();
 	typeDecls=d_new DeclSeq();
 	funcDecls=d_new DeclSeq();
@@ -67,11 +67,10 @@ std::string Environ::setBreak( const std::string &s ){
 }
 
 StructType *Environ::getCurrentClass(){
-	// Look for 'self' parameter which indicates we're in a method
-	Decl *self = decls->findDecl( "self" );
-	if( self && (self->kind & DECL_PARAM) ){
-		// 'self' is a parameter, get its struct type
-		return self->type->structType();
+	// The class context is set by FuncDeclNode::semant on the environ of a
+	// method body (instance or Static); any other environ has none
+	for( Environ *e=this;e;e=e->globals ){
+		if( e->currentClass ) return e->currentClass;
 	}
 	return 0;
 }

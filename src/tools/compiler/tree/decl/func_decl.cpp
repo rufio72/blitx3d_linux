@@ -26,6 +26,11 @@ void FuncDeclNode::proto( DeclSeq *d,Environ *e ){
 void FuncDeclNode::semant( Environ *e ){
 
 	sem_env=d_new Environ( genLabel(),sem_type->returnType,1,e );
+	// Methods (instance, Static, constructor) get their class as access context
+	if( !ownerClassName.empty() ){
+		Type *ownerType=e->findType( ownerClassName );
+		if( ownerType && ownerType->structType() ) sem_env->currentClass=ownerType->structType();
+	}
 	DeclSeq *decls=sem_env->decls;
 
 	int k;
@@ -35,7 +40,8 @@ void FuncDeclNode::semant( Environ *e ){
 	}
 
 	// A method without the 'self' parameter is a Static Method
-	sem_env->staticMethod=!ownerClassName.empty() && !sem_env->getCurrentClass();
+	Decl *selfParam=decls->findDecl( "self" );
+	sem_env->staticMethod=!ownerClassName.empty() && !(selfParam && (selfParam->kind & DECL_PARAM));
 
 	stmts->semant( sem_env );
 }

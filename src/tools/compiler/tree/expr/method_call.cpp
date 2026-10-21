@@ -164,7 +164,7 @@ json MethodCallNode::toJSON( Environ *e ){
 ExprNode *SuperMethodCallNode::semant( Environ *e ){
 	// Super needs the 'self' parameter of the enclosing method: a Static Method
 	// has none (and a Global named 'self' must not be used in its place)
-	if( !e->getCurrentClass() ) ex( "Super cannot be used inside a Static Method" );
+	if( e->staticMethod || !e->getCurrentClass() ) ex( "Super cannot be used inside a Static Method" );
 	self_decl = e->decls->findDecl( "self" );
 
 	// Find the current class type
@@ -187,6 +187,20 @@ ExprNode *SuperMethodCallNode::semant( Environ *e ){
 	}
 	if( !sem_decl ) {
 		ex( "Method '" + method + "' not found in parent class '" + parent->ident + "'" );
+	}
+
+	// Same access control as MethodCallNode, on the resolved parent method
+	if( sem_decl->kind & DECL_PRIVATE ){
+		StructType *cc = e->getCurrentClass();
+		if( !cc || cc != sem_decl->ownerClass ){
+			ex( "Cannot access private method '" + method + "'" );
+		}
+	}
+	if( sem_decl->kind & DECL_PROTECTED ){
+		StructType *cc = e->getCurrentClass();
+		if( !cc || !cc->isSubclassOf( sem_decl->ownerClass ) ){
+			ex( "Cannot access protected method '" + method + "'" );
+		}
 	}
 
 	FuncType *f = sem_decl->type->funcType();

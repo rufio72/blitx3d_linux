@@ -13,7 +13,7 @@ void FieldVarNode::semant( Environ *e ){
 	// Check access control for private fields
 	if( sem_field->kind & DECL_PRIVATE ){
 		StructType *currentClass = e->getCurrentClass();
-		if( !currentClass || currentClass != s ){
+		if( !currentClass || currentClass != sem_field->ownerClass ){
 			ex( "Cannot access private field '" + ident + "'" );
 		}
 	}
@@ -22,7 +22,7 @@ void FieldVarNode::semant( Environ *e ){
 	// Protected fields can be accessed from the same class or any subclass
 	if( sem_field->kind & DECL_PROTECTED ){
 		StructType *currentClass = e->getCurrentClass();
-		if( !currentClass || !currentClass->isSubclassOf( s ) ){
+		if( !currentClass || !currentClass->isSubclassOf( sem_field->ownerClass ) ){
 			ex( "Cannot access protected field '" + ident + "'" );
 		}
 	}

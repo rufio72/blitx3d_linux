@@ -28,6 +28,7 @@ public:
 	std::vector<Label*> labels;
 	Environ *globals;
 	Type *returnType;
+	StructType *currentClass;		//class whose method body this environ belongs to (access control)
 	std::string funcLabel,breakLabel;
 	std::list<Environ*> children;		//for delete!
 	bool staticMethod;			// true while analysing the body of a Static Method
@@ -43,7 +44,7 @@ public:
 
 	std::string setBreak( const std::string &s );
 
-	// Returns the class type if we're inside a method of that class, null otherwise
+	// Returns the class whose method (instance or Static) we are inside, null otherwise
 	StructType *getCurrentClass();
 };
 

@@ -45,8 +45,11 @@ void ClassDeclNode::semant( Environ *e ){
 	for( int k=own_start;k<sem_type->fields->size();++k ){
 		sem_type->fields->decls[k]->offset=k*4;
 	}
+}
 
-	// Semantic analysis for methods
+// Semant dei corpi dei metodi: eseguito da ProgNode::semant dopo
+// stmts->semant, così i metodi vedono Function, Global e Dim del programma.
+void ClassDeclNode::semantMethods( Environ *e ){
 	methods->semant( e );
 }
 

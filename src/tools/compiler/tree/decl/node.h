@@ -9,6 +9,7 @@ struct DeclNode : public Node{
 	DeclNode():pos(-1){}
 	virtual void proto( DeclSeq *d,Environ *e ){}
 	virtual void semant( Environ *e ){}
+	virtual void semantMethods( Environ *e ){}
 	virtual void translate( Codegen *g ){}
 	virtual void transdata( Codegen *g ){}
 #ifdef USE_LLVM

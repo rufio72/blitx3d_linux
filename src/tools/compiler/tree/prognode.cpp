@@ -17,6 +17,7 @@ Environ *ProgNode::semant( Environ *e ){
 	structs->semant( env );
 	funcs->proto( env->funcDecls,env );
 	stmts->semant( env );
+	structs->semantMethods( env );
 	funcs->semant( env );
 	datas->proto( env->decls,env );
 	datas->semant( env );

@@ -15,6 +15,7 @@ struct ClassDeclNode : public DeclNode{
 	~ClassDeclNode(){ delete fields; delete methods; }
 	void proto( DeclSeq *d,Environ *e );
 	void semant( Environ *e );
+	void semantMethods( Environ *e );
 	void translate( Codegen *g );
 #ifdef USE_LLVM
 	void translate2( Codegen_LLVM *g );

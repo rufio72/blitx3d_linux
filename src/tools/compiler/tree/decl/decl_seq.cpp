@@ -25,6 +25,17 @@ void DeclSeqNode::semant( Environ *e ){
 	}
 }
 
+void DeclSeqNode::semantMethods( Environ *e ){
+	for( int k=0;k<decls.size();++k ){
+		try{ decls[k]->semantMethods( e ); }
+		catch( Ex &x ){
+			if( x.pos<0 ) x.pos=decls[k]->pos;
+			if(!x.file.size() ) x.file=decls[k]->file;
+			throw;
+		}
+	}
+}
+
 void DeclSeqNode::translate( Codegen *g ){
 	for( int k=0;k<decls.size();++k ){
 		try{ decls[k]->translate( g ); }

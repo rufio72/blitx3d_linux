@@ -1,6 +1,7 @@
 #include "codegen_c.h"
 #include <cmath>
 #include "../tree/type.h"
+#include "../std.h"
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -749,7 +750,7 @@ int Codegen_C::compileToObject(const std::string &outputPath) {
     compiler = "clang";
 #endif
 
-    std::string cmd = compiler + " -c -O2 -o " + outputPath + " " + cFile;
+    std::string cmd = compiler + " -c -O2 -o " + shellQuote(outputPath) + " " + shellQuote(cFile);
     int ret = system(cmd.c_str());
 
     if (ret == 0) {

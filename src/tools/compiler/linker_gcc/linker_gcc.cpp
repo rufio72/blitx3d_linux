@@ -1,4 +1,5 @@
 #include "linker_gcc.h"
+#include "../std.h"
 #include <iostream>
 #include <cstdlib>
 #include <sstream>
@@ -128,10 +129,10 @@ int Linker_GCC::compileToObject(const std::string &cFile, const std::string &obj
     }
 
     // Output
-    cmd << " -o \"" << objFile << "\"";
+    cmd << " -o " << shellQuote(objFile);
 
     // Input
-    cmd << " \"" << cFile << "\"";
+    cmd << " " << shellQuote(cFile);
 
     std::cout << "Compiling: " << cmd.str() << std::endl;
     return system(cmd.str().c_str());
@@ -143,22 +144,30 @@ int Linker_GCC::linkExecutable(const std::string &objFile, const std::string &ex
     std::stringstream cmd;
     cmd << getLinker(target);
 
+    // ld64 (Apple's native linker) has no --start/--end-group (it resolves
+    // archive cycles by itself) and treats -s as obsolete.
+#ifdef __APPLE__
+    bool ld64 = !(target.type == "android" || target.type == "ovr");
+#else
+    bool ld64 = false;
+#endif
+
     // Link flags
     if (debug) {
         cmd << " -g";
     } else {
-        cmd << " -s"; // strip symbols
+        if (!ld64) cmd << " -s"; // strip symbols
     }
 
     // Output
-    cmd << " -o \"" << exeFile << "\"";
+    cmd << " -o " << shellQuote(exeFile);
 
     // Input object
-    cmd << " \"" << objFile << "\"";
+    cmd << " " << shellQuote(objFile);
 
     // Library paths
     for (const auto &path : getLibPaths(target)) {
-        cmd << " -L\"" << path << "\"";
+        cmd << " -L" << shellQuote(path);
     }
 
     // Extra libraries from caller
@@ -181,26 +190,35 @@ std::string Linker_GCC::getGccCommand(bool debug, const std::string &rt, const T
     std::stringstream cmd;
     cmd << getCompiler(target);
 
+    // ld64 (Apple's native linker) has no --start/--end-group (it resolves
+    // archive cycles by itself) and treats -s as obsolete.
+#ifdef __APPLE__
+    bool ld64 = !(target.type == "android" || target.type == "ovr");
+#else
+    bool ld64 = false;
+#endif
+
     // Compilation and link flags
     if (debug) {
         cmd << " -g -O0";
     } else {
-        cmd << " -O2 -s";
+        cmd << " -O2";
+        if (!ld64) cmd << " -s";
     }
 
     // Output
-    cmd << " -o \"" << exeFile << "\"";
+    cmd << " -o " << shellQuote(exeFile);
 
     // Input C file
-    cmd << " \"" << cFile << "\"";
+    cmd << " " << shellQuote(cFile);
 
     // Library paths
     for (const auto &path : getLibPaths(target)) {
-        cmd << " -L\"" << path << "\"";
+        cmd << " -L" << shellQuote(path);
     }
 
     // Use --start-group to handle circular dependencies between libraries
-    cmd << " -Wl,--start-group";
+    if (!ld64) cmd << " -Wl,--start-group";
 
     // Runtime library
     cmd << " -lruntime." << rt << ".static";
@@ -219,7 +237,7 @@ std::string Linker_GCC::getGccCommand(bool debug, const std::string &rt, const T
         }
     }
 
-    cmd << " -Wl,--end-group";
+    if (!ld64) cmd << " -Wl,--end-group";
 
     // System libraries (after --end-group)
     if (rti != target.runtimes.end()) {

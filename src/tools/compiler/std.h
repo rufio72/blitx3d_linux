@@ -18,4 +18,7 @@
 #include <windows.h>
 #endif
 
+// Quote a path argument for a system() command line.
+std::string shellQuote( const std::string &s );
+
 #endif

@@ -144,6 +144,15 @@ keep compiling (`Local static = 5`, `Function class(x)`, `t\method`,
 - `End Class` and `End Method` remain reserved everywhere (a classic
   `End class` line was already invalid, since `End` takes no arguments).
 
+#### Static Method Dispatch
+
+Method calls are resolved on the *static* type of the expression — there is
+no vtable and no dynamic dispatch. With `Local a.A = <object of class B>`,
+`a\M()` calls `A_M` even if `B` overrides `M`. Overriding only takes effect
+when the expression's declared type is the subclass. The same applies to
+destructors on `Delete`. Keep this in mind if you come from languages with
+virtual methods.
+
 ## Runtime
 
 ### Graphics

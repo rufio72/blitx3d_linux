@@ -1,6 +1,7 @@
 Include "language/arith.bb"
 Include "language/array.bb"
 Include "language/assignment.bb"
+Include "language/class_forward.bb"
 Include "language/class_scope.bb"
 Include "language/comparisons.bb"
 Include "language/const.bb"

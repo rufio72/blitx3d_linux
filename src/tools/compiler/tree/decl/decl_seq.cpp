@@ -14,6 +14,17 @@ void DeclSeqNode::proto( DeclSeq *d,Environ *e ){
 	}
 }
 
+void DeclSeqNode::protoMethods( Environ *e ){
+	for( int k=0;k<decls.size();++k ){
+		try{ decls[k]->protoMethods( e ); }
+		catch( Ex &x ){
+			if( x.pos<0 ) x.pos=decls[k]->pos;
+			if(!x.file.size() ) x.file=decls[k]->file;
+			throw;
+		}
+	}
+}
+
 void DeclSeqNode::semant( Environ *e ){
 	for( int k=0;k<decls.size();++k ){
 		try{ decls[k]->semant( e ); }

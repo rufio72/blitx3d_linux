@@ -14,6 +14,7 @@ struct ClassDeclNode : public DeclNode{
 	ClassDeclNode( const std::string &i,const std::string &s,DeclSeqNode *f,DeclSeqNode *m ):ident(i),superName(s),fields(f),methods(m){}
 	~ClassDeclNode(){ delete fields; delete methods; }
 	void proto( DeclSeq *d,Environ *e );
+	void protoMethods( Environ *e );
 	void semant( Environ *e );
 	void semantMethods( Environ *e );
 	void translate( Codegen *g );

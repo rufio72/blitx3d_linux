@@ -8,6 +8,7 @@ struct DeclSeqNode : public Node{
 	DeclSeqNode(){}
 	~DeclSeqNode(){ for(;decls.size();decls.pop_back())delete decls.back(); }
 	void proto( DeclSeq *d,Environ *e );
+	void protoMethods( Environ *e );
 	void semant( Environ *e );
 	void semantMethods( Environ *e );
 	void translate( Codegen *g );

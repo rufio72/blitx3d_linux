@@ -8,6 +8,7 @@ struct DeclNode : public Node{
 	std::string file;
 	DeclNode():pos(-1){}
 	virtual void proto( DeclSeq *d,Environ *e ){}
+	virtual void protoMethods( Environ *e ){}
 	virtual void semant( Environ *e ){}
 	virtual void semantMethods( Environ *e ){}
 	virtual void translate( Codegen *g ){}

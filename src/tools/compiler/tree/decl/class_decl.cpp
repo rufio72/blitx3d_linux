@@ -19,8 +19,12 @@ void ClassDeclNode::proto( DeclSeq *d,Environ *e ){
 		if( !st ) ex( "'"+superName+"' is not a class type" );
 		sem_type->superType=st;
 	}
+}
 
-	// Register methods as global functions
+// Proto dei metodi (firme registrate come funzioni globali): eseguito da
+// ProgNode::semant dopo structs->proto, così ritorni e parametri possono
+// citare classi e Type dichiarati più avanti.
+void ClassDeclNode::protoMethods( Environ *e ){
 	methods->proto( e->funcDecls,e );
 }
 

@@ -108,8 +108,30 @@ llvm::Value *MethodCallNode::translate2( Codegen_LLVM *g ){
 
 	std::vector<llvm::Value*> args;
 
-	// First argument is the object (self)
-	args.push_back( obj->translate2( g ) );
+	// Primo argomento: l'oggetto (self). In debug un oggetto Null o già
+	// cancellato (fields nullo) dà "Object does not exist" prima della chiamata
+	llvm::Value *self_obj = obj->translate2( g );
+	if( g->debug ){
+		auto cur_func=g->builder->GetInsertBlock()->getParent();
+		auto void_ty=llvm::Type::getVoidTy( *g->context );
+
+		auto null_ex=llvm::BasicBlock::Create( *g->context,"nullobj_ex",cur_func );
+		auto null_chk=llvm::BasicBlock::Create( *g->context,"nullobj_fields",cur_func );
+		auto null_cont=llvm::BasicBlock::Create( *g->context,"nullobj_cont",cur_func );
+
+		g->builder->CreateCondBr( g->builder->CreateIsNull( self_obj ),null_ex,null_chk );
+
+		g->builder->SetInsertPoint( null_chk );
+		auto fields=g->builder->CreateLoad( g->voidPtr,g->CastToObjPtr( self_obj ) );
+		g->builder->CreateCondBr( g->builder->CreateIsNull( fields ),null_ex,null_cont );
+
+		g->builder->SetInsertPoint( null_ex );
+		g->CallIntrinsic( "_bbNullObjEx",void_ty,0 );
+		g->builder->CreateUnreachable();
+
+		g->builder->SetInsertPoint( null_cont );
+	}
+	args.push_back( self_obj );
 
 	// Then the rest of the arguments
 	for( int i = 0; i < exprs->size(); i++ ){
@@ -131,8 +153,10 @@ std::string MethodCallNode::translate3( Codegen_C *g ){
 
 	std::string result = funcName + "(";
 
-	// First argument is the object (self)
-	result += obj->translate3( g );
+	// Primo argomento: l'oggetto (self). In debug un oggetto Null o già
+	// cancellato dà "Object does not exist" prima della chiamata
+	if( g->debug ) result += "_bbNullChk(" + obj->translate3( g ) + ")";
+	else result += obj->translate3( g );
 
 	// Then the rest of the arguments
 	for( int i = 0; i < exprs->size(); i++ ){

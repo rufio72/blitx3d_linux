@@ -86,6 +86,8 @@ Codegen_C::Codegen_C(bool debug) : debug(debug), indentLevel(0), stringCounter(0
     header << "extern bb_int_t _bbObjHandle(bb_obj_t obj);\n";
     header << "extern bb_int_t _bbObjToHandle(bb_obj_t obj);\n";
     header << "extern bb_obj_t _bbObjFromHandle(bb_int_t handle, BBObjType *type);\n";
+    header << "extern void _bbNullObjEx(void);\n";
+    header << "static inline bb_obj_t _bbNullChk(bb_obj_t o){ if( !o || !((BBObj*)o)->fields ) _bbNullObjEx(); return o; }\n";
     header << "\n";
     header << "/* Vector functions */\n";
     header << "extern void *_bbVecAlloc(BBVecType *type);\n";

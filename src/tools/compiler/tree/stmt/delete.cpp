@@ -73,7 +73,9 @@ void DeleteNode::translate3( Codegen_C *g ){
 	if( dtor_decl ){
 		std::string tmp = g->newTemp();
 		g->emitLine( "bb_obj_t " + tmp + " = " + obj + ";" );
-		g->emitLine( g->toCSafeName( "f" + dtor_ident ) + "(" + tmp + ");" );
+		// Delete di un Null (lecito in Blitz) o di un oggetto già cancellato
+		// non chiama il destructor; _bbObjDelete li ignora già da sé
+		g->emitLine( "if( " + tmp + " && ((BBObj*)" + tmp + ")->fields ) " + g->toCSafeName( "f" + dtor_ident ) + "(" + tmp + ");" );
 		g->emitLine( "_bbObjDelete(" + tmp + ");" );
 		return;
 	}

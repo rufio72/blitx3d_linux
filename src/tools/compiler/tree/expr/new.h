@@ -9,6 +9,7 @@ struct NewNode : public ExprNode{
 	std::string ident;
 	ExprSeqNode *ctor_args;  // Constructor arguments (may be null)
 	Decl *ctor_decl;         // Constructor function declaration (may be null)
+	std::string ctor_ident;  // simbolo del costruttore trovato (classe propria o antenata)
 	VarNode *sem_temp;       // temp holding the new object while the constructor runs
 
 	NewNode( const std::string &i, ExprSeqNode *args=0 ):ident(i),ctor_args(args),ctor_decl(0),sem_temp(0){}

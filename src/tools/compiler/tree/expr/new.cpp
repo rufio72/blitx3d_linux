@@ -11,11 +11,22 @@ ExprNode *NewNode::semant( Environ *e ){
 	if( !sem_type ) ex( "custom type name not found" );
 	if( sem_type->structType()==0 ) ex( "type is not a custom type" );
 
-	// Check for constructor: classname_constructor (all lowercase)
+	// Cerca <classe>_constructor risalendo la catena superType, come il
+	// destructor in DeleteNode: i campi della madre stanno agli stessi indici
+	// nel figlio, quindi il costruttore della madre vale anche per il figlio
 	if( ctor_args ){
 		StructType *st = sem_type->structType();
-		std::string ctor_name = st->ident + "_constructor";
-		ctor_decl = e->findFunc( ctor_name );
+		ctor_decl = 0;
+		ctor_ident.clear();
+		for( StructType *c = st; c; c = c->superType ){
+			std::string name = c->ident + "_constructor";
+			Decl *d = e->findFunc( name );
+			if( d && (d->kind & DECL_FUNC) ){
+				ctor_decl = d;
+				ctor_ident = name;
+				break;
+			}
+		}
 
 		// If arguments provided, constructor is required
 		if( ctor_args->size() > 0 ){
@@ -67,9 +78,8 @@ TNode *NewNode::translate( Codegen *g ){
 		TNode *args_node = ctor_args->translate( g, f->cfunc );
 		TNode *r = d_new TNode( IR_ARG, sem_temp->load( g ), args_node, 0 );
 
-		// identifiers are lowercased by the toker, so the emitted symbol is
-		// "_f<class>_constructor"
-		TNode *l = global( "_f" + ident + "_constructor" );
+		// simbolo del costruttore trovato in semant (classe propria o antenata)
+		TNode *l = global( "_f" + ctor_ident );
 		TNode *ctor_call = d_new TNode( IR_CALL, l, r, (ctor_args->size() + 1) * 4 );
 
 		return seq( st,seq( ctor_call,sem_temp->load( g ) ) );
@@ -123,7 +133,7 @@ std::string NewNode::translate3( Codegen_C *g ){
 		g->emitLine( "bb_obj_t " + temp + " = " + obj + ";" );
 
 		// Build constructor call
-		std::string ctorName = g->toCSafeName( "f" + ident + "_constructor" );
+		std::string ctorName = g->toCSafeName( "f" + ctor_ident );
 		std::string args = temp;
 		for( int i = 0; i < ctor_args->size(); i++ ){
 			args += ", " + ctor_args->exprs[i]->translate3( g );

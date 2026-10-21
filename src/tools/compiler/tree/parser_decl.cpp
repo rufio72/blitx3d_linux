@@ -155,6 +155,12 @@ DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic, 
 	std::string methodName=parseIdent();
 	std::string tag=parseTypeTag();
 
+	// constructor e destructor ricevono sempre l'oggetto come primo argomento
+	// (NewNode, DeleteNode): non possono essere Static
+	if( isStatic && (methodName=="constructor" || methodName=="destructor") ){
+		ex( methodName+" cannot be a Static Method" );
+	}
+
 	// Method becomes a global function named ClassName_MethodName
 	std::string funcName=className+"_"+methodName;
 

@@ -200,10 +200,15 @@ void Toker::nextline(){
 				continue;
 			}
 
-			// 'This' and 'Self' may be consumed as plain identifiers outside
-			// classes: normalize their case like IDENT so This/this match
-			if( it->second==THIS || it->second==SELF ){
+			// Single-word OOP keywords are contextual: the parser may consume
+			// them as plain identifiers (classic code uses names like 'self',
+			// 'static', 'class'), so normalize their case like IDENT.
+			// 'End Class'/'End Method' stay reserved and are not touched.
+			switch( it->second ){
+			case THIS:case SELF:case SUPER:case CLASS:case METHOD:
+			case EXTENDS:case STATIC:case PRIVATE:case PUBLIC:case PROTECTED:
 				for( int n=from;n<k;++n ) line[n]=tolower(line[n]);
+				break;
 			}
 
 			tokes.push_back( Toke( it->second,from,k ) );

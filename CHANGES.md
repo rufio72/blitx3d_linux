@@ -126,6 +126,24 @@ End Class
 Print MathUtils_Square(5)  ; 25
 ```
 
+#### Contextual Keywords
+
+The OOP keywords are contextual, so classic sources that use them as names
+keep compiling (`Local static = 5`, `Function class(x)`, `t\method`,
+`.private` labels, `Restore static`):
+
+- `Method`, `Static`, `Private`, `Public`, `Protected` and `Extends` are
+  keywords only inside a `Class` body (header and member positions).
+- `Self`, `This` and `Super` are keywords only inside method bodies; there
+  they stay reserved and cannot be used as variable names (field names such
+  as `obj\super` still work).
+- `Class` starts a declaration only at the beginning of a main-program
+  statement followed by a name. Edge case: `class foo` in that position is
+  read as a class declaration, so a classic call to a user function `class`
+  with a single identifier argument needs parentheses: `class(foo)`.
+- `End Class` and `End Method` remain reserved everywhere (a classic
+  `End class` line was already invalid, since `End` takes no arguments).
+
 ## Runtime
 
 ### Graphics

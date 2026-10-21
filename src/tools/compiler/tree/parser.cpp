@@ -4,30 +4,10 @@
 #include "parser.h"
 
 #include "decl/data_decl.h"
-#include "decl/func_decl.h"
-#include "decl/struct_decl.h"
-#include "decl/class_decl.h"
-#include "decl/var_decl.h"
-#include "decl/vector_decl.h"
 
-#include "expr/after.h"
-#include "expr/arith_expr.h"
-#include "expr/before.h"
-#include "expr/bin_expr.h"
-#include "expr/call.h"
-#include "expr/method_call.h"
-#include "expr/cast.h"
-#include "expr/first.h"
-#include "expr/float_const.h"
 #include "expr/int_const.h"
-#include "expr/last.h"
+#include "expr/method_call.h"
 #include "expr/new.h"
-#include "expr/null.h"
-#include "expr/object_cast.h"
-#include "expr/object_handle.h"
-#include "expr/rel_expr.h"
-#include "expr/string_const.h"
-#include "expr/uni_expr.h"
 #include "expr/var_expr.h"
 
 #include "stmt/ass.h"
@@ -50,10 +30,7 @@
 #include "stmt/select.h"
 #include "stmt/while.h"
 
-#include "var/array_var.h"
 #include "var/ident_var.h"
-#include "var/field_var.h"
-#include "var/vector_var.h"
 
 
 #ifdef DEMO
@@ -61,10 +38,6 @@ static const int TEXTLIMIT=16384;
 #else
 static const int TEXTLIMIT=1024*1024-1;
 #endif
-
-enum{
-	STMTS_PROG,STMTS_BLOCK,STMTS_LINE
-};
 
 static bool isTerm( int c ){ return c==':' || c=='\n'; }
 
@@ -134,10 +107,22 @@ static std::string resolvePathCI( const std::string &path ){
 }
 #endif
 
+// The OOP keywords are contextual: Method/Static/Private/Public/Protected/
+// Extends are keywords only inside a Class body, Self/This/Super only inside
+// method bodies, Class only as a main-program declaration 'Class Name'.
+// Everywhere else they are valid identifiers (classic Blitz3D code uses
+// them as variable, function, field and label names).
+bool Parser::identToke( int toke ){
+	switch( toke ){
+	case IDENT:case THIS:case SELF:case SUPER:case CLASS:case METHOD:
+	case EXTENDS:case STATIC:case PRIVATE:case PUBLIC:case PROTECTED:
+		return true;
+	}
+	return false;
+}
+
 std::string Parser::parseIdent(){
-	// 'This' and 'Self' are only keywords inside methods; elsewhere they are
-	// valid identifiers (classic Blitz3D code uses 'self'/'this' as names)
-	if( toker->curr()!=IDENT && toker->curr()!=THIS && toker->curr()!=SELF ) exp( "identifier" );
+	if( !identToke( toker->curr() ) ) exp( "identifier" );
 	std::string t=toker->text();
 	toker->next();
 	return t;
@@ -271,11 +256,10 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			break;
 		case SUPER:
 			// Super\Method() as a statement
+			// (outside methods 'super' is a plain identifier)
+			if( currentClassName.empty() ) goto this_as_ident_stmt;
 			{
 				toker->next();
-				if( currentClassName.empty() ){
-					ex( "Super can only be used inside a method" );
-				}
 				if( toker->curr()!='\\' && toker->curr()!='.' ){
 					exp( "'\\'" );
 				}
@@ -291,6 +275,9 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 				result=d_new ExprStmtNode( method_call );
 			}
 			break;
+		case METHOD:case EXTENDS:case STATIC:
+		case PRIVATE:case PUBLIC:case PROTECTED:
+			// class-member keywords are plain identifiers in statements
 		case IDENT:
 			this_as_ident_stmt:
 			{
@@ -496,7 +483,7 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			}while( toker->curr()==',' );
 			break;
 		case RESTORE:
-			if( toker->next()==IDENT ){
+			if( identToke( toker->next() ) ){
 				result=d_new RestoreNode( toker->text() );toker->next();
 			}else result=d_new RestoreNode( "" );
 			break;
@@ -513,7 +500,9 @@ void Parser::parseStmtSeq( StmtSeqNode *stmts,int scope ){
 			toker->next();structs->push_back( parseStructDecl() );
 			break;
 		case CLASS:
-			if( scope!=STMTS_PROG ) ex( "'Class' can only appear in main program" );
+			// 'Class Name' at main-program level is a class declaration;
+			// any other use (class = 5, class(x), class 7) is an identifier
+			if( scope!=STMTS_PROG || !identToke( toker->lookAhead( 1 ) ) ) goto this_as_ident_stmt;
 			toker->next();structs->push_back( parseClassDecl() );
 			break;
 		case BBCONST:
@@ -591,300 +580,6 @@ std::string Parser::parseSigilTag(){
 	return "";
 }
 
-VarNode *Parser::parseVar(){
-	std::string ident=parseIdent();
-	std::string tag=parseTypeTag();
-	return parseVar( ident,tag );
-}
-
-VarNode *Parser::parseVar( const std::string &ident,const std::string &tag,bool allowDot ){
-	a_ptr<VarNode> var;
-	if( toker->curr()=='(' ){
-		toker->next();
-		a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-		if( toker->curr()!=')' ) exp( "')'" );
-		toker->next();
-		var=d_new ArrayVarNode( ident,tag,exprs.release() );
-	}else var=d_new IdentVarNode( ident,tag );
-
-	for(;;){
-		if( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
-			bool dot=( toker->curr()=='.' );
-			toker->next();
-			std::string ident=parseIdent();
-			// in dot-mode a '.' is a member access, never a type tag
-			std::string tag=dot ? parseSigilTag() : parseTypeTag();
-			ExprNode *expr=d_new VarExprNode( var.release() );
-			var=d_new FieldVarNode( expr,ident,tag );
-		}else if( toker->curr()=='[' ){
-			toker->next();
-			a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-			if( exprs->exprs.size()!=1 || toker->curr()!=']' ) exp( "']'" );
-			toker->next();
-			ExprNode *expr=d_new VarExprNode( var.release() );
-			var=d_new VectorVarNode( expr,exprs.release() );
-		}else{
-			break;
-		}
-	}
-	return var.release();
-}
-
-// Parse a variable access or method call (obj\Method())
-// Returns either VarExprNode or MethodCallNode
-ExprNode *Parser::parseVarOrMethodCall( const std::string &ident,const std::string &tag,bool allowDot ){
-	a_ptr<VarNode> var;
-	if( toker->curr()=='(' ){
-		toker->next();
-		a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-		if( toker->curr()!=')' ) exp( "')'" );
-		toker->next();
-		var=d_new ArrayVarNode( ident,tag,exprs.release() );
-	}else var=d_new IdentVarNode( ident,tag );
-
-	for(;;){
-		if( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
-			bool dot=( toker->curr()=='.' );
-			toker->next();
-			std::string field_ident=parseIdent();
-			// in dot-mode a '.' is a member access, never a type tag
-			std::string field_tag=dot ? parseSigilTag() : parseTypeTag();
-
-			// Check if this is a method call: obj\Method(...)
-			if( toker->curr()=='(' ){
-				// This is a method call!
-				toker->next();
-				a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-				if( toker->curr()!=')' ) exp( "')'" );
-				toker->next();
-
-				// Create VarExprNode from current var
-				ExprNode *obj_expr=d_new VarExprNode( var.release() );
-
-				// Create method call node
-				ExprNode *method_call=d_new MethodCallNode( obj_expr,field_ident,field_tag,exprs.release() );
-
-				// Check for chained method calls or field access
-				while( toker->curr()=='\\' || (allowDot && toker->curr()=='.') ){
-					bool next_dot=( toker->curr()=='.' );
-					toker->next();
-					std::string next_ident=parseIdent();
-					std::string next_tag=next_dot ? parseSigilTag() : parseTypeTag();
-					if( toker->curr()=='(' ){
-						// Chained method call
-						toker->next();
-						a_ptr<ExprSeqNode> next_exprs( parseExprSeq() );
-						if( toker->curr()!=')' ) exp( "')'" );
-						toker->next();
-						method_call=d_new MethodCallNode( method_call,next_ident,next_tag,next_exprs.release() );
-					}else{
-						// Field access after method call - not supported yet
-						ex( "Field access after method call not yet supported" );
-					}
-				}
-				return method_call;
-			}
-
-			// Regular field access
-			ExprNode *expr=d_new VarExprNode( var.release() );
-			var=d_new FieldVarNode( expr,field_ident,field_tag );
-		}else if( toker->curr()=='[' ){
-			toker->next();
-			a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-			if( exprs->exprs.size()!=1 || toker->curr()!=']' ) exp( "']'" );
-			toker->next();
-			ExprNode *expr=d_new VarExprNode( var.release() );
-			var=d_new VectorVarNode( expr,exprs.release() );
-		}else{
-			break;
-		}
-	}
-	return d_new VarExprNode( var.release() );
-}
-
-DeclNode *Parser::parseVarDecl( int kind,bool constant ){
-	int pos=toker->pos();
-	std::string ident=parseIdent();
-	std::string tag=parseTypeTag();
-	DeclNode *d;
-	if( toker->curr()=='[' ){
-		if( constant ) ex( "Blitz arrays may not be constant" );
-		toker->next();
-		a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-		if( exprs->size()!=1 || toker->curr()!=']' ) exp( "']'" );
-		toker->next();
-		d=d_new VectorDeclNode( ident,tag,exprs.release(),kind );
-	}else{
-		ExprNode *expr=0;
-		if( toker->curr()=='=' ){
-			toker->next();expr=parseExpr( false );
-		}else if( constant ) ex( "Constants must be initialized" );
-		d=d_new VarDeclNode( ident,tag,kind,constant,expr );
-	}
-	d->pos=pos;d->file=incfile;
-	return d;
-}
-
-DimNode *Parser::parseArrayDecl(){
-	int pos=toker->pos();
-	std::string ident=parseIdent();
-	std::string tag=parseTypeTag();
-	if( toker->curr()!='(' ) exp( "'('" );
-	toker->next();a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-	if( toker->curr()!=')' ) exp( "')'" );
-	if( !exprs->size() ) ex( "can't have a 0 dimensional array" );
-	toker->next();
-	DimNode *d=d_new DimNode( ident,tag,exprs.release() );
-	arrayDecls[ident]=d;
-	d->pos=pos;
-	return d;
-}
-
-DeclNode *Parser::parseFuncDecl(){
-	int pos=toker->pos();
-	std::string ident=parseIdent();
-	std::string tag=parseTypeTag();
-	if( toker->curr()!='(' ) exp( "'('" );
-	a_ptr<DeclSeqNode> params( d_new DeclSeqNode() );
-	if( toker->next()!=')' ){
-		for(;;){
-			params->push_back( parseVarDecl( DECL_PARAM,false ) );
-			if( toker->curr()!=',' ) break;
-			toker->next();
-		}
-		if( toker->curr()!=')' ) exp( "')'" );
-	}
-	toker->next();
-	a_ptr<StmtSeqNode> stmts( parseStmtSeq( STMTS_BLOCK ) );
-	if( toker->curr()!=ENDFUNCTION ) exp( "'End Function'" );
-	StmtNode *ret=d_new ReturnNode(0);ret->pos=toker->pos();
-	stmts->push_back( ret );toker->next();
-	DeclNode *d=d_new FuncDeclNode( ident,tag,params.release(),stmts.release() );
-	d->pos=pos;d->file=incfile;
-	return d;
-}
-
-DeclNode *Parser::parseStructDecl(){
-	int pos=toker->pos();
-	std::string ident=parseIdent();
-	while( toker->curr()=='\n' ) toker->next();
-	a_ptr<DeclSeqNode> fields( d_new DeclSeqNode() );
-	while( toker->curr()==FIELD ){
-		do{
-			toker->next();
-			fields->push_back( parseVarDecl( DECL_FIELD,false ) );
-		}while( toker->curr()==',' );
-		while( toker->curr()=='\n' ) toker->next();
-	}
-	if( toker->curr()!=ENDTYPE ) exp( "'Field' or 'End Type'" );
-	toker->next();
-	DeclNode *d=d_new StructDeclNode( ident,fields.release() );
-	d->pos=pos;d->file=incfile;
-	return d;
-}
-
-DeclNode *Parser::parseClassDecl(){
-	int pos=toker->pos();
-	std::string ident=parseIdent();
-	std::string superName;
-	// Check for Extends keyword
-	if( toker->curr()==EXTENDS ){
-		toker->next();
-		superName=parseIdent();
-	}
-	while( toker->curr()=='\n' ) toker->next();
-	a_ptr<DeclSeqNode> fields( d_new DeclSeqNode() );
-	a_ptr<DeclSeqNode> methods( d_new DeclSeqNode() );
-	while( toker->curr()==FIELD || toker->curr()==METHOD || toker->curr()==STATIC ||
-	       toker->curr()==PRIVATE || toker->curr()==PUBLIC || toker->curr()==PROTECTED ){
-		// Check for access modifier
-		int accessMod = 0;  // Default is public (no flag)
-		if( toker->curr()==PRIVATE ){
-			accessMod = DECL_PRIVATE;
-			toker->next();
-		}else if( toker->curr()==PUBLIC ){
-			accessMod = DECL_PUBLIC;
-			toker->next();
-		}else if( toker->curr()==PROTECTED ){
-			accessMod = DECL_PROTECTED;
-			toker->next();
-		}
-
-		if( toker->curr()==FIELD ){
-			do{
-				toker->next();
-				DeclNode *fieldDecl = parseVarDecl( DECL_FIELD | accessMod, false );
-				fields->push_back( fieldDecl );
-			}while( toker->curr()==',' );
-		}else if( toker->curr()==STATIC ){
-			toker->next();
-			if( toker->curr()!=METHOD ) exp( "'Method'" );
-			toker->next();
-			DeclNode *methodDecl = parseMethodDecl( ident, true, accessMod );  // isStatic=true
-			methods->push_back( methodDecl );
-		}else if( toker->curr()==METHOD ){
-			toker->next();
-			DeclNode *methodDecl = parseMethodDecl( ident, false, accessMod );  // isStatic=false
-			methods->push_back( methodDecl );
-		}else if( accessMod ){
-			// Access modifier without Field or Method
-			exp( "'Field' or 'Method'" );
-		}
-		while( toker->curr()=='\n' ) toker->next();
-	}
-	if( toker->curr()!=ENDCLASS ) exp( "'Field', 'Method', 'Static', 'Private', 'Public', 'Protected' or 'End Class'" );
-	toker->next();
-	DeclNode *d=d_new ClassDeclNode( ident,superName,fields.release(),methods.release() );
-	d->pos=pos;d->file=incfile;
-	return d;
-}
-
-DeclNode *Parser::parseMethodDecl( const std::string &className, bool isStatic, int accessMod ){
-	int pos=toker->pos();
-	std::string methodName=parseIdent();
-	std::string tag=parseTypeTag();
-
-	// Method becomes a global function named ClassName_MethodName
-	std::string funcName=className+"_"+methodName;
-
-	if( toker->curr()!='(' ) exp( "'('" );
-
-	// Create params
-	a_ptr<DeclSeqNode> params( d_new DeclSeqNode() );
-
-	// Add implicit Self parameter only for non-static methods
-	if( !isStatic ){
-		DeclNode *selfParam=d_new VarDeclNode( "self",className,DECL_PARAM,false,0 );
-		selfParam->pos=pos;selfParam->file=incfile;
-		params->push_back( selfParam );
-	}
-
-	// Parse remaining parameters
-	if( toker->next()!=')' ){
-		for(;;){
-			params->push_back( parseVarDecl( DECL_PARAM,false ) );
-			if( toker->curr()!=',' ) break;
-			toker->next();
-		}
-		if( toker->curr()!=')' ) exp( "')'" );
-	}
-	toker->next();
-
-	// Parse method body - set current class for Super keyword
-	std::string prevClass = currentClassName;
-	currentClassName = className;
-	a_ptr<StmtSeqNode> stmts( parseStmtSeq( STMTS_BLOCK ) );
-	currentClassName = prevClass;  // Restore previous (empty if not nested)
-	if( toker->curr()!=ENDMETHOD ) exp( "'End Method'" );
-	StmtNode *ret=d_new ReturnNode(0);ret->pos=toker->pos();
-	stmts->push_back( ret );toker->next();
-
-	// Create as a regular function declaration with access modifier and owner class
-	DeclNode *d=d_new FuncDeclNode( funcName,tag,params.release(),stmts.release(),accessMod,className );
-	d->pos=pos;d->file=incfile;
-	return d;
-}
-
 IfNode *Parser::parseIf(){
 	a_ptr<ExprNode> expr;
 	a_ptr<StmtSeqNode> stmts,elseOpt;
@@ -911,289 +606,4 @@ IfNode *Parser::parseIf(){
 	}else if( toker->curr()!='\n' ) exp( "end-of-line" );
 
 	return d_new IfNode( expr.release(),stmts.release(),elseOpt.release() );
-}
-
-ExprSeqNode *Parser::parseExprSeq(){
-	a_ptr<ExprSeqNode> exprs( d_new ExprSeqNode() );
-	bool opt=true;
-	while( ExprNode *e=parseExpr( opt ) ){
-		exprs->push_back( e );
-		if( toker->curr()!=',' ) break;
-		toker->next();opt=false;
-	}
-	return exprs.release();
-}
-
-ExprNode *Parser::parseExpr( bool opt ){
-	if( toker->curr()==NOT ){
-		toker->next();
-		ExprNode *expr=parseExpr1( false );
-		return d_new RelExprNode( '=',expr,d_new IntConstNode( 0 ) );
-	}
-	return parseExpr1( opt );
-}
-
-ExprNode *Parser::parseExpr1( bool opt ){
-
-	a_ptr<ExprNode> lhs( parseExpr2( opt ) );
-	if( !lhs ) return 0;
-	for(;;){
-		int c=toker->curr();
-		if( c!=AND && c!=OR && c!=XOR ) return lhs.release();
-		toker->next();
-		// After AND/OR/XOR, allow Not operator by calling parseUnaryNot
-		ExprNode *rhs;
-		if( toker->curr()==NOT ){
-			toker->next();
-			rhs=parseExpr2( false );
-			rhs=d_new RelExprNode( '=',rhs,d_new IntConstNode( 0 ) );
-		}else{
-			rhs=parseExpr2( false );
-		}
-		lhs=d_new BinExprNode( c,lhs.release(),rhs );
-	}
-}
-
-ExprNode *Parser::parseExpr2( bool opt ){
-
-	a_ptr<ExprNode> lhs( parseExpr3( opt ) );
-	if( !lhs ) return 0;
-	for(;;){
-		int c=toker->curr();
-		if( c!='<' && c!='>' && c!='=' && c!=LE && c!=GE && c!=NE ) return lhs.release();
-		toker->next();ExprNode *rhs=parseExpr3( false );
-		lhs=d_new RelExprNode( c,lhs.release(),rhs );
-	}
-}
-
-ExprNode *Parser::parseExpr3( bool opt ){
-
-	a_ptr<ExprNode> lhs( parseExpr4( opt ) );
-	if( !lhs ) return 0;
-	for(;;){
-		int c=toker->curr();
-		if( c!='+' && c!='-' ) return lhs.release();
-		toker->next();ExprNode *rhs=parseExpr4( false );
-		lhs=d_new ArithExprNode( c,lhs.release(),rhs );
-	}
-}
-
-ExprNode *Parser::parseExpr4( bool opt ){
-	a_ptr<ExprNode> lhs( parseExpr5( opt ) );
-	if( !lhs ) return 0;
-	for(;;){
-		int c=toker->curr();
-		if( c!=SHL && c!=SHR && c!=SAR ) return lhs.release();
-		toker->next();ExprNode *rhs=parseExpr5( false );
-		lhs=d_new BinExprNode( c,lhs.release(),rhs );
-	}
-}
-
-ExprNode *Parser::parseExpr5( bool opt ){
-
-	a_ptr<ExprNode> lhs( parseExpr6( opt ) );
-	if( !lhs ) return 0;
-	for(;;){
-		int c=toker->curr();
-		if( c!='*' && c!='/' && c!=MOD ) return lhs.release();
-		toker->next();ExprNode *rhs=parseExpr6( false );
-		lhs=d_new ArithExprNode( c,lhs.release(),rhs );
-	}
-}
-
-ExprNode *Parser::parseExpr6( bool opt ){
-
-	a_ptr<ExprNode> lhs( parseUniExpr( opt ) );
-	if( !lhs ) return 0;
-	for(;;){
-		int c=toker->curr();
-		if( c!='^' ) return lhs.release();
-		toker->next();ExprNode *rhs=parseUniExpr( false );
-		lhs=d_new ArithExprNode( c,lhs.release(),rhs );
-	}
-}
-
-ExprNode *Parser::parseUniExpr( bool opt ){
-
-	ExprNode *result=0;
-	std::string t;
-
-	int c=toker->curr();
-	switch( c ){
-	case BBINT:
-		if( toker->next()=='%' ) toker->next();
-		result=parseUniExpr( false );
-		result=d_new CastNode( result,Type::int_type );
-		break;
-	case BBFLOAT:
-		if( toker->next()=='#' ) toker->next();
-		result=parseUniExpr( false );
-		result=d_new CastNode( result,Type::float_type );
-		break;
-	case BBSTR:
-		if( toker->next()=='$' ) toker->next();
-		result=parseUniExpr( false );
-		result=d_new CastNode( result,Type::string_type );
-		break;
-	case OBJECT:
-		if( toker->next()=='.' ) toker->next();
-		t=parseIdent();
-		result=parseUniExpr( false );
-		result=d_new ObjectCastNode( result,t );
-		break;
-	case BBHANDLE:
-		toker->next();
-		result=parseUniExpr( false );
-		result=d_new ObjectHandleNode( result );
-		break;
-	case BEFORE:
-		toker->next();
-		result=parseUniExpr( false );
-		result=d_new BeforeNode( result );
-		break;
-	case AFTER:
-		toker->next();
-		result=parseUniExpr( false );
-		result=d_new AfterNode( result );
-		break;
-	case '+':case '-':case '~':case ABS:case SGN:
-		toker->next();
-		result=parseUniExpr( false );
-		if( c=='~' ){
-			result=d_new BinExprNode( XOR,result,d_new IntConstNode( -1 ) );
-		}else{
-			result=d_new UniExprNode( c,result );
-		}
-		break;
-	default:
-		result=parsePrimary( opt );
-	}
-	return result;
-}
-
-ExprNode *Parser::parsePrimary( bool opt ){
-
-	a_ptr<ExprNode> expr;
-	std::string t,ident,tag;
-	ExprNode *result=0;
-	size_t n,k;
-
-	switch( toker->curr() ){
-	case '(':
-		toker->next();
-		expr=parseExpr( false );
-		if( toker->curr()!=')' ) exp( "')'" );
-		toker->next();
-		result=expr.release();
-		break;
-	case BBNEW:
-		toker->next();t=parseIdent();
-		// Check for constructor arguments: New ClassName(args)
-		if( toker->curr()=='(' ){
-			toker->next();
-			ExprSeqNode *args = parseExprSeq();
-			if( toker->curr()!=')' ) exp( "')'" );
-			toker->next();
-			result=d_new NewNode( t, args );
-		}else{
-			result=d_new NewNode( t );
-		}
-		break;
-	case FIRST:
-		toker->next();t=parseIdent();
-		result=d_new FirstNode( t );
-		break;
-	case LAST:
-		toker->next();t=parseIdent();
-		result=d_new LastNode( t );
-		break;
-	case BBNULL:
-		result=d_new NullNode();
-		toker->next();
-		break;
-	case INTCONST:
-		result=d_new IntConstNode( atoi( toker->text() ) );
-		toker->next();
-		break;
-	case FLOATCONST:
-		result=d_new FloatConstNode( atof( toker->text() ) );
-		toker->next();
-		break;
-	case STRINGCONST:
-		t=toker->text();
-		result=d_new StringConstNode( t.substr( 1,t.size()-2 ) );
-		toker->next();
-		break;
-	case BINCONST:
-		n=0;t=toker->text();
-		for( k=1;k<t.size();++k ) n=(n<<1)|(t[k]=='1');
-		result=d_new IntConstNode( n );
-		toker->next();
-		break;
-	case HEXCONST:
-		n=0;t=toker->text();
-		for( k=1;k<t.size();++k ) n=(n<<4)|( isdigit(t[k]) ? t[k]&0xf : (t[k]&7)+9 );
-		result=d_new IntConstNode( n );
-		toker->next();
-		break;
-	case PI:
-		result=d_new FloatConstNode( 3.1415926535897932384626433832795f );
-		toker->next();break;
-	case BBTRUE:
-		result=d_new IntConstNode( 1 );
-		toker->next();break;
-	case BBFALSE:
-		result=d_new IntConstNode( 0 );
-		toker->next();break;
-	case THIS:
-	case SELF:
-		// aliases of the method receiver only inside methods; plain
-		// identifiers elsewhere (classic code uses 'self'/'this' as names)
-		if( currentClassName.empty() ) goto this_as_ident_expr;
-		// Self is treated as a variable named "self"
-		toker->next();
-		// Use parseVarOrMethodCall to support self\Method() / self.Method() syntax
-		result=parseVarOrMethodCall( "self","",true );
-		break;
-	case SUPER:
-		// Super\Method() calls the parent class's method
-		{
-			toker->next();
-			if( currentClassName.empty() ){
-				ex( "Super can only be used inside a method" );
-			}
-			if( toker->curr()!='\\' && toker->curr()!='.' ){
-				exp( "'\\'" );
-			}
-			toker->next();
-			std::string method_ident=parseIdent();
-			std::string method_tag=parseTypeTag();
-			if( toker->curr()!='(' ) exp( "'('" );
-			toker->next();
-			a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-			if( toker->curr()!=')' ) exp( "')'" );
-			toker->next();
-			result=d_new SuperMethodCallNode( currentClassName, method_ident, method_tag, exprs.release() );
-		}
-		break;
-	case IDENT:
-		this_as_ident_expr:
-		ident=toker->text();
-		toker->next();tag=parseTypeTag();
-		if( toker->curr()=='(' && arrayDecls.find(ident)==arrayDecls.end() ){
-			//must be a func
-			toker->next();
-			a_ptr<ExprSeqNode> exprs( parseExprSeq() );
-			if( toker->curr()!=')' ) exp( "')'" );
-			toker->next();
-			result=d_new CallNode( ident,tag,exprs.release() );
-		}else{
-			//must be a var - or method call if obj\Method()
-			result=parseVarOrMethodCall( ident,tag );
-		}
-		break;
-	default:
-		if( !opt ) exp( "expression" );
-	}
-	return result;
 }

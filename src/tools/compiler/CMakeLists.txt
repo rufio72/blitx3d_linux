@@ -115,6 +115,7 @@ set(TREE_SOURCES
   tree/label.h
   tree/type.cpp tree/type.h
   tree/parser.cpp tree/parser.h
+  tree/parser_expr.cpp tree/parser_decl.cpp
   tree/toker.cpp tree/toker.h
 )
 

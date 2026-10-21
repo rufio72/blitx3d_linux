@@ -26,6 +26,11 @@ public:
 	ProgNode *parse( const std::string &main );
 	BundleInfo bundle;
 private:
+	// statement sequence scopes (main program, block, single-line If)
+	enum{
+		STMTS_PROG,STMTS_BLOCK,STMTS_LINE
+	};
+
 	std::string incfile;
 	std::set<std::string> included;
 	Toker *toker,*main_toker;
@@ -44,6 +49,8 @@ private:
 	void exp( const std::string &s );
 
 	std::string parseIdent();
+	// true for IDENT and for contextual keywords usable as identifiers
+	static bool identToke( int toke );
 	void parseChar( int c );
 	std::string parseTypeTag();
 
